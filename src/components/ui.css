@@ -290,6 +290,38 @@
   font-size: var(--text-h3);
 }
 
+/* Brand */
+.wordmark {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--pasta);
+  line-height: 1;
+}
+
+.wordmark__noodle {
+  position: absolute;
+  left: 4%;
+  right: 0;
+  bottom: 0;
+  width: 96%;
+  height: 8px;
+}
+
+.brandbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--butter);
+  border-bottom: 1px solid var(--line);
+}
+
 /* Layout */
 .shell {
   min-height: 100%;

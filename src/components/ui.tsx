@@ -72,6 +72,31 @@ export function TopBar({
   );
 }
 
+export function Wordmark({ size = 26 }: { size?: number }) {
+  return (
+    <span className="wordmark" style={{ fontSize: size }}>
+      Linguini
+      <svg className="wordmark__noodle" viewBox="0 0 120 10" fill="none" role="presentation">
+        <path
+          d="M3 6c10-6 18 6 28 1s18-6 28 0 18 6 28 1 10-4 30-2"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
+/** Persistent yellow Linguini wordmark shown at the top of every screen. */
+export function BrandBar() {
+  return (
+    <header className="brandbar">
+      <Wordmark />
+    </header>
+  );
+}
+
 export function ProgressTrail({
   value,
   total,

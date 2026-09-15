@@ -24,12 +24,7 @@ export function Home() {
   return (
     <div className="stack">
       <div className="spread">
-        <div className="row">
-          <strong style={{ fontFamily: "var(--font-display)", color: "var(--tomato)", fontSize: 22 }}>
-            Linguini
-          </strong>
-        </div>
-        <div className="row">
+        <div className="row" style={{ marginLeft: "auto" }}>
           <span className="pill pill--xp">🔥 {learner.streak}</span>
           <span className="pill pill--new">
             {learner.languageFlag} {learner.language}

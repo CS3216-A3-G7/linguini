@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { BookIcon, CameraIcon, HomeIcon, PersonIcon, TrendIcon } from "./icons";
+import { BrandBar } from "./ui";
 
 const items = [
   { to: "/home", label: "Home", Icon: HomeIcon },
@@ -12,6 +13,7 @@ const items = [
 export function AppShell() {
   return (
     <div className="shell">
+      <BrandBar />
       <main className="shell__content">
         <Outlet />
       </main>
@@ -35,6 +37,7 @@ export function AppShell() {
 export function FocusShell() {
   return (
     <div className="shell">
+      <BrandBar />
       <main className="shell__content" style={{ paddingBottom: "var(--space-8)" }}>
         <Outlet />
       </main>
