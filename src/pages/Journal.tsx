@@ -29,7 +29,7 @@ export function Journal() {
   return (
     <div className="stack">
       <h1>My journal</h1>
-      <p className="muted">Write about your day in the words you are learning.</p>
+      <p className="muted">Practice writing about your day</p>
 
       <Button block onClick={() => navigate("/journal/new")}>
         <PlusIcon size={18} /> Write today&apos;s entry
@@ -61,7 +61,7 @@ export function Journal() {
                 </span>
                 <span className="grow stack-2">
                   <strong>{entry.title}</strong>
-                  <span className="small muted">{formatDate(entry.date)}</span>
+                  <span className="small muted align-middle">{formatDate(entry.date)}</span>
                   <span className="small muted">{entry.wordsUsed.length} words used</span>
                 </span>
               </button>
@@ -69,10 +69,6 @@ export function Journal() {
           </div>
         </div>
       ))}
-
-      <Card>
-        <p className="small">A few minutes of review today goes a long way. Keep the streak going.</p>
-      </Card>
     </div>
   );
 }

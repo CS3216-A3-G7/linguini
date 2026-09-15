@@ -35,8 +35,8 @@
 }
 
 .btn--secondary {
-  background: var(--cream);
-  color: var(--teal-dark);
+  background: var(--teal);
+  color: var(white);
   border: var(--stroke) solid var(--teal);
 }
 

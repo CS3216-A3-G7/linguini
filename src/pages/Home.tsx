@@ -23,27 +23,8 @@ export function Home() {
 
   return (
     <div className="stack">
-      <div className="spread">
-        <div className="row" style={{ marginLeft: "auto" }}>
-          <span className="pill pill--xp">🔥 {learner.streak}</span>
-          <span className="pill pill--new">
-            {learner.languageFlag} {learner.language}
-          </span>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Your profile"
-            onClick={() => navigate("/profile")}
-            style={{ border: "2px solid var(--teal-dark)", fontWeight: 800 }}
-          >
-            {learner.name.charAt(0)}
-          </button>
-        </div>
-      </div>
-
       <div className="stack-2">
         <h1>Hello, {learner.name}!</h1>
-        <p className="muted">What would you like to talk about today?</p>
       </div>
 
       <Card lifted>
@@ -89,21 +70,6 @@ export function Home() {
       ) : null}
 
       <Noodle />
-
-      <div className="stat-grid">
-        <button type="button" className="stat" onClick={() => navigate("/progress")}>
-          <div className="stat__value">{xp}</div>
-          <span className="small muted">XP</span>
-        </button>
-        <button type="button" className="stat" onClick={() => navigate("/vocabulary")}>
-          <div className="stat__value">{vocabulary.length}</div>
-          <span className="small muted">Words</span>
-        </button>
-        <button type="button" className="stat" onClick={() => navigate("/journal")}>
-          <div className="stat__value">{journal.length}</div>
-          <span className="small muted">Entries</span>
-        </button>
-      </div>
 
       <div className="stack-2">
         <h2>Or practise with a ready scene</h2>

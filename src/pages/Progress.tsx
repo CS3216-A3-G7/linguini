@@ -31,7 +31,6 @@ export function Progress() {
   return (
     <div className="stack">
       <h1>Progress</h1>
-      <p className="muted">Where you are, what you found, and what comes next.</p>
 
       {activeScene && active ? (
         <Card lifted>

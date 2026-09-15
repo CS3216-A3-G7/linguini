@@ -88,7 +88,6 @@ export function JournalNew() {
 
       <div className="stack-2">
         <span className="field__label">Word suggestions</span>
-        <p className="small muted">Linguini suggests words — the writing stays yours.</p>
         <div className="chip-row">
           {journalWordSuggestions.map((word) => (
             <button
@@ -128,12 +127,6 @@ export function JournalNew() {
           </div>
         </Feedback>
       ) : null}
-
-      <Card plain>
-        <p className="small muted">
-          Saved entries appear in your journal with the words you practised.
-        </p>
-      </Card>
 
       <Button block disabled={!body.trim()} onClick={save}>
         Save entry
