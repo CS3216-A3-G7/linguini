@@ -7,7 +7,7 @@ export function SessionSummary() {
   const navigate = useNavigate();
   const { sceneId } = useParams();
   const scene = getScene(sceneId);
-  const { session, resetSessionGame } = useAppState();
+  const { session, replayGame } = useAppState();
 
   const revisit = scene.items.slice(0, 3);
 
@@ -67,7 +67,7 @@ export function SessionSummary() {
           variant="secondary"
           block
           onClick={() => {
-            resetSessionGame();
+            replayGame();
             navigate(`/practice/${scene.id}/ispy-1`);
           }}
         >

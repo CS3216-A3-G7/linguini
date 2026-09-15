@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Card, Feedback, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, MicIcon } from "../components/icons";
@@ -11,8 +11,12 @@ export function MicTest() {
   const navigate = useNavigate();
   const { sceneId } = useParams();
   const scene = getScene(sceneId);
-  const { setMicReady } = useAppState();
+  const { ensureSession, setMicReady } = useAppState();
   const [state, setState] = useState<MicState>("idle");
+
+  useEffect(() => {
+    ensureSession(scene.id);
+  }, [scene.id, ensureSession]);
 
   const listen = () => {
     setState("listening");

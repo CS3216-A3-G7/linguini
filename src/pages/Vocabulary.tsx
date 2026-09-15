@@ -7,7 +7,7 @@ import type { VocabStatus, WordClass } from "../data/types";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
 
-const statusTabs: { id: VocabStatus; label: string }[] = [
+const statusLabels: { id: VocabStatus; label: string }[] = [
   { id: "new", label: "New" },
   { id: "learning", label: "Learning" },
   { id: "mastered", label: "Mastered" },
@@ -21,6 +21,15 @@ export function Vocabulary() {
   const [wordClass, setWordClass] = useState<WordClass | "all">("all");
   const [topic, setTopic] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+
+  const statusTabs = useMemo(
+    () =>
+      statusLabels.map(({ id, label }) => ({
+        id,
+        label: `${label} (${vocabulary.filter((item) => item.status === id).length})`,
+      })),
+    [vocabulary],
+  );
 
   const topics = useMemo(
     () => ["all", ...Array.from(new Set(vocabulary.map((item) => item.topic)))],
@@ -108,7 +117,11 @@ export function Vocabulary() {
                   <span className="pill pill--new">{item.topic}</span>
                 </div>
               </div>
-              <Button variant="quiet" onClick={() => setVocabStatus(item.id, nextStatus[item.status])}>
+              <Button
+                variant="quiet"
+                aria-label={`Move ${item.word} to ${nextStatus[item.status]}`}
+                onClick={() => setVocabStatus(item.id, nextStatus[item.status])}
+              >
                 Move
               </Button>
             </div>

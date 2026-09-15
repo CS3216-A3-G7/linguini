@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button, Card, Feedback, IconButton, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, MicIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
@@ -10,10 +10,18 @@ export function ISpyPhase2() {
   const navigate = useNavigate();
   const { sceneId } = useParams();
   const scene = getScene(sceneId);
-  const { session, recordRound } = useAppState();
+  const { session, ensureSession, recordRound } = useAppState();
   const [promptIndex, setPromptIndex] = useState(0);
   const [clue, setClue] = useState("");
   const [guessed, setGuessed] = useState(false);
+
+  useEffect(() => {
+    ensureSession(scene.id);
+  }, [scene.id, ensureSession]);
+
+  const ready =
+    session.sceneId === scene.id &&
+    scene.tasks.every((task) => session.completedTaskIds.includes(task.id));
 
   const prompt = scene.prompts[promptIndex];
   const target = scene.items.find((item) => item.id === prompt.itemId);
@@ -21,7 +29,7 @@ export function ISpyPhase2() {
   const send = () => {
     if (!clue.trim()) return;
     setGuessed(true);
-    recordRound(true);
+    recordRound(`${prompt.itemId}-clue`, true);
   };
 
   const next = () => {
@@ -33,6 +41,8 @@ export function ISpyPhase2() {
     setClue("");
     setGuessed(false);
   };
+
+  if (!ready) return <Navigate to={`/practice/${scene.id}/learn`} replace />;
 
   return (
     <div className="stack">

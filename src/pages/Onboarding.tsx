@@ -16,7 +16,7 @@ const minutesOptions = [5, 10, 20];
 
 export function Onboarding() {
   const navigate = useNavigate();
-  const { setLanguage } = useAppState();
+  const { updateLearner } = useAppState();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,7 +30,15 @@ export function Onboarding() {
 
   const next = () => {
     if (step === steps.length - 1) {
-      setLanguage(language.name, language.flag);
+      updateLearner({
+        ...(name.trim() ? { name: name.trim() } : {}),
+        language: language.name,
+        languageFlag: language.flag,
+        goal,
+        dailyMinutes: minutes,
+        cameraOn: camera,
+        micOn: mic,
+      });
       navigate("/home");
       return;
     }

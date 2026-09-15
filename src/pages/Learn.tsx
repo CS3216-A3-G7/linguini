@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Button,
@@ -20,9 +20,13 @@ export function Learn() {
   const navigate = useNavigate();
   const { sceneId } = useParams();
   const scene = getScene(sceneId);
-  const { session, completeTask } = useAppState();
+  const { session, ensureSession, completeTask } = useAppState();
   const [openTask, setOpenTask] = useState<LearningTask | null>(null);
   const [cardIndex, setCardIndex] = useState(0);
+
+  useEffect(() => {
+    ensureSession(scene.id);
+  }, [scene.id, ensureSession]);
 
   const completed = session.completedTaskIds;
   const allDone = scene.tasks.every((task) => completed.includes(task.id));
@@ -129,7 +133,13 @@ export function Learn() {
               </Button>
             ) : (
               <Button block onClick={finishTask}>
-                Mark complete <XpPill xp={openTask.xp} />
+                {completed.includes(openTask.id) ? (
+                  "Done — close"
+                ) : (
+                  <>
+                    Mark complete <XpPill xp={openTask.xp} />
+                  </>
+                )}
               </Button>
             )}
           </div>

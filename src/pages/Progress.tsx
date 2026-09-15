@@ -21,6 +21,10 @@ export function Progress() {
   const [filter, setFilter] = useState<Filter>("all");
 
   const rows = scenarioProgress.filter((item) => filter === "all" || item.status === filter);
+  const board = leaderboard
+    .map((row) => (row.isYou ? { ...row, xp } : row))
+    .sort((a, b) => b.xp - a.xp)
+    .map((row, index) => ({ ...row, rank: index + 1 }));
   const active = scenarioProgress.find((item) => item.status === "in-progress");
   const activeScene = active ? getScene(active.sceneId) : null;
 
@@ -117,7 +121,7 @@ export function Progress() {
         <h2>Leaderboard</h2>
         <Card>
           <div className="list">
-            {leaderboard.map((row) => (
+            {board.map((row) => (
               <div key={row.rank} className="list__row" style={{ cursor: "default" }}>
                 <span className="chip__marker">{row.rank}</span>
                 <span className="grow">

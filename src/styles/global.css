@@ -12,6 +12,7 @@ body,
 
 body {
   margin: 0;
+  overflow-wrap: anywhere;
   background: var(--butter);
   color: var(--ink);
   font-family: var(--font-ui);
@@ -102,6 +103,17 @@ a {
 
 .grow {
   flex: 1;
+  min-width: 0;
+}
+
+.row,
+.spread {
+  min-width: 0;
+}
+
+.row > *,
+.spread > * {
+  min-width: 0;
 }
 
 .center-text {

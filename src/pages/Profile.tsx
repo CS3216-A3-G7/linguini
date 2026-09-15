@@ -1,11 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Mascot, Noodle } from "../components/ui";
-import { languages, learner as seedLearner } from "../data/mock";
+import { languages } from "../data/mock";
 import { useAppState } from "../state/useAppState";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { learner, setLanguage, xp, vocabulary, journal } = useAppState();
+  const { learner, setLanguage, updateLearner, xp, vocabulary, journal } = useAppState();
 
   return (
     <div className="stack">
@@ -37,7 +37,7 @@ export function Profile() {
           <span className="small muted">Entries</span>
         </div>
         <div className="stat">
-          <div className="stat__value">{seedLearner.dailyMinutes}</div>
+          <div className="stat__value">{learner.dailyMinutes}</div>
           <span className="small muted">Min / day</span>
         </div>
       </div>
@@ -65,11 +65,21 @@ export function Profile() {
           <div className="stack-2">
             <label className="spread">
               <span>Microphone for speaking practice</span>
-              <input type="checkbox" defaultChecked aria-label="Microphone permission" />
+              <input
+                type="checkbox"
+                aria-label="Microphone permission"
+                checked={learner.micOn}
+                onChange={(event) => updateLearner({ micOn: event.target.checked })}
+              />
             </label>
             <label className="spread">
               <span>Camera for scene capture</span>
-              <input type="checkbox" defaultChecked aria-label="Camera permission" />
+              <input
+                type="checkbox"
+                aria-label="Camera permission"
+                checked={learner.cameraOn}
+                onChange={(event) => updateLearner({ cameraOn: event.target.checked })}
+              />
             </label>
             <label className="spread">
               <span>Daily practice reminder</span>

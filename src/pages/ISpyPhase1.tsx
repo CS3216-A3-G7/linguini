@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button, Feedback, IconButton, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, SpeakerIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
@@ -11,10 +11,18 @@ export function ISpyPhase1() {
   const navigate = useNavigate();
   const { sceneId } = useParams();
   const scene = getScene(sceneId);
-  const { recordRound } = useAppState();
+  const { session, ensureSession, recordRound } = useAppState();
   const [roundIndex, setRoundIndex] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [showTranslation, setShowTranslation] = useState(false);
+
+  useEffect(() => {
+    ensureSession(scene.id);
+  }, [scene.id, ensureSession]);
+
+  const ready =
+    session.sceneId === scene.id &&
+    scene.tasks.every((task) => session.completedTaskIds.includes(task.id));
 
   const round = scene.rounds[roundIndex];
   const isCorrect = picked === round.answerId;
@@ -23,7 +31,7 @@ export function ISpyPhase1() {
   const choose = (choiceId: string) => {
     if (answered) return;
     setPicked(choiceId);
-    recordRound(choiceId === round.answerId);
+    recordRound(round.id, choiceId === round.answerId);
   };
 
   const next = () => {
@@ -37,6 +45,8 @@ export function ISpyPhase1() {
   };
 
   const answerItem = scene.items.find((item) => item.id === round.answerId);
+
+  if (!ready) return <Navigate to={`/practice/${scene.id}/learn`} replace />;
 
   return (
     <div className="stack">

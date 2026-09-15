@@ -15,6 +15,8 @@ export const learner = {
   languageFlag: "🇪🇸",
   goal: "Chat with neighbours on my street",
   dailyMinutes: 10,
+  cameraOn: true,
+  micOn: true,
 };
 
 export const languages = [

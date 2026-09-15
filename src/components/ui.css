@@ -161,7 +161,10 @@
 
 .tab {
   flex: 1;
+  min-width: 0;
+  padding: 0 var(--space-2);
   min-height: 40px;
+  white-space: nowrap;
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
@@ -209,6 +212,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  white-space: nowrap;
   padding: 2px var(--space-3);
   border-radius: var(--radius-pill);
   font-size: var(--text-label);
@@ -258,8 +262,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 26px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 6px;
   border-radius: var(--radius-pill);
   background: #fffaf2;
@@ -268,6 +272,14 @@
   font-size: var(--text-label);
   font-weight: 800;
   cursor: pointer;
+}
+
+/* Keeps the marker visually small while meeting the 44px touch target. */
+.scene__marker::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: var(--radius-pill);
 }
 
 .scene__marker--active {
@@ -358,7 +370,8 @@
 }
 
 .bottom-nav__item {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   max-width: 96px;
   display: flex;
   flex-direction: column;
@@ -490,6 +503,7 @@
 }
 
 .thumb {
+  flex: 0 0 auto;
   width: 56px;
   height: 56px;
   border-radius: var(--radius-sm);

@@ -12,9 +12,13 @@ export function PracticeAnalysis() {
   const navigate = useNavigate();
   const { sceneId } = useParams();
   const scene = getScene(sceneId);
-  const { learner, addXp } = useAppState();
+  const { learner, ensureSession, awardAnalysis } = useAppState();
   const [done, setDone] = useState(false);
   const [activeItem, setActiveItem] = useState<string | null>(null);
+
+  useEffect(() => {
+    ensureSession(scene.id);
+  }, [scene.id, ensureSession]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDone(true), 1400);
@@ -22,8 +26,8 @@ export function PracticeAnalysis() {
   }, [sceneId]);
 
   useEffect(() => {
-    if (done) addXp(ANALYSIS_XP);
-  }, [done, addXp]);
+    if (done) awardAnalysis(ANALYSIS_XP);
+  }, [done, awardAnalysis]);
 
   const nouns = scene.items.filter((item) => item.wordClass === "noun").length;
   const others = scene.items.length - nouns;
