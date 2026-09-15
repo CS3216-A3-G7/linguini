@@ -17,12 +17,12 @@ const filters: { id: Filter; label: string }[] = [
 
 export function Progress() {
   const navigate = useNavigate();
-  const { xp, vocabulary } = useAppState();
+  const { learner, xp, vocabulary } = useAppState();
   const [filter, setFilter] = useState<Filter>("all");
 
   const rows = scenarioProgress.filter((item) => filter === "all" || item.status === filter);
   const board = leaderboard
-    .map((row) => (row.isYou ? { ...row, xp } : row))
+    .map((row) => (row.isYou ? { ...row, xp, name: learner.name } : row))
     .sort((a, b) => b.xp - a.xp)
     .map((row, index) => ({ ...row, rank: index + 1 }));
   const active = scenarioProgress.find((item) => item.status === "in-progress");
