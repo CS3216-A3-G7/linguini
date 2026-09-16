@@ -1,18 +1,17 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button, Card, Feedback, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, MicIcon } from "../components/icons";
-import { getScene } from "../data/mock";
+import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 
 type MicState = "idle" | "listening" | "working" | "unavailable";
 
 export function MicTest() {
   const navigate = useNavigate();
-  const { sceneId } = useParams();
-  const scene = getScene(sceneId);
-  const { ensureSession, setMicReady } = useAppState();
-  const [state, setState] = useState<MicState>("idle");
+  const scene = useScene();
+  const { ensureSession, setMicReady, learner } = useAppState();
+  const [state, setState] = useState<MicState>(learner.micOn ? "idle" : "unavailable");
 
   useEffect(() => {
     ensureSession(scene.id);
@@ -45,8 +44,8 @@ export function MicTest() {
       <Card>
         <div className="stack-2 center-text">
           <span className="label muted">Test prompt</span>
-          <h2>“¡Hola! Vamos a empezar.”</h2>
-          <span className="small muted">Hello! Let&apos;s start.</span>
+          <h2>{scene.items[0].example}</h2>
+          <span className="small muted">{scene.items[0].exampleTranslation}</span>
         </div>
       </Card>
 
@@ -77,7 +76,7 @@ export function MicTest() {
       ) : null}
 
       <div className="stack-2">
-        <Button block onClick={listen} disabled={state === "listening"}>
+        <Button block onClick={listen} disabled={!learner.micOn || state === "listening"}>
           {state === "listening" ? "Listening…" : "Test my mic"}
         </Button>
         <Button variant="secondary" block onClick={skip}>

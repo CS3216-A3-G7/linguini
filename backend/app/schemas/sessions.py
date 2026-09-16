@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import AwareDatetime, Field, model_validator
@@ -51,6 +51,7 @@ class GenerateSessionPlanRequest(ApiModel):
 
 
 class SessionDetailResponse(ApiModel):
+    demo_state: DemoPracticeState | None = None
     session: Session
     scene_objects: list[SceneObject] = Field(default_factory=list)
     tasks: list[SessionTaskPublic] = Field(default_factory=list)
@@ -62,3 +63,32 @@ class SessionSummaryResponse(ApiModel):
     session: Session
     progress: SessionProgress
     learned_vocabulary_ids: list[UUID] = Field(default_factory=list)
+
+
+class DemoPracticeState(ApiModel):
+    answers: dict[str, str] = Field(default_factory=dict)
+    clues: dict[str, str] = Field(default_factory=dict)
+    scene_id: str
+    completed_task_ids: list[str] = Field(default_factory=list)
+    scored_round_ids: list[str] = Field(default_factory=list)
+    analysis_scored: bool = False
+    rounds_played: int = 0
+    correct_rounds: int = 0
+    session_xp: int = 0
+    mic_ready: bool = False
+
+
+class StoredDemoSession(ApiModel):
+    session: Session
+    state: DemoPracticeState
+    idempotency_key: str | None = None
+
+
+class DemoPracticeEventRequest(ApiModel):
+    kind: Literal["analysis", "task", "round", "clue"]
+    item_id: str | None = None
+    answer_id: str | None = None
+    text: Annotated[str, Field(max_length=1000)] | None = None
+
+
+SessionDetailResponse.model_rebuild()

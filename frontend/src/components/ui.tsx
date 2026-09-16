@@ -117,8 +117,8 @@ export function ProgressTrail({
   );
 }
 
-export function StatusPill({ status }: { status: "new" | "learning" | "mastered" }) {
-  const copy = { new: "New", learning: "Learning", mastered: "Mastered" }[status];
+export function StatusPill({ status }: { status: "new" | "learning" | "familiar" | "mastered" }) {
+  const copy = { new: "New", learning: "Learning", familiar: "Familiar", mastered: "Mastered" }[status];
   return <span className={`pill pill--${status}`}>{copy}</span>;
 }
 

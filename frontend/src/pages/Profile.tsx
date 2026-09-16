@@ -1,16 +1,19 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Mascot, Noodle } from "../components/ui";
-import { languages } from "../data/mock";
+import { languages } from "../config/languages";
 import { useAppState } from "../state/useAppState";
+import type { LanguageProfile } from "../lib/api";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { learner, setLanguage, updateLearner, xp, vocabulary, journal } = useAppState();
-
+  const { learner, setLanguage, saveUser, saveLanguageProfile, profileSaving, profileError, xp, vocabulary, journal, activeProfile } = useAppState();
+  const [name, setName] = useState(learner.name);
+  const [goal, setGoal] = useState(learner.goal);
+  const [saved, setSaved] = useState(false);
   return (
     <div className="stack">
       <h1>Profile</h1>
-
       <Card lifted>
         <div className="row">
           <Mascot size={72} />
@@ -19,10 +22,7 @@ export function Profile() {
             <span className="small muted">
               {learner.languageFlag} {learner.language} · level {learner.level}
             </span>
-            <div className="row">
-              <span className="pill pill--xp">{xp} XP</span>
-              <span className="pill pill--learning">🔥 {learner.streak} day streak</span>
-            </div>
+            <span className="pill pill--xp">{xp} XP</span>
           </div>
         </div>
       </Card>
@@ -37,66 +37,64 @@ export function Profile() {
           <span className="small muted">Entries</span>
         </div>
         <div className="stat">
-          <div className="stat__value">{learner.dailyMinutes}</div>
+          <div className="stat__value">{learner.dailyMinutes ?? "—"}</div>
           <span className="small muted">Min / day</span>
         </div>
       </div>
 
+      {profileSaving ? <p role="status">Saving profile…</p> : null}
+      {profileError ? <p role="alert">{profileError}</p> : null}
+
       <div className="stack-2">
         <h2>Target language</h2>
         <div className="chip-row">
-          {languages.map((option) => (
-            <button
-              key={option.code}
-              type="button"
-              className={`chip${option.name === learner.language ? " chip--selected" : ""}`}
-              aria-pressed={option.name === learner.language}
-              onClick={() => setLanguage(option.name, option.flag)}
-            >
-              {option.flag} {option.name}
-            </button>
-          ))}
+          {languages.map((option) => <button key={option.code} type="button" disabled={profileSaving}
+            className={`chip${option.code === learner.languageCode ? " chip--selected" : ""}`}
+            aria-pressed={option.code === learner.languageCode}
+            onClick={() => { setSaved(false); void setLanguage(option.code); }}>{option.flag} {option.name}</button>)}
         </div>
+        <p className="small muted">Your selection is saved. Scenes, vocabulary, and progress follow this language. Demo content is currently available in Spanish only.</p>
       </div>
 
-      <div className="stack-2">
-        <h2>Preferences</h2>
-        <Card plain>
-          <div className="stack-2">
-            <label className="spread">
-              <span>Microphone for speaking practice</span>
-              <input
-                type="checkbox"
-                aria-label="Microphone permission"
-                checked={learner.micOn}
-                onChange={(event) => updateLearner({ micOn: event.target.checked })}
-              />
-            </label>
-            <label className="spread">
-              <span>Camera for scene capture</span>
-              <input
-                type="checkbox"
-                aria-label="Camera permission"
-                checked={learner.cameraOn}
-                onChange={(event) => updateLearner({ cameraOn: event.target.checked })}
-              />
-            </label>
-            <label className="spread">
-              <span>Daily practice reminder</span>
-              <input type="checkbox" defaultChecked aria-label="Daily reminder" />
-            </label>
-            <label className="spread">
-              <span>Show English translations first</span>
-              <input type="checkbox" aria-label="Translations first" />
-            </label>
-          </div>
-        </Card>
-      </div>
+      <Card>
+        <form className="stack" onSubmit={async (event) => {
+          event.preventDefault();
+          setSaved(await saveUser({ displayName: name.trim(), learningGoal: goal.trim() }));
+        }}>
+          <label className="field">Your name<input className="input" required maxLength={100} value={name} onChange={(event) => { setName(event.target.value); setSaved(false); }} /></label>
+          <label className="field">Your goal<input className="input" maxLength={300} value={goal} onChange={(event) => { setGoal(event.target.value); setSaved(false); }} /></label>
+          <Button disabled={profileSaving || !name.trim()} type="submit">Save profile</Button>
+          {saved && !profileError ? <p role="status">Profile saved.</p> : null}
+        </form>
+      </Card>
 
       <div className="stack-2">
-        <h2>Your goal</h2>
+        <h2>Learning preferences</h2>
         <Card>
-          <p className="small">{learner.goal}</p>
+          <div className="stack">
+            <label className="spread">
+              Level
+              <select disabled={profileSaving || !activeProfile} value={learner.level} onChange={(event) => void saveLanguageProfile({ proficiencyLevel: event.target.value as LanguageProfile["proficiencyLevel"] })}>
+                {["A1", "A2", "B1", "B2", "C1", "C2"].map((level) => <option key={level}>{level}</option>)}
+              </select>
+            </label>
+            <label className="spread">
+              Daily goal
+              <select disabled={profileSaving || !activeProfile} value={learner.dailyMinutes ?? ""} onChange={(event) => void saveLanguageProfile({ dailyGoalMinutes: event.target.value ? Number(event.target.value) : null })}>
+                <option value="">Not set</option>
+                {[...new Set([5, 10, 20, ...(learner.dailyMinutes ? [learner.dailyMinutes] : [])])].sort((a, b) => a - b).map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}
+              </select>
+            </label>
+            <label className="spread">
+              Microphone for speaking practice
+              <input type="checkbox" disabled={profileSaving} checked={learner.micOn} onChange={(event) => void saveUser({ microphoneEnabled: event.target.checked })} />
+            </label>
+            <label className="spread">
+              Camera for scene capture
+              <input type="checkbox" disabled={profileSaving} checked={learner.cameraOn} onChange={(event) => void saveUser({ cameraEnabled: event.target.checked })} />
+            </label>
+            <p className="small muted">Device preferences are saved; browser permission is requested separately when needed.</p>
+          </div>
         </Card>
       </div>
 

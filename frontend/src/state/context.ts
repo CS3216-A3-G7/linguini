@@ -1,8 +1,12 @@
 import { createContext } from "react";
-import type { learner as seedLearner } from "../data/mock";
+import type { useAccount } from "./useAccount";
+import type { usePractice } from "./usePractice";
+import type { JournalDraft } from "../lib/api";
 import type { JournalEntry, VocabRecord, VocabStatus } from "../data/types";
+import type { ProgressResponse } from "../lib/api";
+import type { SceneSummary } from "../data/types";
 
-export type Learner = typeof seedLearner;
+export type Learner = ReturnType<typeof useAccount>["learner"];
 
 export type Session = {
   sceneId: string;
@@ -15,24 +19,25 @@ export type Session = {
   micReady: boolean;
 };
 
-export type AppState = {
+export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof useAccount>, "user" | "activeProfile" | "profileSaving" | "profileError" | "setLanguage" | "saveUser" | "saveLanguageProfile" | "completeOnboarding"> & {
+  scenes: SceneSummary[];
+  scenesLoading: boolean;
+  scenesError: string | null;
+  progress: ProgressResponse | null;
+  progressError: string | null;
+  progressLoading: boolean;
+  vocabularyError: string | null;
+  vocabularyLoading: boolean;
   learner: Learner;
-  updateLearner: (patch: Partial<Learner>) => void;
-  setLanguage: (language: string, flag: string) => void;
   xp: number;
   vocabulary: VocabRecord[];
   setVocabStatus: (id: string, status: VocabStatus) => void;
   journal: JournalEntry[];
-  addJournalEntry: (entry: JournalEntry) => void;
-  session: Session;
-  /** Starts a session for the scene, keeping progress when it is already the active scene. */
-  ensureSession: (sceneId: string) => void;
-  startSession: (sceneId: string) => void;
-  awardAnalysis: (xp: number) => void;
-  completeTask: (taskId: string, xp: number) => void;
-  setMicReady: (ready: boolean) => void;
-  recordRound: (roundId: string, correct: boolean) => void;
-  replayGame: () => void;
+  journalLoading: boolean;
+  journalError: string | null;
+  journalSaving: boolean;
+  journalSaveError: string | null;
+  saveJournalEntry: (draft: JournalDraft, id?: string) => Promise<JournalEntry | null>;
 };
 
 export const AppStateContext = createContext<AppState | null>(null);

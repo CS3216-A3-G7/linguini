@@ -1,0 +1,96 @@
+[
+  {
+    "journal": {
+      "id": "6aa1d1e1-fb47-457f-90e3-ccf3dcef3cbd",
+      "createdAt": "2026-09-14T12:00:00Z",
+      "updatedAt": "2026-09-14T12:00:00Z",
+      "userId": "11111111-1111-4111-8111-111111111111",
+      "languageProfileId": "22222222-2222-4222-8222-222222222222",
+      "localDate": "2026-09-14",
+      "timezone": "UTC",
+      "title": "A walk downtown",
+      "art": "street",
+      "selectedWords": [
+        "la calle",
+        "el árbol",
+        "el autobús",
+        "grande"
+      ],
+      "status": "draft",
+      "currentRevisionId": "5a2d8178-fb2b-4ab3-bcd3-c0e174c138d4"
+    },
+    "revisions": [
+      {
+        "id": "5a2d8178-fb2b-4ab3-bcd3-c0e174c138d4",
+        "createdAt": "2026-09-14T12:00:00Z",
+        "updatedAt": "2026-09-14T12:00:00Z",
+        "journalId": "6aa1d1e1-fb47-457f-90e3-ccf3dcef3cbd",
+        "revisionNumber": 1,
+        "content": "Hoy caminé por una calle tranquila y vi un árbol grande cerca del autobús. El autobús es amarillo y siempre llega tarde.",
+        "createdBy": "user"
+      }
+    ]
+  },
+  {
+    "journal": {
+      "id": "40d24154-e5af-42c8-a794-8d9e6348002b",
+      "createdAt": "2026-09-11T12:00:00Z",
+      "updatedAt": "2026-09-11T12:00:00Z",
+      "userId": "11111111-1111-4111-8111-111111111111",
+      "languageProfileId": "22222222-2222-4222-8222-222222222222",
+      "localDate": "2026-09-11",
+      "timezone": "UTC",
+      "title": "Morning coffee",
+      "art": "cafe",
+      "selectedWords": [
+        "el café",
+        "la taza",
+        "caliente"
+      ],
+      "status": "draft",
+      "currentRevisionId": "19b669d7-152e-440d-a001-14070f0d615e"
+    },
+    "revisions": [
+      {
+        "id": "19b669d7-152e-440d-a001-14070f0d615e",
+        "createdAt": "2026-09-11T12:00:00Z",
+        "updatedAt": "2026-09-11T12:00:00Z",
+        "journalId": "40d24154-e5af-42c8-a794-8d9e6348002b",
+        "revisionNumber": 1,
+        "content": "Pedí un café caliente en la plaza. La taza es pequeña y bonita. El camarero habló despacio conmigo.",
+        "createdBy": "user"
+      }
+    ]
+  },
+  {
+    "journal": {
+      "id": "82f2e615-fc66-42b7-8f9f-41e07ab6bc35",
+      "createdAt": "2026-09-08T12:00:00Z",
+      "updatedAt": "2026-09-08T12:00:00Z",
+      "userId": "11111111-1111-4111-8111-111111111111",
+      "languageProfileId": "22222222-2222-4222-8222-222222222222",
+      "localDate": "2026-09-08",
+      "timezone": "UTC",
+      "title": "At the market",
+      "art": "market",
+      "selectedWords": [
+        "el mercado",
+        "la manzana",
+        "fresco"
+      ],
+      "status": "draft",
+      "currentRevisionId": "948ec5a9-249b-405a-b6bf-99f71b70d2ff"
+    },
+    "revisions": [
+      {
+        "id": "948ec5a9-249b-405a-b6bf-99f71b70d2ff",
+        "createdAt": "2026-09-08T12:00:00Z",
+        "updatedAt": "2026-09-08T12:00:00Z",
+        "journalId": "82f2e615-fc66-42b7-8f9f-41e07ab6bc35",
+        "revisionNumber": 1,
+        "content": "Compré fruta fresca en el mercado. Dos manzanas rojas por un euro.",
+        "createdBy": "user"
+      }
+    ]
+  }
+]

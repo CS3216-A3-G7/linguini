@@ -1,21 +1,26 @@
 from datetime import date
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.api.dependencies import get_active_language, get_learning_service
 from app.api.errors import service_not_implemented
 from app.schemas.base import CursorPage
 from app.schemas.vocabulary import DailyVocabularyItem, DailyVocabularyResponse
+from app.services.learning import LearningService
 
 router = APIRouter(prefix="/me/vocabulary", tags=["vocabulary"])
 
 
 @router.get("", response_model=CursorPage[DailyVocabularyItem])
-async def list_vocabulary(
+def list_vocabulary(
+    service: Annotated[LearningService, Depends(get_learning_service)],
+    language: Annotated[str, Depends(get_active_language)],
     cursor: str | None = None,
     limit: int = Query(default=50, ge=1, le=100),
 ) -> CursorPage[DailyVocabularyItem]:
-    service_not_implemented("List learner vocabulary")
+    return service.list_vocabulary(cursor, limit, language)
 
 
 @router.get("/daily", response_model=DailyVocabularyResponse)

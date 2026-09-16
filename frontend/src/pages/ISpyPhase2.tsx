@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Button, Card, Feedback, IconButton, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, MicIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
-import { getScene } from "../data/mock";
+import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 
 export function ISpyPhase2() {
   const navigate = useNavigate();
-  const { sceneId } = useParams();
-  const scene = getScene(sceneId);
-  const { session, ensureSession, recordRound } = useAppState();
-  const [promptIndex, setPromptIndex] = useState(0);
-  const [clue, setClue] = useState("");
-  const [guessed, setGuessed] = useState(false);
+  const scene = useScene();
+  const { session, ensureSession, recordClue } = useAppState();
+  const [promptIndex, setPromptIndex] = useState(() => {
+    const next = scene.prompts.findIndex((prompt) => !session.scoredRoundIds.includes(`clue:${prompt.id}`));
+    return next < 0 ? scene.prompts.length - 1 : next;
+  });
+  const [clue, setClue] = useState(session.clues[scene.prompts[promptIndex].id] ?? "");
+  const guessed = session.scoredRoundIds.includes(`clue:${scene.prompts[promptIndex].id}`);
 
   useEffect(() => {
     ensureSession(scene.id);
@@ -26,10 +28,9 @@ export function ISpyPhase2() {
   const prompt = scene.prompts[promptIndex];
   const target = scene.items.find((item) => item.id === prompt.itemId);
 
-  const send = () => {
+  const send = async () => {
     if (!clue.trim()) return;
-    setGuessed(true);
-    recordRound(`${prompt.itemId}-clue`, true);
+    await recordClue(prompt.id, clue);
   };
 
   const next = () => {
@@ -39,7 +40,6 @@ export function ISpyPhase2() {
     }
     setPromptIndex((current) => current + 1);
     setClue("");
-    setGuessed(false);
   };
 
   if (!ready) return <Navigate to={`/practice/${scene.id}/learn`} replace />;

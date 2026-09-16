@@ -1,19 +1,27 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { Button, Card, Mascot, Noodle, StatusPill, TopBar, XpPill } from "../components/ui";
-import { getScene } from "../data/mock";
+import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 
 export function SessionSummary() {
   const navigate = useNavigate();
-  const { sceneId } = useParams();
-  const scene = getScene(sceneId);
-  const { session, replayGame } = useAppState();
+  const scene = useScene();
+  const { session, startSession, completeSession, practiceSaving } = useAppState();
+  const finished = scene.tasks.every((task) => session.completedTaskIds.includes(task.id))
+    && scene.rounds.every((round) => session.scoredRoundIds.includes(`round:${round.id}`))
+    && scene.prompts.every((prompt) => session.scoredRoundIds.includes(`clue:${prompt.id}`));
+  useEffect(() => {
+    if (finished && session.status === "inProgress") void completeSession();
+  }, [finished, session.status, completeSession]);
 
   const revisit = scene.items.slice(0, 3);
 
   return (
     <div className="stack">
-      <TopBar title="Session complete" onBack={() => navigate("/home")} />
+      <TopBar title="Session summary" onBack={() => navigate("/home")} />
+      <p className="small muted">{session.status === "completed" ? "Session and XP saved." : "XP is saved after each action."}</p>
+      {!finished ? <Button onClick={() => navigate(`/practice/${scene.id}/learn`)}>Continue unfinished practice</Button> : null}
       <div className="center-text stack-2" style={{ alignItems: "center" }}>
         <Mascot size={120} />
         <h1>Good job!</h1>
@@ -66,12 +74,12 @@ export function SessionSummary() {
         <Button
           variant="secondary"
           block
-          onClick={() => {
-            replayGame();
-            navigate(`/practice/${scene.id}/ispy-1`);
+          disabled={practiceSaving}
+          onClick={async () => {
+            if (await startSession(scene.id)) navigate(`/practice/${scene.id}/analysis`);
           }}
         >
-          Replay I-Spy
+          Practise again
         </Button>
         <Button variant="quiet" block onClick={() => navigate("/home")}>
           Back home

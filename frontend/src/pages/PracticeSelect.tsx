@@ -3,14 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { Button, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, CameraIcon, UploadIcon } from "../components/icons";
 import { SceneArt } from "../components/SceneArt";
-import { scenes } from "../data/mock";
+import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
 
 export function PracticeSelect() {
   const navigate = useNavigate();
-  const { startSession } = useAppState();
+  const { startSession, scenes, learner } = useAppState();
   const [selected, setSelected] = useState<string | null>(null);
   const [captured, setCaptured] = useState(false);
+
+  if (!scenes.length) return <div className="stack"><h1>Choose your environment</h1><SceneCatalogStatus /></div>;
 
   const capture = () => {
     setCaptured(true);
@@ -52,7 +54,7 @@ export function PracticeSelect() {
           </>
         )}
         <div className="row">
-          <Button onClick={capture}>
+          <Button onClick={capture} disabled={!learner.cameraOn}>
             <CameraIcon size={18} /> Open camera
           </Button>
           <Button variant="secondary" onClick={capture}>

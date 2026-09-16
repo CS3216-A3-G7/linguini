@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Button, Feedback, IconButton, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, SpeakerIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
-import { getScene } from "../data/mock";
+import { useScene } from "../state/useScene";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
 
 export function ISpyPhase1() {
   const navigate = useNavigate();
-  const { sceneId } = useParams();
-  const scene = getScene(sceneId);
+  const scene = useScene();
   const { session, ensureSession, recordRound } = useAppState();
-  const [roundIndex, setRoundIndex] = useState(0);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [roundIndex, setRoundIndex] = useState(() => {
+    const next = scene.rounds.findIndex((round) => !session.scoredRoundIds.includes(`round:${round.id}`));
+    return next < 0 ? scene.rounds.length - 1 : next;
+  });
+  const picked = session.answers[scene.rounds[roundIndex].id] ?? null;
   const [showTranslation, setShowTranslation] = useState(false);
 
   useEffect(() => {
@@ -28,10 +30,9 @@ export function ISpyPhase1() {
   const isCorrect = picked === round.answerId;
   const answered = picked !== null;
 
-  const choose = (choiceId: string) => {
+  const choose = async (choiceId: string) => {
     if (answered) return;
-    setPicked(choiceId);
-    recordRound(round.id, choiceId === round.answerId);
+    await recordRound(round.id, choiceId);
   };
 
   const next = () => {
@@ -40,7 +41,6 @@ export function ISpyPhase1() {
       return;
     }
     setRoundIndex((current) => current + 1);
-    setPicked(null);
     setShowTranslation(false);
   };
 
@@ -62,7 +62,7 @@ export function ISpyPhase1() {
       <div className="card card--lifted stack-2">
         <div className="spread">
           <span className="label muted">Linguini says</span>
-          <IconButton label="Hear the clue" onClick={() => speak(round.clue)}>
+          <IconButton label="Hear the clue" onClick={() => speak(round.clue, scene.languageCode)}>
             <SpeakerIcon />
           </IconButton>
         </div>

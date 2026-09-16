@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button, Card, Feedback, ProgressTrail, TopBar, XpPill } from "../components/ui";
 import { ArrowRightIcon, CheckIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
-import { getScene } from "../data/mock";
+import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 
 const ANALYSIS_XP = 12;
 
 export function PracticeAnalysis() {
   const navigate = useNavigate();
-  const { sceneId } = useParams();
-  const scene = getScene(sceneId);
+  const scene = useScene();
   const { learner, ensureSession, awardAnalysis } = useAppState();
   const [done, setDone] = useState(false);
   const [activeItem, setActiveItem] = useState<string | null>(null);
@@ -23,10 +22,10 @@ export function PracticeAnalysis() {
   useEffect(() => {
     const timer = window.setTimeout(() => setDone(true), 1400);
     return () => window.clearTimeout(timer);
-  }, [sceneId]);
+  }, [scene.id]);
 
   useEffect(() => {
-    if (done) awardAnalysis(ANALYSIS_XP);
+    if (done) void awardAnalysis();
   }, [done, awardAnalysis]);
 
   const nouns = scene.items.filter((item) => item.wordClass === "noun").length;

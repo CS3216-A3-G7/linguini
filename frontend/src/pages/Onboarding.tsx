@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Noodle, ProgressTrail, TopBar } from "../components/ui";
 import { CameraIcon, CheckIcon, MicIcon } from "../components/icons";
-import { languages } from "../data/mock";
+import { languages } from "../config/languages";
 import { useAppState } from "../state/useAppState";
 
 const goals = [
@@ -16,30 +16,25 @@ const minutesOptions = [5, 10, 20];
 
 export function Onboarding() {
   const navigate = useNavigate();
-  const { updateLearner } = useAppState();
+  const { learner, completeOnboarding, profileSaving, profileError } = useAppState();
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [language, setLocalLanguage] = useState(languages[0]);
-  const [goal, setGoal] = useState(goals[0]);
-  const [minutes, setMinutes] = useState(10);
-  const [mic, setMic] = useState(true);
-  const [camera, setCamera] = useState(true);
+  const [name, setName] = useState(learner.name);
+  const [language, setLocalLanguage] = useState(languages.find((option) => option.code === learner.languageCode) ?? languages[0]);
+  const [goal, setGoal] = useState(learner.goal || goals[0]);
+  const [minutes, setMinutes] = useState(learner.dailyMinutes ?? 10);
+  const [mic, setMic] = useState(learner.micOn);
+  const [camera, setCamera] = useState(learner.cameraOn);
 
-  const steps = ["Create account", "Choose a language", "Set your goal", "Permissions"];
+  const steps = ["Your profile", "Choose a language", "Set your goal", "Permissions"];
 
-  const next = () => {
+  const next = async () => {
     if (step === steps.length - 1) {
-      updateLearner({
-        ...(name.trim() ? { name: name.trim() } : {}),
-        language: language.name,
-        languageFlag: language.flag,
-        goal,
-        dailyMinutes: minutes,
-        cameraOn: camera,
-        micOn: mic,
+      const saved = await completeOnboarding(language.code, minutes, {
+        displayName: name.trim() || learner.name,
+        learningGoal: goal, cameraEnabled: camera, microphoneEnabled: mic,
+        onboardingCompleted: true,
       });
-      navigate("/home");
+      if (saved) navigate("/home");
       return;
     }
     setStep((current) => current + 1);
@@ -64,21 +59,8 @@ export function Onboarding() {
               id="ob-name"
               className="input"
               value={name}
-              placeholder="Roshni"
+              placeholder="Alex"
               onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label className="field__label" htmlFor="ob-email">
-              Email
-            </label>
-            <input
-              id="ob-email"
-              className="input"
-              type="email"
-              value={email}
-              placeholder="you@example.com"
-              onChange={(event) => setEmail(event.target.value)}
             />
           </div>
         </div>
@@ -185,7 +167,9 @@ export function Onboarding() {
         </div>
       )}
 
-      <Button block onClick={next}>
+      {profileError ? <p role="alert">{profileError}</p> : null}
+      {profileSaving ? <p role="status">Saving profile…</p> : null}
+      <Button block disabled={profileSaving} onClick={next}>
         {step === steps.length - 1 ? "Start learning" : "Continue"}
       </Button>
     </div>

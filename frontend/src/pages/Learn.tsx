@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Button,
   Card,
@@ -11,15 +11,14 @@ import {
 } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, SpeakerIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
-import { getScene } from "../data/mock";
+import { useScene } from "../state/useScene";
 import type { LearningTask } from "../data/types";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
 
 export function Learn() {
   const navigate = useNavigate();
-  const { sceneId } = useParams();
-  const scene = getScene(sceneId);
+  const scene = useScene();
   const { session, ensureSession, completeTask } = useAppState();
   const [openTask, setOpenTask] = useState<LearningTask | null>(null);
   const [cardIndex, setCardIndex] = useState(0);
@@ -36,10 +35,9 @@ export function Learn() {
     setCardIndex(0);
   };
 
-  const finishTask = () => {
+  const finishTask = async () => {
     if (!openTask) return;
-    completeTask(openTask.id, openTask.xp);
-    setOpenTask(null);
+    if (await completeTask(openTask.id)) setOpenTask(null);
   };
 
   const items = openTask ? scene.items.filter((item) => openTask.itemIds.includes(item.id)) : [];
@@ -107,7 +105,7 @@ export function Learn() {
                     {card.wordClass}
                     {card.gender ? ` · ${card.gender}` : ""}
                   </span>
-                  <IconButton label={`Hear ${card.word}`} onClick={() => speak(card.word)}>
+                  <IconButton label={`Hear ${card.word}`} onClick={() => speak(card.word, scene.languageCode)}>
                     <SpeakerIcon />
                   </IconButton>
                 </div>

@@ -1,36 +1,49 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Feedback, TopBar } from "../components/ui";
-import { CameraIcon, UploadIcon } from "../components/icons";
+import { Button, Feedback, TopBar } from "../components/ui";
+import { UploadIcon } from "../components/icons";
 import { SceneArt } from "../components/SceneArt";
 import type { SceneArtId } from "../components/SceneArt";
-import { journalWordSuggestions, scenes } from "../data/mock";
+import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
+import { getTodayJournal } from "../lib/api";
+import { useApiData } from "../lib/useApiData";
+import type { JournalEntry } from "../data/types";
 
 export function JournalNew() {
+  const { data, loading, error } = useApiData(getTodayJournal);
+  if (loading) return <p role="status">Loading today's journal…</p>;
+  if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
+  return <JournalForm key={data.entry?.id ?? "new"} entry={data.entry} date={data.date} />;
+}
+
+export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | null; date: string; onSaved?: (entry: JournalEntry) => void }) {
   const navigate = useNavigate();
-  const { addJournalEntry } = useAppState();
-  const today = new Date();
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [art, setArt] = useState<SceneArtId | null>(null);
-  const [selectedWords, setSelectedWords] = useState<string[]>([]);
+  const { saveJournalEntry, journalSaving, journalSaveError, scenes, vocabulary, vocabularyError, vocabularyLoading, learner, activeProfile } = useAppState();
+  const sameLanguage = !entry || entry.languageProfileId === activeProfile?.id;
+  const journalWordSuggestions = sameLanguage ? vocabulary.map((item) => item.word) : [];
+  const today = new Date(`${date}T12:00:00`);
+  const [title, setTitle] = useState(entry?.title ?? "");
+  const [body, setBody] = useState(entry?.body ?? "");
+  const [art, setArt] = useState<SceneArtId | null>(entry?.art ?? null);
+  const [selectedWords, setSelectedWords] = useState<string[]>(entry?.wordsUsed ?? []);
 
   const toggleWord = (word: string) =>
     setSelectedWords((current) =>
       current.includes(word) ? current.filter((item) => item !== word) : [...current, word],
     );
 
-  const save = () => {
-    addJournalEntry({
-      id: `j-${today.getTime()}`,
-      date: today.toISOString().slice(0, 10),
+  const save = async () => {
+    const saved = await saveJournalEntry({
       title: title.trim() || "Today's entry",
       art: art ?? "street",
       body: body.trim(),
       wordsUsed: selectedWords,
-    });
-    navigate("/journal");
+    }, entry?.id);
+    if (saved) {
+      if (onSaved) onSaved(saved);
+      else navigate(`/journal/${saved.id}`);
+    }
   };
 
   return (
@@ -39,7 +52,7 @@ export function JournalNew() {
         title={today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
         onBack={() => navigate("/journal")}
       />
-      <h1>Add a new entry</h1>
+      <h1>{entry ? "Edit journal entry" : "Today's journal"}</h1>
 
       <div className="field">
         <label className="field__label" htmlFor="entry-title">
@@ -47,6 +60,7 @@ export function JournalNew() {
         </label>
         <input
           id="entry-title"
+          maxLength={200}
           className="input"
           placeholder="A walk downtown"
           value={title}
@@ -55,7 +69,7 @@ export function JournalNew() {
       </div>
 
       <div className="stack-2">
-        <span className="field__label">Photo</span>
+        <span className="field__label">Illustration</span>
         {art ? (
           <div className="scene">
             <SceneArt scene={art} className="scene__art" />
@@ -65,10 +79,11 @@ export function JournalNew() {
             <span style={{ color: "var(--teal-dark)" }}>
               <UploadIcon size={40} />
             </span>
-            <p className="small muted">Upload an image or pick one from today</p>
+            <p className="small muted">Choose a scene illustration below</p>
           </div>
         )}
         <div className="grid-3">
+          <SceneCatalogStatus />
           {scenes.slice(0, 3).map((scene) => (
             <button
               key={scene.id}
@@ -81,14 +96,15 @@ export function JournalNew() {
             </button>
           ))}
         </div>
-        <Button variant="secondary" onClick={() => setArt("street")}>
-          <CameraIcon size={18} /> Take a photo
-        </Button>
       </div>
 
       <div className="stack-2">
         <span className="field__label">Word suggestions</span>
+        {!sameLanguage ? <p className="small muted">Select this entry's language in Profile to see matching word suggestions.</p> : null}
         <div className="chip-row">
+          {vocabularyLoading ? <p role="status">Loading words…</p> : null}
+          {vocabularyError ? <p role="alert">{vocabularyError}</p> : null}
+          {!vocabularyLoading && !vocabularyError && !journalWordSuggestions.length ? <p className="small muted">No saved words for {learner.language} yet.</p> : null}
           {journalWordSuggestions.map((word) => (
             <button
               key={word}
@@ -109,6 +125,7 @@ export function JournalNew() {
         </label>
         <textarea
           id="entry-body"
+          maxLength={20000}
           className="textarea"
           placeholder="Hoy caminé por la calle y vi un árbol grande…"
           value={body}
@@ -128,7 +145,9 @@ export function JournalNew() {
         </Feedback>
       ) : null}
 
-      <Button block disabled={!body.trim()} onClick={save}>
+      {journalSaveError ? <p role="alert">{journalSaveError}</p> : null}
+      {journalSaving ? <p role="status">Saving journal…</p> : null}
+      <Button block disabled={journalSaving || !body.trim()} onClick={save}>
         Save entry
       </Button>
     </div>

@@ -1,5 +1,5 @@
 /** Plays the word with the browser voice when available; silently no-ops otherwise. */
-export function speak(text: string, lang = "es-ES") {
+export function speak(text: string, lang: string) {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = lang;

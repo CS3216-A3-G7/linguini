@@ -22,6 +22,9 @@ from app.schemas.vocabulary import DailyVocabularyItem
 
 
 class Journal(EntityModel):
+    title: Annotated[str, Field(max_length=200)] = "Today's entry"
+    art: Literal["street", "cafe", "market", "bedroom", "kitchen", "park"] = "street"
+    selected_words: list[NonEmptyText] = Field(default_factory=list)
     user_id: UUID
     language_profile_id: UUID
     local_date: date
@@ -100,9 +103,17 @@ class JournalWordMention(EntityModel):
 
 class UpsertTodayJournalRequest(ApiModel):
     language_profile_id: UUID
+    title: Annotated[str, Field(max_length=200)] = "Today's entry"
+    art: Literal["street", "cafe", "market", "bedroom", "kitchen", "park"] = "street"
+    selected_words: list[NonEmptyText] = Field(default_factory=list)
+    content: Annotated[str, Field(min_length=1, max_length=20_000)] | None = None
 
 
 class UpdateJournalRequest(ApiModel):
+    title: Annotated[str, Field(max_length=200)] | None = None
+    art: Literal["street", "cafe", "market", "bedroom", "kitchen", "park"] | None = None
+    selected_words: list[NonEmptyText] | None = None
+    content: Annotated[str, Field(min_length=1, max_length=20_000)] | None = None
     audio_media_asset_id: UUID | None = None
 
 

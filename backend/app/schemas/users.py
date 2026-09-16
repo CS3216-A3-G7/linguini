@@ -23,6 +23,9 @@ def _validate_timezone(value: str | None) -> str | None:
 
 
 class User(EntityModel):
+    learning_goal: Annotated[str, Field(max_length=300)] = ""
+    microphone_enabled: bool = True
+    camera_enabled: bool = True
     auth_provider_id: NonEmptyText
     display_name: Annotated[str, Field(min_length=1, max_length=100)]
     email: Annotated[str, Field(max_length=320)] | None = None
@@ -33,6 +36,9 @@ class User(EntityModel):
 
 
 class UpdateUserRequest(ApiModel):
+    learning_goal: Annotated[str, Field(max_length=300)] | None = None
+    microphone_enabled: bool | None = None
+    camera_enabled: bool | None = None
     display_name: Annotated[str, Field(min_length=1, max_length=100)] | None = None
     timezone: str | None = None
     onboarding_completed: bool | None = None

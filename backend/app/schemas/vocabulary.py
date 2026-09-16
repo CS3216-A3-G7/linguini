@@ -61,6 +61,9 @@ class VocabularyEncounter(EntityModel):
 
 
 class DailyVocabularyItem(ApiModel):
+    # Optional presentation metadata for the originating demo scene.
+    scene_id: str | None = None
+    topic: str | None = None
     vocabulary: VocabularyItem
     translation: VocabularyTranslation | None = None
     progress: UserVocabularyProgress | None = None

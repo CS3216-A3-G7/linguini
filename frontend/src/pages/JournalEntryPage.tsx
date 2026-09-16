@@ -1,14 +1,26 @@
 import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useState } from "react";
+import { getJournal } from "../lib/api";
+import { useApiData } from "../lib/useApiData";
+import { JournalForm } from "./JournalNew";
 import { Button, Card, TopBar } from "../components/ui";
 import { PlusIcon } from "../components/icons";
 import { SceneArt } from "../components/SceneArt";
 import { useAppState } from "../state/useAppState";
 
 export function JournalEntryPage() {
-  const navigate = useNavigate();
   const { entryId } = useParams();
-  const { journal, vocabulary } = useAppState();
-  const entry = journal.find((item) => item.id === entryId);
+  return <JournalEntryDetail key={entryId} entryId={entryId ?? ""} />;
+}
+
+function JournalEntryDetail({ entryId }: { entryId: string }) {
+  const navigate = useNavigate();
+  const { vocabulary } = useAppState();
+  const load = useCallback((signal?: AbortSignal) => getJournal(entryId ?? "", signal), [entryId]);
+  const { data: entry, setData, loading, error } = useApiData(load);
+  const [editing, setEditing] = useState(false);
+  if (loading) return <p role="status">Loading journal entry…</p>;
+  if (error) return <p role="alert">{error} Reload to retry.</p>;
 
   if (!entry) {
     return (
@@ -20,6 +32,7 @@ export function JournalEntryPage() {
   }
 
   const linked = vocabulary.filter((record) => entry.wordsUsed.includes(record.word));
+  if (editing) return <JournalForm key={entry.id} entry={entry} date={entry.date} onSaved={(saved) => { setData(saved); setEditing(false); }} />;
 
   return (
     <div className="stack">
@@ -32,6 +45,7 @@ export function JournalEntryPage() {
         onBack={() => navigate("/journal")}
       />
       <h1>{entry.title}</h1>
+      <Button variant="secondary" onClick={() => setEditing(true)}>Edit entry</Button>
       <div className="scene">
         <SceneArt scene={entry.art} className="scene__art" />
       </div>

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button, Card, IconButton, StatusPill, Tabs } from "../components/ui";
 import { FilterIcon, SpeakerIcon } from "../components/icons";
 import { SceneArt } from "../components/SceneArt";
-import { getScene } from "../data/mock";
+import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import type { VocabStatus, WordClass } from "../data/types";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
@@ -10,13 +10,12 @@ import { useAppState } from "../state/useAppState";
 const statusLabels: { id: VocabStatus; label: string }[] = [
   { id: "new", label: "New" },
   { id: "learning", label: "Learning" },
+  { id: "familiar", label: "Familiar" },
   { id: "mastered", label: "Mastered" },
 ];
 
-const wordClasses: (WordClass | "all")[] = ["all", "noun", "adjective", "preposition", "phrase"];
-
 export function Vocabulary() {
-  const { vocabulary, setVocabStatus } = useAppState();
+  const { vocabulary, setVocabStatus, vocabularyLoading, vocabularyError, scenes, learner } = useAppState();
   const [status, setStatus] = useState<VocabStatus>("learning");
   const [wordClass, setWordClass] = useState<WordClass | "all">("all");
   const [topic, setTopic] = useState<string>("all");
@@ -43,9 +42,19 @@ export function Vocabulary() {
       (topic === "all" || item.topic === topic),
   );
 
+  const wordClasses: (WordClass | "all")[] = ["all", ...new Set(vocabulary.map((item) => item.wordClass))];
+
+  if (vocabularyError) {
+    return <div className="stack"><h1>My vocabulary</h1><p role="alert">{vocabularyError} Reload to retry.</p></div>;
+  }
+  if (vocabularyLoading) {
+    return <div className="stack"><h1>My vocabulary</h1><p role="status">Loading vocabulary…</p></div>;
+  }
+
   const nextStatus: Record<VocabStatus, VocabStatus> = {
     new: "learning",
     learning: "mastered",
+    familiar: "mastered",
     mastered: "new",
   };
 
@@ -58,6 +67,8 @@ export function Vocabulary() {
         </IconButton>
       </div>
       <p className="muted">Everything you found in your own scenes.</p>
+      <SceneCatalogStatus />
+      <p className="small muted">Moving words changes this session only. Status resets on reload.</p>
 
       <Tabs options={statusTabs} value={status} onChange={setStatus} />
 
@@ -96,16 +107,16 @@ export function Vocabulary() {
 
       <div className="list">
         {rows.map((item) => {
-          const scene = getScene(item.sceneId);
+          const scene = scenes.find((candidate) => candidate.id === item.sceneId);
           return (
             <div key={item.id} className="list__row" style={{ cursor: "default" }}>
               <span className="thumb">
-                <SceneArt scene={scene.art} />
+                {scene ? <SceneArt scene={scene.art} /> : <span aria-label="Word">Aa</span>}
               </span>
               <div className="grow stack-2">
                 <div className="row">
                   <strong>{item.word}</strong>
-                  <IconButton label={`Hear ${item.word}`} onClick={() => speak(item.word)}>
+                  <IconButton label={`Hear ${item.word}`} onClick={() => speak(item.word, learner.languageCode)}>
                     <SpeakerIcon size={18} />
                   </IconButton>
                 </div>
@@ -132,7 +143,7 @@ export function Vocabulary() {
       {rows.length === 0 ? (
         <Card>
           <p className="small">
-            Nothing in this list yet. Play a scene and the words you meet land here.
+            No words in this list for {learner.language} yet.
           </p>
         </Card>
       ) : null}

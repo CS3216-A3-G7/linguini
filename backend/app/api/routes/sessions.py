@@ -1,19 +1,25 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
+from app.api.dependencies import get_practice_service
 from app.api.errors import service_not_implemented
 from app.schemas.media import ReviewSceneObjectsRequest
 from app.schemas.sessions import (
     CreateSessionRequest,
+    DemoPracticeEventRequest,
     GenerateSessionPlanRequest,
     Session,
     SessionDetailResponse,
     SessionSummaryResponse,
 )
 from app.schemas.tasks import SessionTaskPublic
+from app.services.practice import PracticeService
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+PracticeServiceDep = Annotated[PracticeService, Depends(get_practice_service)]
 
 
 @router.post(
@@ -21,18 +27,27 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
     response_model=SessionDetailResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def create_session(request: CreateSessionRequest) -> SessionDetailResponse:
-    service_not_implemented("Create and analyze session")
+def create_session(
+    request: CreateSessionRequest, service: PracticeServiceDep
+) -> SessionDetailResponse:
+    return service.create(request)
 
 
 @router.get("/active", response_model=SessionDetailResponse | None)
-async def get_active_session() -> SessionDetailResponse | None:
-    service_not_implemented("Get active session")
+def get_active_session(service: PracticeServiceDep) -> SessionDetailResponse | None:
+    return service.active()
 
 
 @router.get("/{session_id}", response_model=SessionDetailResponse)
-async def get_session(session_id: UUID) -> SessionDetailResponse:
-    service_not_implemented("Get session")
+def get_session(session_id: UUID, service: PracticeServiceDep) -> SessionDetailResponse:
+    return service.get(session_id)
+
+
+@router.post("/{session_id}/demo-events", response_model=SessionDetailResponse)
+def record_demo_event(
+    session_id: UUID, request: DemoPracticeEventRequest, service: PracticeServiceDep
+) -> SessionDetailResponse:
+    return service.record(session_id, request)
 
 
 @router.patch("/{session_id}/scene-objects", response_model=SessionDetailResponse)
@@ -64,8 +79,8 @@ async def get_session_summary(session_id: UUID) -> SessionSummaryResponse:
 
 
 @router.post("/{session_id}/complete", response_model=Session)
-async def complete_session(session_id: UUID) -> Session:
-    service_not_implemented("Complete session")
+def complete_session(session_id: UUID, service: PracticeServiceDep) -> Session:
+    return service.complete(session_id)
 
 
 @router.post("/{session_id}/abandon", response_model=Session)

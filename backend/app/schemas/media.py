@@ -126,6 +126,10 @@ class ReviewSceneObjectsRequest(ApiModel):
 
 
 class PreloadedScene(ApiModel):
+    language_code: NonEmptyText = "es"
+    scene_id: NonEmptyText
+    art: Literal["street", "cafe", "market", "bedroom", "kitchen", "park"]
+    language: NonEmptyText
     media_asset: MediaAsset
     title: NonEmptyText
     description: str | None = None

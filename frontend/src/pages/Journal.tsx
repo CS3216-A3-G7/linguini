@@ -18,7 +18,9 @@ function monthOf(date: string) {
 
 export function Journal() {
   const navigate = useNavigate();
-  const { journal } = useAppState();
+  const { journal, journalLoading, journalError } = useAppState();
+  if (journalLoading) return <p role="status">Loading journal history…</p>;
+  if (journalError) return <p role="alert">{journalError} Reload to retry.</p>;
 
   const months = journal.reduce<Record<string, typeof journal>>((groups, entry) => {
     const key = monthOf(entry.date);

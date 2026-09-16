@@ -1,7 +1,7 @@
 import type { SceneArtId } from "../components/SceneArt";
 
-export type WordClass = "noun" | "adjective" | "preposition" | "phrase";
-export type VocabStatus = "new" | "learning" | "mastered";
+export type WordClass = "noun" | "verb" | "adjective" | "adverb" | "pronoun" | "preposition" | "conjunction" | "interjection" | "determiner" | "phrase" | "other";
+export type VocabStatus = "new" | "learning" | "familiar" | "mastered";
 export type Gender = "la" | "el" | null;
 
 export type LanguageItem = {
@@ -28,7 +28,7 @@ export type LearningTask = {
   xp: number;
   /** language items this task teaches */
   itemIds: string[];
-  note?: string;
+  note?: string | null;
 };
 
 export type ISpyChoice = {
@@ -54,6 +54,8 @@ export type Phase2Prompt = {
 };
 
 export type Scene = {
+  mediaAssetId: string;
+  languageCode: string;
   id: string;
   title: string;
   blurb: string;
@@ -64,6 +66,8 @@ export type Scene = {
   rounds: ISpyRound[];
   prompts: Phase2Prompt[];
 };
+
+export type SceneSummary = Pick<Scene, "id" | "mediaAssetId" | "title" | "blurb" | "art" | "language" | "languageCode">;
 
 export type ScenarioProgress = {
   sceneId: string;
@@ -86,6 +90,7 @@ export type VocabRecord = {
 };
 
 export type JournalEntry = {
+  languageProfileId: string;
   id: string;
   date: string;
   title: string;

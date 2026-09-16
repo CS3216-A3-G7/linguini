@@ -1,7 +1,9 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
+from app.api.dependencies import get_journal_service
 from app.api.errors import service_not_implemented
 from app.schemas.journals import (
     AddJournalMediaRequest,
@@ -17,28 +19,38 @@ from app.schemas.journals import (
     UpdateJournalRequest,
     UpsertTodayJournalRequest,
 )
+from app.services.journals import JournalService
 
 router = APIRouter(tags=["journals"])
 
+JournalServiceDep = Annotated[JournalService, Depends(get_journal_service)]
+
+
+@router.get("/journals", response_model=list[JournalDetailResponse])
+def list_journals(service: JournalServiceDep) -> list[JournalDetailResponse]:
+    return service.list_entries()
+
 
 @router.get("/journal/today/context", response_model=JournalTodayContextResponse)
-async def get_today_journal_context() -> JournalTodayContextResponse:
-    service_not_implemented("Get today's journal context")
+def get_today_journal_context(service: JournalServiceDep) -> JournalTodayContextResponse:
+    return service.today()
 
 
 @router.put("/journal/today", response_model=Journal)
-async def upsert_today_journal(request: UpsertTodayJournalRequest) -> Journal:
-    service_not_implemented("Create or resume today's journal")
+def upsert_today_journal(request: UpsertTodayJournalRequest, service: JournalServiceDep) -> Journal:
+    return service.upsert_today(request)
 
 
 @router.get("/journals/{journal_id}", response_model=JournalDetailResponse)
-async def get_journal(journal_id: UUID) -> JournalDetailResponse:
-    service_not_implemented("Get journal")
+def get_journal(journal_id: UUID, service: JournalServiceDep) -> JournalDetailResponse:
+    return service.get_entry(journal_id)
 
 
 @router.patch("/journals/{journal_id}", response_model=Journal)
-async def update_journal(journal_id: UUID, request: UpdateJournalRequest) -> Journal:
-    service_not_implemented("Update journal")
+def update_journal(
+    journal_id: UUID, request: UpdateJournalRequest, service: JournalServiceDep
+) -> Journal:
+    return service.update(journal_id, request)
 
 
 @router.post(
@@ -46,9 +58,7 @@ async def update_journal(journal_id: UUID, request: UpdateJournalRequest) -> Jou
     response_model=JournalMedia,
     status_code=status.HTTP_201_CREATED,
 )
-async def add_journal_media(
-    journal_id: UUID, request: AddJournalMediaRequest
-) -> JournalMedia:
+async def add_journal_media(journal_id: UUID, request: AddJournalMediaRequest) -> JournalMedia:
     service_not_implemented("Add journal media")
 
 
@@ -65,10 +75,12 @@ async def remove_journal_media(journal_id: UUID, media_asset_id: UUID) -> None:
     response_model=JournalRevision,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_journal_revision(
-    journal_id: UUID, request: CreateJournalRevisionRequest
+def create_journal_revision(
+    journal_id: UUID,
+    request: CreateJournalRevisionRequest,
+    service: JournalServiceDep,
 ) -> JournalRevision:
-    service_not_implemented("Create journal revision")
+    return service.add_revision(journal_id, request.content)
 
 
 @router.post(
@@ -99,7 +111,5 @@ async def reject_journal_suggestion(suggestion_id: UUID) -> JournalSuggestion:
 
 
 @router.post("/journals/{journal_id}/complete", response_model=Journal)
-async def complete_journal(
-    journal_id: UUID, request: CompleteJournalRequest
-) -> Journal:
+async def complete_journal(journal_id: UUID, request: CompleteJournalRequest) -> Journal:
     service_not_implemented("Complete journal")

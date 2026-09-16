@@ -36,7 +36,7 @@
 
 .btn--secondary {
   background: var(--teal);
-  color: var(white);
+  color: white;
   border: var(--stroke) solid var(--teal);
 }
 

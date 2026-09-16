@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Mascot, TopBar } from "../components/ui";
-import { getScene, scenarioProgress } from "../data/mock";
+import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
+import { useAppState } from "../state/useAppState";
 
 export function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("roshni@linguini.app");
+  const [email, setEmail] = useState("alex@linguini.app");
   const [password, setPassword] = useState("noodles");
-  const resumable = getScene(scenarioProgress[0].sceneId);
+  const { progress, scenes } = useAppState();
+  const active = progress?.scenarios.find((row) => row.status === "in-progress");
+  const resumable = scenes.find((scene) => scene.id === active?.sceneId);
 
   return (
     <div className="stack">
@@ -52,7 +55,8 @@ export function Login() {
           Log in
         </Button>
       </form>
-      <Card>
+      <SceneCatalogStatus />
+      {resumable ? <Card>
         <div className="stack-2">
           <span className="label muted">Interrupted session</span>
           <strong>{resumable.title}</strong>
@@ -61,7 +65,7 @@ export function Login() {
             Resume after login
           </Button>
         </div>
-      </Card>
+      </Card> : null}
       <p className="small muted center-text">
         New here?{" "}
         <button type="button" className="btn btn--quiet" onClick={() => navigate("/onboarding")}>

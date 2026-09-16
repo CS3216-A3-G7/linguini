@@ -1,5 +1,8 @@
-from fastapi import APIRouter, status
+from typing import Annotated
 
+from fastapi import APIRouter, Depends, status
+
+from app.api.dependencies import get_active_language, get_scene_service
 from app.api.errors import service_not_implemented
 from app.schemas.media import (
     ConfirmMediaUploadRequest,
@@ -8,6 +11,8 @@ from app.schemas.media import (
     MediaAsset,
     PreloadedScene,
 )
+from app.schemas.scenes import PreloadedSceneDetail
+from app.services.scenes import SceneService
 
 router = APIRouter(tags=["media"])
 
@@ -27,5 +32,17 @@ async def confirm_upload(request: ConfirmMediaUploadRequest) -> MediaAsset:
 
 
 @router.get("/preloaded-scenes", response_model=list[PreloadedScene])
-async def list_preloaded_scenes() -> list[PreloadedScene]:
-    service_not_implemented("List preloaded scenes")
+def list_preloaded_scenes(
+    service: Annotated[SceneService, Depends(get_scene_service)],
+    language: Annotated[str, Depends(get_active_language)],
+) -> list[PreloadedScene]:
+    return service.list_scenes(language)
+
+
+@router.get("/preloaded-scenes/{scene_id}", response_model=PreloadedSceneDetail)
+def get_preloaded_scene(
+    scene_id: str,
+    service: Annotated[SceneService, Depends(get_scene_service)],
+    language: Annotated[str, Depends(get_active_language)],
+) -> PreloadedSceneDetail:
+    return service.get_scene(scene_id, language)

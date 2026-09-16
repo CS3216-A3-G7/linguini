@@ -17,6 +17,7 @@ import { Journal } from "./pages/Journal";
 import { JournalEntryPage } from "./pages/JournalEntryPage";
 import { JournalNew } from "./pages/JournalNew";
 import { Profile } from "./pages/Profile";
+import { SceneRoute } from "./components/SceneRoute";
 
 export default function App() {
   return (
@@ -25,12 +26,14 @@ export default function App() {
         <Route path="/" element={<Welcome />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/practice/:sceneId/analysis" element={<PracticeAnalysis />} />
-        <Route path="/practice/:sceneId/mic-test" element={<MicTest />} />
-        <Route path="/practice/:sceneId/learn" element={<Learn />} />
-        <Route path="/practice/:sceneId/ispy-1" element={<ISpyPhase1 />} />
-        <Route path="/practice/:sceneId/ispy-2" element={<ISpyPhase2 />} />
-        <Route path="/practice/:sceneId/summary" element={<SessionSummary />} />
+        <Route path="/practice/:sceneId" element={<SceneRoute />}>
+          <Route path="analysis" element={<PracticeAnalysis />} />
+          <Route path="mic-test" element={<MicTest />} />
+          <Route path="learn" element={<Learn />} />
+          <Route path="ispy-1" element={<ISpyPhase1 />} />
+          <Route path="ispy-2" element={<ISpyPhase2 />} />
+          <Route path="summary" element={<SessionSummary />} />
+        </Route>
       </Route>
       <Route element={<AppShell />}>
         <Route path="/home" element={<Home />} />

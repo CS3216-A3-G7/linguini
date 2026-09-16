@@ -1,15 +1,17 @@
+
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Noodle, ProgressTrail } from "../components/ui";
 import { ArrowRightIcon, BookIcon, CameraIcon, MicIcon, TrendIcon } from "../components/icons";
 import { SceneArt } from "../components/SceneArt";
-import { getScene, scenarioProgress, scenes } from "../data/mock";
+import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
+
 
 export function Home() {
   const navigate = useNavigate();
-  const { learner, xp, vocabulary, journal, startSession } = useAppState();
-  const resume = scenarioProgress.find((item) => item.status === "in-progress");
-  const resumeScene = resume ? getScene(resume.sceneId) : null;
+  const { startSession, progress, progressLoading, progressError, scenes, user, learner } = useAppState();
+  const resume = progress?.scenarios.find((item) => item.status === "in-progress");
+  const resumeScene = scenes.find((scene) => scene.id === resume?.sceneId);
   const suggestions = scenes.slice(0, 3);
 
   const begin = (sceneId?: string) => {
@@ -24,7 +26,8 @@ export function Home() {
   return (
     <div className="stack">
       <div className="stack-2">
-        <h1>Hello, {learner.name}!</h1>
+        {user ? <h1>Hello, {user.displayName}!</h1> : <h1>Welcome</h1>}
+        <p className="small muted">Learning {learner.language} · {learner.dailyMinutes ?? "No"} min daily goal</p>
       </div>
 
       <Card lifted>
@@ -45,6 +48,8 @@ export function Home() {
         </div>
       </Card>
 
+      {progressLoading ? <p role="status" className="small muted">Loading your active scenario…</p> : null}
+      {progressError ? <p role="alert" className="small">{progressError} Reload to retry.</p> : null}
       {resumeScene && resume ? (
         <Card plain>
           <div className="stack-2">
@@ -73,6 +78,7 @@ export function Home() {
 
       <div className="stack-2">
         <h2>Or practise with a ready scene</h2>
+        <SceneCatalogStatus />
         <div className="grid-3">
           {suggestions.map((scene) => (
             <button

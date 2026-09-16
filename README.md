@@ -6,14 +6,22 @@ then play I-Spy with Linguini in both directions.
 ## Current status
 
 This repository contains a React/TypeScript frontend and a FastAPI/Pydantic backend.
-The frontend runs independently with mock data and in-memory state, which resets on
-refresh. Scene images are SVG placeholders; word playback uses browser speech synthesis
+The home greeting loads the demo user from `GET /api/v1/me`. Progress and saved
+vocabulary load from `/api/v1/me/progress` and `/api/v1/me/vocabulary`.
+Scene summaries load from `/api/v1/preloaded-scenes`; practice routes fetch
+`/api/v1/preloaded-scenes/{sceneId}` before rendering their scene content.
+The shared user and active language profile load from `/api/v1/me` and
+`/api/v1/me/language-profiles`. Profile edits and onboarding now save to backend
+JSON. Language selection filters scenes, vocabulary, and progress on the backend.
+Practice actions and XP now persist in backend JSON, as do journal entries and
+edits. Vocabulary status changes remain in memory. Scene images are SVG placeholders; word playback uses browser speech synthesis
 when available.
 
 The backend defines API routes and validated request/response schemas. Its health
-endpoint works; business route handlers return `501 Not Implemented` when reached.
-Authentication, persistence, AI services, and frontend API integration are not
-implemented yet. No API keys or database configuration are needed for this prototype.
+endpoint, user/profile edits, progress, vocabulary, scenes, demo sessions, and journal reads/writes work; remaining business route handlers return
+`501 Not Implemented` when reached. The demo user is read from a temporary JSON
+file through a service and repository. Authentication, databases, and AI services
+are not implemented. No API keys or database configuration are needed.
 
 ## Repository layout
 
@@ -22,7 +30,7 @@ linguini/
 |-- frontend/             React app and frontend tooling
 |   |-- src/
 |   |   |-- components/   Shared UI, app shells, and scene rendering
-|   |   |-- data/         Mock data and frontend types
+|   |   |-- data/         Frontend types (mock.ts removed)
 |   |   |-- lib/          Browser speech helper
 |   |   |-- pages/        Screen components
 |   |   |-- state/        In-memory learner and session state
@@ -54,11 +62,13 @@ From the repository root:
 ```sh
 cd frontend
 npm ci
+cp .env.example .env.local
 npm run dev
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`.
-The backend does not need to be running to explore the current UI.
+In PowerShell, use `Copy-Item .env.example .env.local` for the copy command.
+Open `http://localhost:5173/home` to load the demo greeting. The backend must be
+running for this request; failures appear on screen without a hardcoded fallback.
 
 ### Backend
 
@@ -69,12 +79,104 @@ from the repository root:
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+Copy-Item .env.example .env.local
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --env-file .env.local
 ```
 
 Skip environment creation if `backend/.venv` already exists.
 Open `http://127.0.0.1:8000/docs` for the API documentation.
 See the [backend README](backend/README.md) for macOS/Linux setup and API details.
+
+`frontend/.env.local` sets `VITE_API_BASE_URL=http://127.0.0.1:8000` (the server
+origin, without `/api/v1`). Restart Vite after changing it. `backend/.env.local`
+sets `CORS_ALLOWED_ORIGINS=http://localhost:5173` and `DEMO_USER_ID` to the UUID
+in `backend/app/data/users.json`. Allowed origins are comma-separated; include
+the exact frontend origin, including port, if using another host or Vite port.
+Restart the backend after changing its environment. Both example files use
+matching defaults. No authentication is performed; `/me` always uses this demo ID.
+
+If port 8000 is occupied by another project, add `--port 8001` to the backend
+command and set `VITE_API_BASE_URL=http://127.0.0.1:8001` in `frontend/.env.local`.
+Open `/progress` or `/vocabulary` to see the integrated screens. Restart the
+backend after code changes unless it was started with `--reload`.
+
+`backend/app/data/progress.json` owns starting XP, scenario progress, and the
+leaderboard. `backend/app/data/vocabulary.json` owns saved words, translations,
+and learning statuses. Both are validated against Pydantic models on each read.
+Reload the browser after editing the JSON. The vocabulary client fetches every
+page; filters run locally. Loading and API errors are visible, with no mock-data
+fallback. Vocabulary status changes remain temporary in-memory changes.
+Journal history lives in `backend/app/data/journals.json`. Scene metadata,
+word markers, and bundled demo practice content now live in
+`backend/app/data/scenes.json`. The SVG artwork remains in frontend components.
+
+The catalog retains the existing scene slugs, so practice links still work. Open
+`/practice` to select a scene or `/practice/calle-mayor/analysis` to test a direct
+link. Loading, empty catalog, missing scene, and API failures have visible states.
+Unknown scene IDs no longer fall back to the first scene. Reload the browser after
+editing scene JSON. Scene content remains static; camera uploads and AI generation
+are not implemented. Demo multiple-choice answers are scored on the backend.
+
+## Profile and language selection
+
+Open `/profile` to edit your name and learning goal, choose a target language,
+or change its level and daily minutes. Selections save immediately; name/goal
+edits use **Save profile**. Microphone and camera preferences are persisted too,
+but browser permissions remain separate. Onboarding configures this same demo
+user; it does not create an authenticated account.
+
+`backend/app/data/language_profiles.json` stores language profiles keyed by user
+ID, with at most one active profile per user. Switching language reloads content
+and reloads practice state for that profile. Your selection and per-language goals survive
+refreshes and backend restarts. Name changes appear in Home and the leaderboard.
+
+The demo contains Spanish content only. Choose French (or another language) to
+see empty scenes/vocabulary/progress, then return to Spanish to restore its data.
+Spanish practice URLs return 404 while another language is active. Speech playback
+uses the content language, and journal word suggestions use the filtered vocabulary.
+Changing the level saves a preference; adaptive difficulty/content generation is
+not implemented.
+
+## Saved practice and journals
+
+XP previously reset because it was only incremented in React state. Practice now
+creates/resumes a backend session and saves each action through
+`POST /api/v1/sessions/{id}/demo-events`. `progress.json` stores sessions and XP
+together, keyed by user and target language. The backend calculates awards; retries
+of the same action in the same session award XP once. Reloads and backend restarts
+preserve totals, completed tasks, answers, and clues. **Practise again** explicitly
+starts a new session. The browser stores only the session ID, not XP.
+
+Analysis earns 12 XP, tasks use the scene's configured XP, multiple-choice answers
+earn 5 XP when correct or 2 when incorrect, and a submitted clue earns 2 participation
+XP. Free-form clue feedback is still scripted; it is not AI evaluation. Failed saves
+show a retry action. The summary marks finished practice complete on the backend.
+
+Journal history/detail and Save entry use the backend. Entries retain their language
+profile; history includes this user's entries across languages. One journal per
+user/local day is enforced using the user's timezone. Editing appends a revision;
+retrying identical text does not append another revision. Journal illustrations
+are selected scene artwork, not photo uploads. Journals do not award XP.
+
+With existing dependencies and `.env.local` files, run in separate PowerShell terminals:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --env-file .env.local
+```
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Use `VITE_API_BASE_URL=http://localhost:8000` in `frontend/.env.local` and
+`CORS_ALLOWED_ORIGINS=http://localhost:5173` in `backend/.env.local`.
+Open `http://localhost:5173/practice`, complete an action, then refresh `/progress`
+to verify saved XP. Restart Vite after changing its environment configuration.
+
+Run one backend process while using JSON persistence. Writes use a process lock
+and atomic file replacement; this is not a multi-worker database substitute.
 
 ## Frontend commands
 
@@ -117,5 +219,5 @@ These are frontend routes, separate from the backend's `/api/v1` endpoints.
 
 Use [design.md](design.md) and `frontend/src/styles/tokens.css` for visual conventions.
 Frontend types and backend schemas are currently maintained separately. When
-connecting the apps, align the UI with the backend OpenAPI contracts and configure
-the API URL plus a development proxy or backend CORS support; neither is configured yet.
+connecting additional screens, align the UI with the backend OpenAPI contracts
+and use the centralized request helper in `frontend/src/lib/api.ts`.
