@@ -1,0 +1,102 @@
+import type { SceneArtId } from "../components/SceneArt";
+
+export type WordClass = "noun" | "adjective" | "preposition" | "phrase";
+export type VocabStatus = "new" | "learning" | "mastered";
+export type Gender = "la" | "el" | null;
+
+export type LanguageItem = {
+  id: string;
+  word: string;
+  translation: string;
+  wordClass: WordClass;
+  gender: Gender;
+  marker: number;
+  /** marker position on the scene, in percent of width/height */
+  x: number;
+  y: number;
+  example: string;
+  exampleTranslation: string;
+};
+
+export type LearningTaskKind = "word" | "gender" | "syntax" | "phrase";
+
+export type LearningTask = {
+  id: string;
+  kind: LearningTaskKind;
+  title: string;
+  summary: string;
+  xp: number;
+  /** language items this task teaches */
+  itemIds: string[];
+  note?: string;
+};
+
+export type ISpyChoice = {
+  id: string;
+  label: string;
+};
+
+export type ISpyRound = {
+  id: string;
+  clue: string;
+  clueTranslation: string;
+  answerId: string;
+  choices: ISpyChoice[];
+  encouragement: string;
+};
+
+export type Phase2Prompt = {
+  id: string;
+  itemId: string;
+  suggestions: string[];
+  llmGuess: string;
+  feedback: string;
+};
+
+export type Scene = {
+  id: string;
+  title: string;
+  blurb: string;
+  art: SceneArtId;
+  language: string;
+  items: LanguageItem[];
+  tasks: LearningTask[];
+  rounds: ISpyRound[];
+  prompts: Phase2Prompt[];
+};
+
+export type ScenarioProgress = {
+  sceneId: string;
+  status: "in-progress" | "completed" | "mastered";
+  spokenItems: number;
+  totalItems: number;
+  level: string;
+};
+
+export type VocabRecord = {
+  id: string;
+  word: string;
+  translation: string;
+  wordClass: WordClass;
+  gender: Gender;
+  status: VocabStatus;
+  topic: string;
+  sceneId: string;
+  example: string;
+};
+
+export type JournalEntry = {
+  id: string;
+  date: string;
+  title: string;
+  art: SceneArtId;
+  body: string;
+  wordsUsed: string[];
+};
+
+export type LeaderboardRow = {
+  rank: number;
+  name: string;
+  xp: number;
+  isYou?: boolean;
+};
