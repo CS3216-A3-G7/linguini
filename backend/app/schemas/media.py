@@ -1,0 +1,132 @@
+"""Media upload and scene-understanding schemas."""
+
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Annotated, Literal
+from uuid import UUID
+
+from pydantic import AwareDatetime, Field, field_validator, model_validator
+
+from app.schemas.base import ApiModel, EntityModel, NonEmptyText, UnitScore
+from app.schemas.enums import MediaSource, MediaType, SceneObjectSelectionStatus
+
+
+class MediaAsset(EntityModel):
+    owner_user_id: UUID | None = None
+    media_type: MediaType
+    source: MediaSource
+    storage_key: NonEmptyText
+    mime_type: NonEmptyText
+    width: Annotated[int, Field(gt=0)] | None = None
+    height: Annotated[int, Field(gt=0)] | None = None
+    duration_ms: Annotated[int, Field(gt=0)] | None = None
+    captured_at: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def validate_media_metadata(self) -> MediaAsset:
+        if self.media_type is MediaType.IMAGE and self.duration_ms is not None:
+            raise ValueError("image assets cannot have durationMs")
+        if self.media_type is MediaType.AUDIO and (
+            self.width is not None or self.height is not None
+        ):
+            raise ValueError("audio assets cannot have image dimensions")
+        if self.source is MediaSource.PRELOADED and self.owner_user_id is not None:
+            raise ValueError("preloaded assets cannot have an ownerUserId")
+        return self
+
+
+class BoundingBox(ApiModel):
+    """Normalized image coordinates in the inclusive range 0..1."""
+
+    x: Annotated[Decimal, Field(ge=0, le=1)]
+    y: Annotated[Decimal, Field(ge=0, le=1)]
+    width: Annotated[Decimal, Field(gt=0, le=1)]
+    height: Annotated[Decimal, Field(gt=0, le=1)]
+
+    @model_validator(mode="after")
+    def remain_inside_image(self) -> BoundingBox:
+        if self.x + self.width > 1:
+            raise ValueError("x + width must not exceed 1")
+        if self.y + self.height > 1:
+            raise ValueError("y + height must not exceed 1")
+        return self
+
+
+class SceneObject(EntityModel):
+    session_id: UUID
+    media_asset_id: UUID
+    detected_label: NonEmptyText
+    confirmed_label: Annotated[str, Field(min_length=1, max_length=200)] | None = None
+    selection_status: SceneObjectSelectionStatus = SceneObjectSelectionStatus.SUGGESTED
+    bounding_box: BoundingBox
+    confidence: UnitScore | None = None
+    vocabulary_item_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def corrected_objects_need_a_label(self) -> SceneObject:
+        if (
+            self.selection_status is SceneObjectSelectionStatus.CORRECTED
+            and self.confirmed_label is None
+        ):
+            raise ValueError("corrected scene objects require confirmedLabel")
+        return self
+
+
+class CreateUploadUrlRequest(ApiModel):
+    file_name: Annotated[str, Field(min_length=1, max_length=255)]
+    media_type: MediaType
+    mime_type: NonEmptyText
+
+
+class CreateUploadUrlResponse(ApiModel):
+    upload_url: NonEmptyText
+    storage_key: NonEmptyText
+    expires_in_seconds: Annotated[int, Field(gt=0)]
+
+
+class ConfirmMediaUploadRequest(ApiModel):
+    storage_key: NonEmptyText
+    media_type: MediaType
+    source: MediaSource
+    mime_type: NonEmptyText
+    width: Annotated[int, Field(gt=0)] | None = None
+    height: Annotated[int, Field(gt=0)] | None = None
+    duration_ms: Annotated[int, Field(gt=0)] | None = None
+    captured_at: AwareDatetime | None = None
+
+
+class SceneObjectReviewItem(ApiModel):
+    scene_object_id: UUID
+    selection_status: SceneObjectSelectionStatus
+    confirmed_label: Annotated[str, Field(min_length=1, max_length=200)] | None = None
+
+    @model_validator(mode="after")
+    def validate_correction(self) -> SceneObjectReviewItem:
+        if (
+            self.selection_status is SceneObjectSelectionStatus.CORRECTED
+            and self.confirmed_label is None
+        ):
+            raise ValueError("corrected objects require confirmedLabel")
+        return self
+
+
+class ReviewSceneObjectsRequest(ApiModel):
+    objects: Annotated[list[SceneObjectReviewItem], Field(min_length=1)]
+
+    @field_validator("objects")
+    @classmethod
+    def unique_scene_objects(
+        cls, value: list[SceneObjectReviewItem]
+    ) -> list[SceneObjectReviewItem]:
+        object_ids = [item.scene_object_id for item in value]
+        if len(object_ids) != len(set(object_ids)):
+            raise ValueError("each scene object may appear only once")
+        return value
+
+
+class PreloadedScene(ApiModel):
+    media_asset: MediaAsset
+    title: NonEmptyText
+    description: str | None = None
+    difficulty: Literal["beginner", "intermediate", "advanced"] = "beginner"
