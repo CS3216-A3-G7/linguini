@@ -96,8 +96,29 @@ Vocabulary reads use the active target language and its source-language translat
 in one database snapshot. Missing translations remain null. Trusted backend events
 use `PostgresVocabularyRepository.record_encounter` to atomically record an event
 and update counters. Stable IDs make event retries idempotent; conflicting reuse is
-rejected. Mastery/status are not inferred from counters. Encounter session/task IDs
-still lack foreign keys pending reconciliation of historical references.
+rejected. Mastery/status are not inferred from counters. Composite foreign keys
+require every encounter's session to belong to its user, and its task to belong
+to that exact session. Missing parents and cross-user/session references are
+rejected even for direct SQL writes. These constraints establish ownership and
+existence; they do not prove an answer was evaluated or a task was completed.
+
+The `20260918100000_enforce_encounter_parents` migration validates existing history
+and fails atomically if invalid references exist. Before deploying it to an existing
+database, this query should return no rows:
+
+```sql
+SELECT e.id, e.user_id, e.session_id, e.session_task_id
+FROM public.vocabulary_encounters e
+LEFT JOIN public.sessions s ON s.id = e.session_id AND s.user_id = e.user_id
+LEFT JOIN public.session_tasks t ON t.id = e.session_task_id AND t.session_id = e.session_id
+WHERE s.id IS NULL OR t.id IS NULL;
+```
+
+Reconcile any results with real historical records before deployment; the migration
+does not fabricate parents, delete encounters, or adjust counters. Foreign keys use
+`NO ACTION`, deferred until transaction commit: individual sessions/tasks cannot be
+deleted while referenced, but deleting an entire user's aggregate can cascade
+atomically. Prisma records the relations; SQL defines the deferred-check behavior.
 
 Practice sessions and XP update in one transaction. Retrying a scored demo event
 awards XP once. Sessions are owned by the user/profile; a new active session can

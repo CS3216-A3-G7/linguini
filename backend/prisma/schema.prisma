@@ -141,6 +141,7 @@ model Session {
   updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   sceneObjects       SceneObject[]
   tasks              SessionTask[]
+  vocabularyEncounters VocabularyEncounter[]
 
   aiRuns             AiGenerationRun[]
 
@@ -236,9 +237,10 @@ model VocabularyEncounter {
   userId           String @map("user_id") @db.Uuid
   vocabularyItemId String @map("vocabulary_item_id") @db.Uuid
   progress         UserVocabularyProgress @relation(fields: [userId, vocabularyItemId], references: [userId, vocabularyItemId], onDelete: Cascade, onUpdate: Cascade)
-  // Add session/task FKs together after tasks and historical encounter references migrate.
   sessionId        String @map("session_id") @db.Uuid
+  session          Session @relation(fields: [sessionId, userId], references: [id, userId], onDelete: NoAction, onUpdate: NoAction, map: "vocabulary_encounters_session_owner_fkey")
   sessionTaskId    String @map("session_task_id") @db.Uuid
+  sessionTask      SessionTask @relation(fields: [sessionTaskId, sessionId], references: [id, sessionId], onDelete: NoAction, onUpdate: NoAction, map: "vocabulary_encounters_task_session_fkey")
   encounterType    String @map("encounter_type") @db.VarChar(10)
   outcome          String @db.VarChar(9)
   occurredAt       DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
@@ -250,6 +252,8 @@ model VocabularyEncounter {
   @@index([userId, vocabularyItemId, occurredAt])
   @@index([sessionId])
   @@index([sessionTaskId])
+  @@index([sessionId, userId])
+  @@index([sessionTaskId, sessionId])
   @@map("vocabulary_encounters")
 }
 
@@ -277,7 +281,9 @@ model SessionTask {
   updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   attempts         TaskAttempt[]
   hints            TaskHint[]
+  vocabularyEncounters VocabularyEncounter[]
 
+  @@unique([id, sessionId])
   @@unique([sessionId, orderIndex])
   @@index([vocabularyItemId])
   @@index([sceneObjectId, sessionId])

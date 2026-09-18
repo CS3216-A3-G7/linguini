@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from encounter_factory import create_encounter_task
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
@@ -35,6 +36,7 @@ from app.schemas.vocabulary import UserVocabularyProgress, VocabularyEncounter, 
 @pytest.fixture
 def context(database, monkeypatch):
     engine, owner, profile, client = database
+    task = create_encounter_task(engine, client, profile)
     words = [
         VocabularyItem(language_code="es", lemma=word, display_text=word, part_of_speech="noun")
         for word in ("mundo", "amigo")
@@ -43,8 +45,8 @@ def context(database, monkeypatch):
         VocabularyEncounter(
             user_id=owner.id,
             vocabulary_item_id=word.id,
-            session_id=uuid4(),
-            session_task_id=uuid4(),
+            session_id=task.session_id,
+            session_task_id=task.id,
             encounter_type="introduced",
             outcome="completed",
         )

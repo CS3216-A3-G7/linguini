@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+from encounter_factory import create_encounter_task
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import delete, insert, select, text, update
@@ -169,13 +170,21 @@ def test_api_pagination_translation_and_isolation(database, monkeypatch):
     assert repository.list_vocabulary(owner.id) == []
 
 
-def test_concurrent_encounters_are_idempotent_and_atomic(database):
+@pytest.fixture
+def encounter_task(database):
+    engine, owner, *_ = database
+    profile = PostgresLanguageProfileRepository(engine).list_for_user(owner.id)[0]
+    with TestClient(create_app()) as client:
+        return create_encounter_task(engine, client, profile)
+
+
+def test_concurrent_encounters_are_idempotent_and_atomic(database, encounter_task):
     engine, owner, ids, _, repository = database
     event = VocabularyEncounter(
         user_id=owner.id,
         vocabulary_item_id=ids[0],
-        session_id=uuid4(),
-        session_task_id=uuid4(),
+        session_id=encounter_task.session_id,
+        session_task_id=encounter_task.id,
         encounter_type="practised",
         outcome="correct",
     )
@@ -320,17 +329,122 @@ def test_pronunciation_audio_relation(database):
         {"session_id": None},
     ],
 )
-def test_encounter_database_constraints(database, patch):
+def test_encounter_database_constraints(database, encounter_task, patch):
     engine, owner, ids, _, _ = database
     event = VocabularyEncounter(
         user_id=owner.id,
         vocabulary_item_id=ids[0],
-        session_id=uuid4(),
-        session_task_id=uuid4(),
+        session_id=encounter_task.session_id,
+        session_task_id=encounter_task.id,
         encounter_type="introduced",
         outcome="completed",
     )
     with pytest.raises(IntegrityError), engine.begin() as connection:
         connection.execute(
             insert(vocabulary_encounters).values(**(event.model_dump(by_alias=False) | patch))
+        )
+
+
+@pytest.mark.parametrize(
+    "invalid", ["missing_session", "missing_task", "other_session", "other_user"]
+)
+def test_encounter_parent_links_and_counter_rollback(
+    database, encounter_task, monkeypatch, invalid
+):
+    engine, owner, ids, _, repository = database
+    other = User(display_name="Other", auth_provider_id=f"test-{uuid4()}")
+    event = VocabularyEncounter(
+        user_id=owner.id,
+        vocabulary_item_id=ids[0],
+        session_id=encounter_task.session_id,
+        session_task_id=encounter_task.id,
+        encounter_type="practised",
+        outcome="correct",
+    )
+    expected_constraint = "vocabulary_encounters_task_session_fkey"
+    if invalid == "missing_session":
+        event.session_id = uuid4()
+        expected_constraint = "vocabulary_encounters_session_owner_fkey"
+    elif invalid == "missing_task":
+        event.session_task_id = uuid4()
+    elif invalid == "other_session":
+        profile = PostgresLanguageProfileRepository(engine).list_for_user(owner.id)[0]
+        with TestClient(create_app()) as client:
+            event.session_task_id = create_encounter_task(engine, client, profile).id
+    else:
+        # A valid progress pair ensures the new owner FK, rather than the old progress FK,
+        # is what rejects the reference to someone else's existing session and task.
+        with engine.begin() as connection:
+            connection.execute(insert(users).values(**other.model_dump(by_alias=False)))
+            progress = UserVocabularyProgress(user_id=other.id, vocabulary_item_id=ids[0])
+            connection.execute(
+                insert(user_vocabulary_progress).values(**progress.model_dump(by_alias=False))
+            )
+        event.user_id = other.id
+        expected_constraint = "vocabulary_encounters_session_owner_fkey"
+    try:
+        with pytest.raises(IntegrityError) as error, engine.begin() as connection:
+            connection.execute(
+                insert(vocabulary_encounters).values(**event.model_dump(by_alias=False))
+            )
+        assert error.value.orig.diag.constraint_name == expected_constraint
+        with pytest.raises(LearningStorageError):
+            repository.record_encounter(event)
+        with engine.connect() as connection:
+            progress = (
+                connection.execute(
+                    select(user_vocabulary_progress).where(
+                        user_vocabulary_progress.c.user_id == event.user_id,
+                        user_vocabulary_progress.c.vocabulary_item_id == ids[0],
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            assert progress["exposure_count"] == progress["correct_attempt_count"] == 0
+            assert (
+                connection.execute(
+                    select(vocabulary_encounters).where(vocabulary_encounters.c.id == event.id)
+                ).first()
+                is None
+            )
+    finally:
+        if invalid == "other_user":
+            with engine.begin() as connection:
+                connection.execute(delete(users).where(users.c.id == other.id))
+
+
+def test_encounter_links_protect_history_and_owner_deletion(database, encounter_task):
+    from app.repositories.postgres.practice import sessions
+    from app.repositories.postgres.tasks import session_tasks
+
+    engine, owner, ids, _, repository = database
+    event = repository.record_encounter(
+        VocabularyEncounter(
+            user_id=owner.id,
+            vocabulary_item_id=ids[0],
+            session_id=encounter_task.session_id,
+            session_task_id=encounter_task.id,
+            encounter_type="introduced",
+            outcome="completed",
+        )
+    )
+    for table, parent_id in [(sessions, event.session_id), (session_tasks, event.session_task_id)]:
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.execute(delete(table).where(table.c.id == parent_id))
+    for field in ["session_id", "session_task_id"]:
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.execute(
+                update(vocabulary_encounters)
+                .where(vocabulary_encounters.c.id == event.id)
+                .values(**{field: uuid4()})
+            )
+    with engine.begin() as connection:
+        connection.execute(delete(users).where(users.c.id == owner.id))
+    with engine.connect() as connection:
+        assert (
+            connection.execute(
+                select(vocabulary_encounters).where(vocabulary_encounters.c.id == event.id)
+            ).first()
+            is None
         )
