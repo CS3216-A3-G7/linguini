@@ -1,4 +1,3 @@
-import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from unittest.mock import MagicMock
@@ -11,14 +10,13 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from test_postgres_sessions import create_run
 from test_postgres_sessions import database as database
 
-from app.import_ai_generation_runs import import_ai_generation_runs
 from app.repositories.ai import AiRunConflictError, AiRunNotFoundError, AiRunStorageError
-from app.repositories.implementations.postgres.ai import (
+from app.repositories.postgres.ai import (
     PostgresAiGenerationRunRepository,
     ai_generation_runs,
 )
-from app.repositories.implementations.postgres.journals import PostgresJournalRepository, journals
-from app.repositories.implementations.postgres.users import users
+from app.repositories.postgres.journals import PostgresJournalRepository, journals
+from app.repositories.postgres.users import users
 from app.schemas.ai import AiGenerationRun, AiGenerationRunCompletion
 from app.schemas.base import utc_now
 from app.schemas.journals import Journal, JournalDetailResponse
@@ -213,37 +211,8 @@ def test_terminal_immutability_and_context_cascade(context):
     assert repository.get(run.id) is None
 
 
-def test_import_rollback_and_preserves_live_results(context, tmp_path):
-    engine, owner, _, repository, run = context
-    failed = run_record(
-        user_id=owner.id, status="failed", completed_at=utc_now(), error_code="timeout"
-    )
-    path = tmp_path / "ai_runs.json"
-    bad = run_record(user_id=owner.id, session_id=uuid4())
-    path.write_text(json.dumps([failed.model_dump(mode="json"), bad.model_dump(mode="json")]))
-    with pytest.raises(IntegrityError):
-        import_ai_generation_runs(engine, path)
-    assert repository.list_runs() == []
-    path.write_text(json.dumps([failed.model_dump(mode="json"), run.model_dump(mode="json")]))
-    assert import_ai_generation_runs(engine, path) == 2
-    repository.finish(run.id, AiGenerationRunCompletion(status="succeeded"))
-    assert import_ai_generation_runs(engine, path) == 0
-    assert repository.get(run.id).status == "succeeded"
-    assert repository.get(failed.id).error_code == "timeout"
-    conflicting = run.model_copy(update={"model_name": "different-model"})
-    path.write_text(json.dumps([conflicting.model_dump(mode="json")]))
-    with pytest.raises(ValueError):
-        import_ai_generation_runs(engine, path)
-
-
-def test_duplicate_import_and_safe_errors(tmp_path):
+def test_safe_storage_errors():
     engine = MagicMock()
-    run = run_record()
-    path = tmp_path / "ai_runs.json"
-    path.write_text(json.dumps([run.model_dump(mode="json")] * 2))
-    with pytest.raises(ValueError):
-        import_ai_generation_runs(engine, path)
-    engine.begin.assert_not_called()
     engine.connect.side_effect = OperationalError("select", {}, Exception("secret"))
     with pytest.raises(AiRunStorageError, match="Unable to load AI run"):
         PostgresAiGenerationRunRepository(engine, None).get(uuid4())

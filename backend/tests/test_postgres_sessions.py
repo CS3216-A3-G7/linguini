@@ -1,40 +1,26 @@
-import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, insert, update
 from sqlalchemy.exc import IntegrityError
 
-from app.config import DEMO_USERS_PATH
-from app.database import create_database_engine, get_session_storage
-from app.import_media_assets import import_media_assets
-from app.import_sessions import import_sessions
+from app.database import create_database_engine
 from app.main import create_app
-from app.repositories.implementations.postgres.language_profiles import (
+from app.repositories.postgres.language_profiles import (
     PostgresLanguageProfileRepository,
 )
-from app.repositories.implementations.postgres.practice import PostgresPracticeRepository, sessions
-from app.repositories.implementations.postgres.scene_objects import (
+from app.repositories.postgres.practice import PostgresPracticeRepository, sessions
+from app.repositories.postgres.scene_objects import (
     PostgresSceneObjectRepository,
     scene_objects,
 )
-from app.repositories.implementations.postgres.users import users
+from app.repositories.postgres.users import users
 from app.repositories.practice import PracticeStorageError
 from app.schemas.media import SceneObject
 from app.schemas.users import LanguageProfile, User
-
-
-def test_session_configuration(monkeypatch):
-    monkeypatch.setenv("SESSION_STORAGE", "postgres")
-    monkeypatch.setenv("USER_STORAGE", "json")
-    with pytest.raises(ValueError):
-        get_session_storage()
-    for key in ["USER_STORAGE", "LANGUAGE_PROFILE_STORAGE", "MEDIA_ASSET_STORAGE"]:
-        monkeypatch.setenv(key, "postgres")
-    assert get_session_storage() == "postgres"
 
 
 @pytest.fixture
@@ -42,14 +28,6 @@ def database(monkeypatch):
     if not os.getenv("TEST_DATABASE_URL"):
         pytest.skip("Requires migrated test PostgreSQL")
     monkeypatch.setenv("DATABASE_URL", os.environ["TEST_DATABASE_URL"])
-    for key in [
-        "USER_STORAGE",
-        "LANGUAGE_PROFILE_STORAGE",
-        "MEDIA_ASSET_STORAGE",
-        "SESSION_STORAGE",
-    ]:
-        monkeypatch.setenv(key, "postgres")
-    monkeypatch.setenv("VOCABULARY_STORAGE", "json")
     engine = create_database_engine()
     owner = User(display_name="Sessions test", auth_provider_id=f"test-{uuid4()}")
     monkeypatch.setenv("DEMO_USER_ID", str(owner.id))
@@ -63,7 +41,6 @@ def database(monkeypatch):
             proficiency_level="A1",
         )
     )
-    import_media_assets(engine, DEMO_USERS_PATH.parent / "scenes.json")
     with TestClient(create_app()) as client:
         yield engine, owner, profile, client
     with engine.begin() as connection:
@@ -72,7 +49,7 @@ def database(monkeypatch):
 
 
 def create_run(client, profile, key="session-key-1"):
-    scenes = json.loads((DEMO_USERS_PATH.parent / "scenes.json").read_text(encoding="utf-8"))
+    scenes = client.get("/api/v1/preloaded-scenes").json()
     scene = next(row for row in scenes if row.get("languageCode", "es") == "es")
     response = client.post(
         "/api/v1/sessions",
@@ -178,31 +155,6 @@ def test_invalid_session_rolls_back_xp_and_enforces_owner(database):
         )
 
 
-def test_import_is_repeatable_without_overwriting_live_progress(database, tmp_path):
-    engine, owner, profile, client = database
-    create_run(client, profile)
-    repository = PostgresPracticeRepository(engine, owner.id)
-    snapshot = repository.read()[0]
-    path = tmp_path / "progress.json"
-    path.write_text(json.dumps([snapshot.model_dump(mode="json")]))
-    with engine.begin() as connection:
-        connection.execute(delete(sessions).where(sessions.c.user_id == owner.id))
-        from app.repositories.implementations.postgres.practice import practice_progress
-
-        connection.execute(delete(practice_progress).where(practice_progress.c.user_id == owner.id))
-    assert import_sessions(engine, path)["sessions"] == 1
-    repository.change(lambda rows: setattr(rows[0], "xp", 50))
-    assert import_sessions(engine, path) == {"progress": 0, "sessions": 0, "scene_objects": 0}
-    assert repository.read()[0].xp == 50
-    with engine.connect() as connection:
-        assert (
-            connection.execute(
-                select(sessions.c.id).where(sessions.c.user_id == owner.id)
-            ).scalar_one()
-            == snapshot.practice_sessions[0].session.id
-        )
-
-
 def test_complete_session_and_replay(database):
     engine, owner, profile, client = database
     detail = create_run(client, profile)
@@ -226,25 +178,3 @@ def test_complete_session_and_replay(database):
     assert client.post(endpoint + "/complete").json() == first.json()
     assert client.post(endpoint + "/abandon").status_code == 409
     assert PostgresPracticeRepository(engine, owner.id).read()[0].scenarios[0].status == "completed"
-
-
-def test_object_import_and_missing_reference_rollback(database, tmp_path):
-    engine, owner, profile, client = database
-    run = create_run(client, profile)["session"]
-    item = SceneObject(
-        session_id=run["id"],
-        media_asset_id=run["sceneMediaAssetId"],
-        detected_label="cup",
-        bounding_box={"x": 0, "y": 0, "width": 0.5, "height": 0.5},
-    )
-    path = tmp_path / "progress.json"
-    path.write_text("[]")
-    objects = tmp_path / "objects.json"
-    missing = item.model_copy(update={"id": uuid4(), "session_id": uuid4()})
-    objects.write_text(json.dumps([item.model_dump(mode="json"), missing.model_dump(mode="json")]))
-    with pytest.raises(IntegrityError):
-        import_sessions(engine, path, objects)
-    assert PostgresSceneObjectRepository(engine).list_for_session(UUID(run["id"]), owner.id) == []
-    objects.write_text(json.dumps([item.model_dump(mode="json")]))
-    assert import_sessions(engine, path, objects)["scene_objects"] == 1
-    assert import_sessions(engine, path, objects)["scene_objects"] == 0

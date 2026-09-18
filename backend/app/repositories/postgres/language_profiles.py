@@ -20,12 +20,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.repositories.implementations.postgres.users import users
 from app.repositories.language_profiles import (
     LanguageProfileConflictError,
     LanguageProfileNotFoundError,
     LanguageProfileStorageError,
 )
+from app.repositories.postgres.users import users
 from app.schemas.users import LanguageProfile, UpdateLanguageProfileRequest
 
 # Query metadata only; Prisma migrations own constraints and DDL.

@@ -21,8 +21,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.repositories.implementations.postgres.practice import sessions
-from app.repositories.implementations.postgres.users import users
+from app.repositories.postgres.practice import sessions
+from app.repositories.postgres.users import users
 from app.repositories.tasks import TaskConflictError, TaskNotFoundError, TaskStorageError
 from app.schemas.tasks import SessionTask, TaskAttempt, TaskHint
 

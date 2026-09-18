@@ -1,6 +1,5 @@
 """Language-profile checks against a migrated, dedicated test PostgreSQL database."""
 
-import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock
@@ -11,34 +10,19 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, insert
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from app.database import create_database_engine, get_language_profile_storage
-from app.import_language_profiles import import_language_profiles
+from app.database import create_database_engine
 from app.main import create_app
-from app.repositories.implementations.postgres.language_profiles import (
-    PostgresLanguageProfileRepository,
-    language_profiles,
-)
-from app.repositories.implementations.postgres.users import users
 from app.repositories.language_profiles import (
     LanguageProfileConflictError,
     LanguageProfileNotFoundError,
     LanguageProfileStorageError,
 )
+from app.repositories.postgres.language_profiles import (
+    PostgresLanguageProfileRepository,
+    language_profiles,
+)
+from app.repositories.postgres.users import users
 from app.schemas.users import LanguageProfile, UpdateLanguageProfileRequest, User
-
-
-def test_profile_storage_configuration(monkeypatch):
-    monkeypatch.delenv("LANGUAGE_PROFILE_STORAGE", raising=False)
-    assert get_language_profile_storage() == "json"
-    monkeypatch.setenv("LANGUAGE_PROFILE_STORAGE", "invalid")
-    with pytest.raises(ValueError, match="LANGUAGE_PROFILE_STORAGE"):
-        get_language_profile_storage()
-    monkeypatch.setenv("LANGUAGE_PROFILE_STORAGE", "postgres")
-    monkeypatch.setenv("USER_STORAGE", "json")
-    with pytest.raises(ValueError, match="requires USER_STORAGE"):
-        get_language_profile_storage()
-    monkeypatch.setenv("USER_STORAGE", "postgres")
-    assert get_language_profile_storage() == "postgres"
 
 
 def profile(user_id, language="es", **kwargs):
@@ -65,29 +49,11 @@ def test_storage_errors_are_wrapped():
         repository.update(uuid4(), uuid4(), UpdateLanguageProfileRequest(is_active=True))
 
 
-@pytest.mark.parametrize("invalid", ["ids", "pairs", "active"])
-def test_import_rejects_invalid_source_before_writing(tmp_path, invalid):
-    first = profile(uuid4())
-    second = first.model_copy()
-    if invalid != "ids":
-        second.id = uuid4()
-    if invalid == "active":
-        second.target_language_code = "fr"
-    engine = MagicMock()
-    path = tmp_path / "profiles.json"
-    path.write_text(json.dumps([row.model_dump(mode="json") for row in [first, second]]))
-    with pytest.raises(ValueError):
-        import_language_profiles(engine, path)
-    engine.begin.assert_not_called()
-
-
 @pytest.fixture
 def database(monkeypatch):
     if not os.getenv("TEST_DATABASE_URL"):
         pytest.skip("Requires migrated test PostgreSQL")
     monkeypatch.setenv("DATABASE_URL", os.environ["TEST_DATABASE_URL"])
-    monkeypatch.setenv("USER_STORAGE", "postgres")
-    monkeypatch.setenv("LANGUAGE_PROFILE_STORAGE", "postgres")
     engine = create_database_engine()
     owners = [User(auth_provider_id=f"test-{uuid4()}", display_name="Test") for _ in range(2)]
     monkeypatch.setenv("DEMO_USER_ID", str(owners[0].id))
@@ -177,33 +143,6 @@ def test_concurrent_activation(database):
             )
         )
     assert sum(row.is_active for row in repository.list_for_user(owners[0].id)) == 1
-
-
-def test_import_idempotency_and_rollback(database, tmp_path):
-    engine, owners = database
-    first = profile(owners[0].id)
-    path = tmp_path / "profiles.json"
-    path.write_text(json.dumps([first.model_dump(mode="json")]))
-    assert import_language_profiles(engine, path) == 1
-    repository = PostgresLanguageProfileRepository(engine)
-    repository.update(owners[0].id, first.id, UpdateLanguageProfileRequest(daily_goal_minutes=30))
-    assert import_language_profiles(engine, path) == 0
-    assert repository.list_for_user(owners[0].id)[0].daily_goal_minutes == 30
-    # A valid insert before a foreign-key/parent failure must not survive the transaction.
-    records = [profile(owners[0].id, "fr", is_active=False), profile(uuid4())]
-    path.write_text(json.dumps([row.model_dump(mode="json") for row in records]))
-    with pytest.raises(LanguageProfileStorageError):
-        import_language_profiles(engine, path)
-    assert len(repository.list_for_user(owners[0].id)) == 1
-    # Conflicting pair after a valid insert rolls back the whole batch.
-    records = [
-        profile(owners[0].id, "fr", is_active=False),
-        profile(owners[0].id, "ES", is_active=False),
-    ]
-    path.write_text(json.dumps([row.model_dump(mode="json") for row in records]))
-    with pytest.raises(IntegrityError):
-        import_language_profiles(engine, path)
-    assert len(repository.list_for_user(owners[0].id)) == 1
 
 
 @pytest.mark.parametrize(

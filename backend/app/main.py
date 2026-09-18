@@ -8,31 +8,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.learning_errors import register_learning_errors
 from app.api.router import api_router
 from app.config import get_allowed_origins
-from app.database import (
-    create_database_engine,
-    get_journal_storage,
-    get_language_profile_storage,
-    get_media_asset_storage,
-    get_session_storage,
-    get_user_storage,
-    get_vocabulary_storage,
-)
+from app.database import create_database_engine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    get_language_profile_storage()
-    get_media_asset_storage()
-    get_vocabulary_storage()
-    get_session_storage()
-    get_journal_storage()
-    engine = create_database_engine() if get_user_storage() == "postgres" else None
+    engine = create_database_engine()
     app.state.database_engine = engine
     try:
         yield
     finally:
-        if engine is not None:
-            engine.dispose()
+        engine.dispose()
 
 
 def create_app() -> FastAPI:

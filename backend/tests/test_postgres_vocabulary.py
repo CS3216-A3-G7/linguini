@@ -1,4 +1,3 @@
-import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
@@ -11,20 +10,18 @@ from pydantic import ValidationError
 from sqlalchemy import delete, insert, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from app.config import DEMO_USERS_PATH
-from app.database import create_database_engine, get_vocabulary_storage
-from app.import_vocabulary import import_vocabulary
+from app.database import create_database_engine
 from app.main import create_app
-from app.repositories.implementations.json.learning import JsonLearningRepository
-from app.repositories.implementations.postgres.language_profiles import (
+from app.repositories.learning import LearningStorageError
+from app.repositories.postgres.language_profiles import (
     PostgresLanguageProfileRepository,
 )
-from app.repositories.implementations.postgres.media_assets import (
+from app.repositories.postgres.media_assets import (
     PostgresMediaAssetRepository,
     media_assets,
 )
-from app.repositories.implementations.postgres.users import users
-from app.repositories.implementations.postgres.vocabulary import (
+from app.repositories.postgres.users import users
+from app.repositories.postgres.vocabulary import (
     PostgresVocabularyRepository,
     VocabularyEncounterConflictError,
     user_vocabulary_progress,
@@ -32,7 +29,6 @@ from app.repositories.implementations.postgres.vocabulary import (
     vocabulary_items,
     vocabulary_translations,
 )
-from app.repositories.learning import LearningStorageError
 from app.schemas.media import MediaAsset
 from app.schemas.users import LanguageProfile, User
 from app.schemas.vocabulary import (
@@ -42,67 +38,24 @@ from app.schemas.vocabulary import (
 )
 
 
-def test_configuration(monkeypatch):
-    monkeypatch.delenv("VOCABULARY_STORAGE", raising=False)
-    assert get_vocabulary_storage() == "json"
-    monkeypatch.setenv("VOCABULARY_STORAGE", "invalid")
-    with pytest.raises(ValueError):
-        get_vocabulary_storage()
-    monkeypatch.setenv("VOCABULARY_STORAGE", "postgres")
-    monkeypatch.setenv("USER_STORAGE", "json")
-    with pytest.raises(ValueError):
-        get_vocabulary_storage()
-    monkeypatch.setenv("USER_STORAGE", "postgres")
-    monkeypatch.setenv("LANGUAGE_PROFILE_STORAGE", "json")
-    with pytest.raises(ValueError):
-        get_vocabulary_storage()
-    monkeypatch.setenv("LANGUAGE_PROFILE_STORAGE", "postgres")
-    assert get_vocabulary_storage() == "postgres"
-
-
 def test_progress_count_validation():
     with pytest.raises(ValidationError):
         UserVocabularyProgress(user_id=uuid4(), vocabulary_item_id=uuid4(), correct_attempt_count=1)
 
 
-@pytest.mark.parametrize("broken", ["reference", "duplicate", "encounter"])
-def test_import_validates_before_write(tmp_path, broken):
-    rows = json.loads((DEMO_USERS_PATH.parent / "vocabulary.json").read_text(encoding="utf-8"))[:1]
-    if broken == "reference":
-        rows[0]["progress"]["vocabularyItemId"] = str(uuid4())
-    elif broken == "duplicate":
-        second = json.loads(json.dumps(rows[0]))
-        second["vocabulary"]["lemma"] = "different"
-        rows.append(second)
-    else:
-        rows[0]["encounterIds"] = [str(uuid4())]
-    path = tmp_path / "vocabulary.json"
-    path.write_text(json.dumps(rows))
-    engine = MagicMock()
-    with pytest.raises(ValueError):
-        import_vocabulary(engine, path)
-    engine.begin.assert_not_called()
-
-
-def test_storage_errors_and_progress_delegation():
+def test_storage_errors():
     engine = MagicMock()
     engine.connect.side_effect = OperationalError("select", {}, Exception("secret"))
-    fallback = MagicMock()
-    repository = PostgresVocabularyRepository(engine, fallback)
+    repository = PostgresVocabularyRepository(engine)
     with pytest.raises(LearningStorageError):
         repository.list_vocabulary(uuid4())
-    owner = uuid4()
-    repository.get_progress(owner, "es")
-    fallback.get_progress.assert_called_once_with(owner, "es")
 
 
 @pytest.fixture
-def database(monkeypatch, tmp_path):
+def database(monkeypatch):
     if not os.getenv("TEST_DATABASE_URL"):
         pytest.skip("Requires migrated test PostgreSQL")
     monkeypatch.setenv("DATABASE_URL", os.environ["TEST_DATABASE_URL"])
-    for key in ["USER_STORAGE", "LANGUAGE_PROFILE_STORAGE", "VOCABULARY_STORAGE"]:
-        monkeypatch.setenv(key, "postgres")
     engine = create_database_engine()
     owner = User(display_name="Vocabulary test", auth_provider_id=f"test-{uuid4()}")
     monkeypatch.setenv("DEMO_USER_ID", str(owner.id))
@@ -116,24 +69,34 @@ def database(monkeypatch, tmp_path):
             proficiency_level="A1",
         )
     )
-    rows = json.loads((DEMO_USERS_PATH.parent / "vocabulary.json").read_text(encoding="utf-8"))[:3]
     ids = []
     media_ids = []
-    for row in rows:
-        item_id = uuid4()
-        ids.append(item_id)
-        row["vocabulary"]["id"] = str(item_id)
-        for field in ["translation", "progress"]:
-            row[field]["id"] = str(uuid4())
-            row[field]["vocabularyItemId"] = str(item_id)
-        row["progress"]["userId"] = str(owner.id)
-    path = tmp_path / "vocabulary.json"
-    path.write_text(json.dumps(rows), encoding="utf-8")
-    repository = PostgresVocabularyRepository(
-        engine, JsonLearningRepository(DEMO_USERS_PATH.parent)
-    )
+    from app.schemas.vocabulary import VocabularyItem
+
+    with engine.begin() as connection:
+        for word in ["calle", "autobus", "arbol"]:
+            item = VocabularyItem(
+                language_code="es", lemma=word, display_text=word, part_of_speech="noun"
+            )
+            ids.append(item.id)
+            translation = VocabularyTranslation(
+                vocabulary_item_id=item.id,
+                source_language_code="en",
+                translated_text=f"Translation of {word}",
+            )
+            progress = UserVocabularyProgress(user_id=owner.id, vocabulary_item_id=item.id)
+            connection.execute(insert(vocabulary_items).values(**item.model_dump(by_alias=False)))
+            connection.execute(
+                insert(vocabulary_translations).values(**translation.model_dump(by_alias=False))
+            )
+            connection.execute(
+                insert(user_vocabulary_progress).values(
+                    **progress.model_dump(by_alias=False), scene_id="calle-mayor", topic="City"
+                )
+            )
+    repository = PostgresVocabularyRepository(engine)
     try:
-        yield engine, owner, ids, media_ids, path, repository
+        yield engine, owner, ids, media_ids, repository
     finally:
         with engine.begin() as connection:
             connection.execute(delete(users).where(users.c.id == owner.id))
@@ -142,15 +105,8 @@ def database(monkeypatch, tmp_path):
         engine.dispose()
 
 
-def test_import_api_pagination_translation_and_isolation(database, monkeypatch):
-    engine, owner, ids, _, path, repository = database
-    assert import_vocabulary(engine, path) == {
-        "vocabulary_items": 3,
-        "vocabulary_translations": 3,
-        "user_vocabulary_progress": 3,
-        "vocabulary_encounters": 0,
-    }
-    assert all(count == 0 for count in import_vocabulary(engine, path).values())
+def test_api_pagination_translation_and_isolation(database, monkeypatch):
+    engine, owner, ids, _, repository = database
     with TestClient(create_app()) as client:
         first = client.get("/api/v1/me/vocabulary?limit=2")
         assert first.status_code == 200
@@ -214,8 +170,7 @@ def test_import_api_pagination_translation_and_isolation(database, monkeypatch):
 
 
 def test_concurrent_encounters_are_idempotent_and_atomic(database):
-    engine, owner, ids, _, path, repository = database
-    import_vocabulary(engine, path)
+    engine, owner, ids, _, repository = database
     event = VocabularyEncounter(
         user_id=owner.id,
         vocabulary_item_id=ids[0],
@@ -243,7 +198,6 @@ def test_concurrent_encounters_are_idempotent_and_atomic(database):
     word = next(row for row in repository.list_vocabulary(owner.id) if row.vocabulary.id == ids[0])
     assert word.progress.exposure_count == word.progress.correct_attempt_count == 9
     assert len(word.encounter_ids) == 9
-    assert all(count == 0 for count in import_vocabulary(engine, path).values())
     assert (
         next(
             row for row in repository.list_vocabulary(owner.id) if row.vocabulary.id == ids[0]
@@ -266,48 +220,6 @@ def test_concurrent_encounters_are_idempotent_and_atomic(database):
         )
 
 
-def test_history_import_and_failure_rollback(database, tmp_path):
-    engine, owner, ids, _, path, repository = database
-    rows = json.loads(path.read_text())
-    event = VocabularyEncounter(
-        user_id=owner.id,
-        vocabulary_item_id=ids[0],
-        session_id=uuid4(),
-        session_task_id=uuid4(),
-        encounter_type="introduced",
-        outcome="completed",
-    )
-    rows[0]["encounterIds"] = [str(event.id)]
-    path.write_text(json.dumps(rows))
-    history = tmp_path / "encounters.json"
-    history.write_text(json.dumps([event.model_dump(mode="json")]))
-    assert import_vocabulary(engine, path, history)["vocabulary_encounters"] == 1
-    assert next(
-        row for row in repository.list_vocabulary(owner.id) if row.vocabulary.id == ids[0]
-    ).encounter_ids == [event.id]
-    # Import snapshots preserve counters rather than replaying history over the snapshots.
-    assert all(row.progress.exposure_count == 0 for row in repository.list_vocabulary(owner.id))
-    for row in rows:
-        row["encounterIds"] = []
-        new_id = uuid4()
-        ids.append(new_id)
-        row["vocabulary"]["id"] = str(new_id)
-        for field in ["translation", "progress"]:
-            row[field]["id"] = str(uuid4())
-            row[field]["vocabularyItemId"] = str(new_id)
-    rows[-1]["progress"]["userId"] = str(uuid4())
-    path.write_text(json.dumps(rows))
-    with pytest.raises(IntegrityError):
-        import_vocabulary(engine, path)
-    with engine.connect() as connection:
-        assert (
-            connection.execute(
-                select(vocabulary_items).where(vocabulary_items.c.id == ids[-3])
-            ).first()
-            is None
-        )
-
-
 @pytest.mark.parametrize(
     "patch",
     [
@@ -319,8 +231,7 @@ def test_history_import_and_failure_rollback(database, tmp_path):
     ],
 )
 def test_progress_constraints(database, patch):
-    engine, _, ids, _, path, _ = database
-    import_vocabulary(engine, path)
+    engine, _, ids, _, _ = database
     with pytest.raises(IntegrityError), engine.begin() as connection:
         connection.execute(
             update(user_vocabulary_progress)
@@ -330,8 +241,7 @@ def test_progress_constraints(database, patch):
 
 
 def test_relations_uniqueness_and_rls(database):
-    engine, owner, ids, _, path, _ = database
-    import_vocabulary(engine, path)
+    engine, owner, ids, _, _ = database
     duplicate = VocabularyTranslation(
         vocabulary_item_id=ids[0], source_language_code="EN", translated_text="duplicate"
     )
@@ -360,8 +270,7 @@ def test_relations_uniqueness_and_rls(database):
 
 
 def test_pronunciation_audio_relation(database):
-    engine, _, ids, media_ids, path, _ = database
-    import_vocabulary(engine, path)
+    engine, _, ids, media_ids, _ = database
     audio = MediaAsset(
         media_type="audio", source="preloaded", mime_type="audio/ogg", storage_key=f"test/{uuid4()}"
     )
@@ -412,8 +321,7 @@ def test_pronunciation_audio_relation(database):
     ],
 )
 def test_encounter_database_constraints(database, patch):
-    engine, owner, ids, _, path, _ = database
-    import_vocabulary(engine, path)
+    engine, owner, ids, _, _ = database
     event = VocabularyEncounter(
         user_id=owner.id,
         vocabulary_item_id=ids[0],

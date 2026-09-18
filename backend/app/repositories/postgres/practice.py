@@ -20,9 +20,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.repositories.implementations.postgres.language_profiles import language_profiles
-from app.repositories.implementations.postgres.users import users
-from app.repositories.learning import LearningRepository
+from app.repositories.postgres.language_profiles import language_profiles
+from app.repositories.postgres.users import users
+from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
 from app.repositories.practice import PracticeStorageError
 from app.schemas.progress import StoredProgress
 from app.schemas.sessions import Session, StoredDemoSession
@@ -213,7 +213,7 @@ class PostgresPracticeRepository:
 
 class SessionBackedLearningRepository:
     def __init__(
-        self, practice: PostgresPracticeRepository, vocabulary: LearningRepository
+        self, practice: PostgresPracticeRepository, vocabulary: PostgresVocabularyRepository
     ) -> None:
         self.practice = practice
         self.vocabulary = vocabulary

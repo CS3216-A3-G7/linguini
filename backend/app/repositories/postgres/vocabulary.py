@@ -1,4 +1,4 @@
-"""Vocabulary persistence; XP/scenario progress continues using its existing store."""
+"""PostgreSQL vocabulary persistence."""
 
 from uuid import UUID
 
@@ -21,10 +21,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.repositories.implementations.postgres.language_profiles import language_profiles
-from app.repositories.implementations.postgres.users import users
-from app.repositories.learning import LearningRepository, LearningStorageError
-from app.schemas.progress import StoredProgress
+from app.repositories.learning import LearningStorageError
+from app.repositories.postgres.language_profiles import language_profiles
+from app.repositories.postgres.users import users
 from app.schemas.vocabulary import (
     DailyVocabularyItem,
     UserVocabularyProgress,
@@ -106,14 +105,8 @@ class VocabularyEncounterConflictError(Exception):
 
 
 class PostgresVocabularyRepository:
-    def __init__(self, engine: Engine, progress_repository: LearningRepository) -> None:
+    def __init__(self, engine: Engine) -> None:
         self.engine = engine
-        self.progress_repository = progress_repository
-
-    def get_progress(
-        self, user_id: UUID, language_code: str | None = None
-    ) -> StoredProgress | None:
-        return self.progress_repository.get_progress(user_id, language_code)
 
     def list_vocabulary(self, user_id: UUID) -> list[DailyVocabularyItem]:
         try:

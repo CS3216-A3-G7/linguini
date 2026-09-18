@@ -1,7 +1,5 @@
-import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
-from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -10,26 +8,23 @@ from sqlalchemy import delete, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 from test_postgres_sessions import database as database
 
-from app.database import get_journal_storage
-from app.import_journals import import_journals
 from app.main import create_app
-from app.repositories.implementations.postgres.journals import (
+from app.repositories.journals import JournalConflictError
+from app.repositories.postgres.journals import (
     PostgresJournalRepository,
     journal_revisions,
     journal_suggestions,
     journals,
 )
-from app.repositories.implementations.postgres.media_assets import media_assets
-from app.repositories.implementations.postgres.vocabulary import (
+from app.repositories.postgres.media_assets import media_assets
+from app.repositories.postgres.vocabulary import (
     user_vocabulary_progress,
     vocabulary_encounters,
     vocabulary_items,
 )
-from app.repositories.journals import JournalConflictError
 from app.schemas.journals import (
     Journal,
     JournalDetailResponse,
-    JournalMedia,
     JournalSuggestion,
     JournalWordMention,
 )
@@ -37,25 +32,9 @@ from app.schemas.media import MediaAsset
 from app.schemas.vocabulary import UserVocabularyProgress, VocabularyEncounter, VocabularyItem
 
 
-def test_configuration(monkeypatch):
-    monkeypatch.delenv("JOURNAL_STORAGE", raising=False)
-    assert get_journal_storage() == "json"
-    monkeypatch.setenv("JOURNAL_STORAGE", "invalid")
-    with pytest.raises(ValueError):
-        get_journal_storage()
-    monkeypatch.setenv("JOURNAL_STORAGE", "postgres")
-    monkeypatch.setenv("USER_STORAGE", "json")
-    with pytest.raises(ValueError):
-        get_journal_storage()
-    for key in ("USER_STORAGE", "LANGUAGE_PROFILE_STORAGE", "MEDIA_ASSET_STORAGE"):
-        monkeypatch.setenv(key, "postgres")
-    assert get_journal_storage() == "postgres"
-
-
 @pytest.fixture
 def context(database, monkeypatch):
     engine, owner, profile, client = database
-    monkeypatch.setenv("JOURNAL_STORAGE", "postgres")
     words = [
         VocabularyItem(language_code="es", lemma=word, display_text=word, part_of_speech="noun")
         for word in ("mundo", "amigo")
@@ -305,32 +284,6 @@ def test_database_scope_revision_immutability_and_spans(context):
         )
 
 
-def test_import_completed_aggregate_repeatability_and_rollback(context, tmp_path):
-    engine, owner, profile, client, repository, words, encounters, photo, _ = context
-    row = save(client, profile)
-    endpoint = f"/api/v1/journals/{row['id']}"
-    client.post(endpoint + "/complete", json={"currentRevisionId": row["currentRevisionId"]})
-    snapshot = repository.read()[0]
-    snapshot.media.append(
-        JournalMedia(journal_id=snapshot.journal.id, media_asset_id=photo.id, display_order=0)
-    )
-    path = tmp_path / "journals.json"
-    with engine.begin() as connection:
-        connection.execute(delete(journals).where(journals.c.user_id == owner.id))
-    broken = snapshot.model_copy(deep=True)
-    broken.media[0].media_asset_id = uuid4()
-    path.write_text(json.dumps([broken.model_dump(mode="json")]))
-    with pytest.raises(IntegrityError):
-        import_journals(engine, path)
-    assert repository.read() == []
-    path.write_text(json.dumps([snapshot.model_dump(mode="json")]))
-    assert import_journals(engine, path)["revisions"] == 1
-    assert repository.read()[0].journal.status == "completed"
-    client.patch(endpoint, json={"content": "New live content"})
-    assert import_journals(engine, path)["journals"] == 0
-    assert len(repository.read()[0].revisions) == 2
-
-
 def test_rls_and_cascade(context):
     engine, owner, profile, client, repository, *_ = context
     row = save(client, profile)
@@ -351,19 +304,3 @@ def test_rls_and_cascade(context):
             is None
         )
     assert repository.read() == []
-
-
-def test_import_validates_before_writing(tmp_path):
-    journal = Journal(
-        user_id=uuid4(),
-        language_profile_id=uuid4(),
-        local_date=date.today(),
-        timezone="UTC",
-        current_revision_id=uuid4(),
-    )
-    path = tmp_path / "invalid.json"
-    path.write_text(json.dumps([JournalDetailResponse(journal=journal).model_dump(mode="json")]))
-    engine = MagicMock()
-    with pytest.raises(ValueError):
-        import_journals(engine, path)
-    engine.begin.assert_not_called()

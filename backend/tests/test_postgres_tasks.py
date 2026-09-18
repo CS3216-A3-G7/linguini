@@ -1,4 +1,3 @@
-import json
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from unittest.mock import MagicMock
@@ -11,11 +10,10 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from test_postgres_sessions import create_run
 from test_postgres_sessions import database as database
 
-from app.import_tasks import import_tasks
-from app.repositories.implementations.postgres.media_assets import media_assets
-from app.repositories.implementations.postgres.practice import sessions
-from app.repositories.implementations.postgres.scene_objects import PostgresSceneObjectRepository
-from app.repositories.implementations.postgres.tasks import (
+from app.repositories.postgres.media_assets import media_assets
+from app.repositories.postgres.practice import sessions
+from app.repositories.postgres.scene_objects import PostgresSceneObjectRepository
+from app.repositories.postgres.tasks import (
     PostgresTaskRepository,
     entity_values,
     session_tasks,
@@ -208,32 +206,19 @@ def test_database_rejects_invalid_task_states(context, invalid):
         )
 
 
-def test_import_atomic_repeatable_and_cascades(context, tmp_path):
+def test_task_children_cascade(context):
     engine, owner, client, repository, task, run = context
     attempt = TaskAttempt(
         session_task_id=task.id, attempt_number=1, input_mode="text", response_payload={"text": "a"}
     )
     hint = TaskHint(session_task_id=task.id, hint_level=1, content={"text": "hint"})
-    bundle = {
-        "tasks": [task.model_dump(mode="json")],
-        "attempts": [attempt.model_dump(mode="json")],
-        "hints": [hint.model_dump(mode="json")],
-    }
-    path = tmp_path / "tasks.json"
-    broken = json.loads(json.dumps(bundle))
-    broken["hints"][0]["sessionTaskId"] = str(uuid4())
-    path.write_text(json.dumps(broken))
-    with pytest.raises(IntegrityError):
-        import_tasks(engine, path)
-    assert repository.get(task.id, owner.id) is None
-    path.write_text(json.dumps(bundle))
-    assert import_tasks(engine, path) == {"session_tasks": 1, "task_attempts": 1, "task_hints": 1}
-    assert import_tasks(engine, path) == {"session_tasks": 0, "task_attempts": 0, "task_hints": 0}
+    repository.create_task(task, owner.id)
+    repository.create_attempt(attempt, owner.id)
+    repository.create_hint(hint, owner.id)
     with engine.begin() as connection:
         connection.execute(
             update(session_tasks).where(session_tasks.c.id == task.id).values(status="inProgress")
         )
-    import_tasks(engine, path)
     assert repository.get(task.id, owner.id).status == "inProgress"
     with engine.begin() as connection:
         connection.execute(delete(sessions).where(sessions.c.id == task.session_id))
@@ -259,15 +244,15 @@ def test_terminal_sessions_block_new_records_and_rls(context):
     with engine.connect() as connection:
         rows = connection.execute(
             text(
-                    "SELECT relname, relrowsecurity FROM pg_class WHERE oid IN "
-                    "('public.session_tasks'::regclass,'public.task_attempts'::regclass,"
-                    "'public.task_hints'::regclass)"
+                "SELECT relname, relrowsecurity FROM pg_class WHERE oid IN "
+                "('public.session_tasks'::regclass,'public.task_attempts'::regclass,"
+                "'public.task_hints'::regclass)"
             )
         ).all()
         assert len(rows) == 3 and all(row.relrowsecurity for row in rows)
 
 
-def test_validation_and_safe_storage_errors(tmp_path):
+def test_validation_and_safe_storage_errors():
     with pytest.raises(ValidationError):
         TaskAttempt(
             session_task_id=uuid4(), attempt_number=1, input_mode="speech", response_payload={}
@@ -276,8 +261,3 @@ def test_validation_and_safe_storage_errors(tmp_path):
     engine.connect.side_effect = OperationalError("select", {}, Exception("secret"))
     with pytest.raises(TaskStorageError, match="Unable to load tasks"):
         PostgresTaskRepository(engine).get(uuid4(), uuid4())
-    path = tmp_path / "bad.json"
-    path.write_text('{"tasks": [{"id": "invalid"}]}')
-    with pytest.raises(ValidationError):
-        import_tasks(engine, path)
-    engine.begin.assert_not_called()

@@ -17,8 +17,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.repositories.implementations.postgres.practice import sessions
-from app.repositories.implementations.postgres.users import users
+from app.repositories.postgres.practice import sessions
+from app.repositories.postgres.users import users
 from app.repositories.practice import PracticeStorageError
 from app.repositories.scene_objects import SceneObjectNotFoundError, SceneObjectReviewConflictError
 from app.schemas.media import ReviewSceneObjectsRequest, SceneObject

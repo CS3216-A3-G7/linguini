@@ -1,4 +1,3 @@
-import json
 import os
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -9,22 +8,15 @@ from pydantic import ValidationError
 from sqlalchemy import delete, insert, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from app.api.dependencies import get_media_asset_repository, get_scene_repository
-from app.config import DEMO_USERS_PATH
-from app.database import create_database_engine, get_media_asset_storage
-from app.import_media_assets import import_media_assets
+from app.api.dependencies import get_media_asset_repository
+from app.database import create_database_engine
 from app.main import create_app
-from app.repositories.implementations.json.media_assets import (
-    JsonMediaAssetRepository,
-    read_media_assets,
-)
-from app.repositories.implementations.json.scenes import JsonSceneRepository
-from app.repositories.implementations.postgres.media_assets import (
+from app.repositories.media_assets import MediaAssetConflictError, MediaAssetStorageError
+from app.repositories.postgres.media_assets import (
     PostgresMediaAssetRepository,
     media_assets,
 )
-from app.repositories.implementations.postgres.users import users
-from app.repositories.media_assets import MediaAssetConflictError, MediaAssetStorageError
+from app.repositories.postgres.users import users
 from app.schemas.media import MediaAsset
 from app.schemas.users import User
 
@@ -61,48 +53,8 @@ def test_invalid_metadata(values):
         asset(**values)
 
 
-def test_media_storage_configuration(monkeypatch):
-    monkeypatch.delenv("MEDIA_ASSET_STORAGE", raising=False)
-    assert get_media_asset_storage() == "json"
-    monkeypatch.setenv("MEDIA_ASSET_STORAGE", "invalid")
-    with pytest.raises(ValueError):
-        get_media_asset_storage()
-    monkeypatch.setenv("MEDIA_ASSET_STORAGE", "postgres")
-    monkeypatch.setenv("USER_STORAGE", "json")
-    with pytest.raises(ValueError, match="requires USER_STORAGE"):
-        get_media_asset_storage()
-    monkeypatch.setenv("USER_STORAGE", "postgres")
-    assert get_media_asset_storage() == "postgres"
-
-
-def test_json_lookup_and_api():
-    path = DEMO_USERS_PATH.parent / "scenes.json"
-    records = read_media_assets(path)
-    assert len(records) == 6
-    assert JsonMediaAssetRepository(path).get_by_ids([records[0].id]) == {records[0].id: records[0]}
-    with TestClient(create_app()) as client:
-        response = client.get(f"/api/v1/media/{records[0].id}")
-        assert response.status_code == 200
-        assert response.json() == records[0].model_dump(mode="json")
-        assert client.get(f"/api/v1/media/{uuid4()}").status_code == 404
-
-
-def test_import_deduplicates_shared_asset_and_rejects_conflicts(tmp_path):
-    row = asset().model_dump(mode="json")
-    path = tmp_path / "scenes.json"
-    path.write_text(json.dumps([{"mediaAsset": row}, {"mediaAsset": row}]))
-    assert len(read_media_assets(path)) == 1
-    path.write_text(json.dumps([{"mediaAsset": row}, {"mediaAsset": row | {"width": 99}}]))
-    engine = MagicMock()
-    with pytest.raises(ValueError, match="Conflicting"):
-        import_media_assets(engine, path)
-    engine.begin.assert_not_called()
-    path.write_text(json.dumps([row, row | {"id": str(uuid4())}]))
-    with pytest.raises(ValueError, match="storage key"):
-        import_media_assets(engine, path, from_scenes=False)
-
-
 def test_storage_errors_are_controlled():
+
     engine = MagicMock()
     engine.connect.side_effect = OperationalError("select", {}, Exception("private"))
     engine.begin.side_effect = OperationalError("insert", {}, Exception("private"))
@@ -111,6 +63,13 @@ def test_storage_errors_are_controlled():
     with pytest.raises(MediaAssetStorageError):
         repository.create(asset())
     app = create_app()
+    from app.api.dependencies import get_user_service
+    from app.services.users import UserService
+
+    fake_user = User(display_name="Test", auth_provider_id="test")
+    fake_users = MagicMock()
+    fake_users.get_by_id.return_value = fake_user
+    app.dependency_overrides[get_user_service] = lambda: UserService(fake_users, fake_user.id)
     app.dependency_overrides[get_media_asset_repository] = lambda: repository
     response = TestClient(app).get(f"/api/v1/media/{uuid4()}")
     assert response.status_code == 500
@@ -123,8 +82,6 @@ def database(monkeypatch):
     if not os.getenv("TEST_DATABASE_URL"):
         pytest.skip("Requires migrated test PostgreSQL")
     monkeypatch.setenv("DATABASE_URL", os.environ["TEST_DATABASE_URL"])
-    monkeypatch.setenv("USER_STORAGE", "postgres")
-    monkeypatch.setenv("MEDIA_ASSET_STORAGE", "postgres")
     engine = create_database_engine()
     owner = User(display_name="Media test", auth_provider_id=f"test-{uuid4()}")
     monkeypatch.setenv("DEMO_USER_ID", str(owner.id))
@@ -175,52 +132,6 @@ def test_owned_and_shared_lookup(database, monkeypatch):
         repository.create(asset(storage_key=shared.storage_key))
     with pytest.raises(IntegrityError), engine.begin() as connection:
         connection.execute(delete(users).where(users.c.id == owner.id))
-
-
-def test_scene_import_and_database_hydration(database, tmp_path):
-    engine, owner, ids = database
-    scenes = json.loads((DEMO_USERS_PATH.parent / "scenes.json").read_text(encoding="utf-8"))
-    for scene in scenes:
-        row = asset().model_dump(mode="json")
-        scene["mediaAsset"] = row
-        ids.append(MediaAsset.model_validate(row).id)
-    path = tmp_path / "scenes.json"
-    path.write_text(json.dumps(scenes), encoding="utf-8")
-    assert import_media_assets(engine, path) == 6
-    assert import_media_assets(engine, path) == 0
-    with engine.begin() as connection:
-        connection.execute(
-            update(media_assets).where(media_assets.c.id == ids[0]).values(width=640)
-        )
-    app = create_app()
-    app.dependency_overrides[get_scene_repository] = lambda: JsonSceneRepository(path)
-    with TestClient(app) as client:
-        # Active profile still comes from JSON in this incremental configuration.
-        from app.api.dependencies import get_active_language
-
-        app.dependency_overrides[get_active_language] = lambda: "es"
-        response = client.get("/api/v1/preloaded-scenes")
-        assert response.status_code == 200
-        assert response.json()[0]["mediaAsset"]["width"] == 640
-        assert (
-            client.get(f"/api/v1/preloaded-scenes/{scenes[0]['sceneId']}").json()["mediaAsset"][
-                "width"
-            ]
-            == 640
-        )
-        with engine.begin() as connection:
-            connection.execute(delete(media_assets).where(media_assets.c.id == ids[0]))
-        assert client.get("/api/v1/preloaded-scenes").status_code == 500
-    # Import a valid new row then a conflicting key: the new row must roll back.
-    fresh = asset()
-    conflicting = asset(storage_key=scenes[1]["mediaAsset"]["storageKey"])
-    ids.extend([fresh.id, conflicting.id])
-    path.write_text(
-        json.dumps([fresh.model_dump(mode="json"), conflicting.model_dump(mode="json")])
-    )
-    with pytest.raises(IntegrityError):
-        import_media_assets(engine, path, from_scenes=False)
-    assert PostgresMediaAssetRepository(engine).get_by_ids([fresh.id]) == {}
 
 
 @pytest.mark.parametrize(

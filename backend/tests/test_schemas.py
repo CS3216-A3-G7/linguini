@@ -21,9 +21,7 @@ from app.schemas.tasks import (
 
 
 def test_api_models_accept_and_emit_camel_case() -> None:
-    request = SubmitObjectSelectionAttemptRequest.model_validate(
-        {"sceneObjectId": str(uuid4())}
-    )
+    request = SubmitObjectSelectionAttemptRequest.model_validate({"sceneObjectId": str(uuid4())})
 
     dumped = request.model_dump(mode="json")
 

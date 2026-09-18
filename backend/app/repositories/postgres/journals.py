@@ -24,8 +24,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.repositories.implementations.postgres.users import users
 from app.repositories.journals import JournalConflictError, JournalStorageError, validate_entries
+from app.repositories.postgres.users import users
 from app.schemas.journals import (
     Journal,
     JournalDetailResponse,
