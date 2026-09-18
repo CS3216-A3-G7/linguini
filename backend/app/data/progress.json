@@ -1,6 +1,6 @@
 [
   {
-    "xp": 1330,
+    "xp": 1342,
     "scenarios": [
       {
         "sceneId": "cafe-plaza",
@@ -123,10 +123,10 @@
           "userId": "11111111-1111-4111-8111-111111111111",
           "languageProfileId": "22222222-2222-4222-8222-222222222222",
           "sceneMediaAssetId": "40e54611-22fb-4a38-977c-f0786df70866",
-          "status": "inProgress",
+          "status": "abandoned",
           "startedAt": "2026-09-16T15:58:47.503345Z",
           "completedAt": null,
-          "abandonedAt": null,
+          "abandonedAt": "2026-09-16T16:05:14.977328Z",
           "planVersion": null,
           "failureCode": null
         },
@@ -146,6 +146,35 @@
           "micReady": false
         },
         "idempotencyKey": "a80126fd-08da-4719-b042-f14392fa06d1"
+      },
+      {
+        "session": {
+          "id": "f6f3dbd3-1b12-47bd-9281-8b553ba51a24",
+          "createdAt": "2026-09-16T16:05:14.977617Z",
+          "updatedAt": "2026-09-16T16:05:16.467330Z",
+          "userId": "11111111-1111-4111-8111-111111111111",
+          "languageProfileId": "22222222-2222-4222-8222-222222222222",
+          "sceneMediaAssetId": "40e54611-22fb-4a38-977c-f0786df70866",
+          "status": "inProgress",
+          "startedAt": "2026-09-16T16:05:14.977423Z",
+          "completedAt": null,
+          "abandonedAt": null,
+          "planVersion": null,
+          "failureCode": null
+        },
+        "state": {
+          "answers": {},
+          "clues": {},
+          "sceneId": "cafe-plaza",
+          "completedTaskIds": [],
+          "scoredRoundIds": [],
+          "analysisScored": true,
+          "roundsPlayed": 0,
+          "correctRounds": 0,
+          "sessionXp": 12,
+          "micReady": false
+        },
+        "idempotencyKey": "313e1f4b-fc56-4a7c-adaa-89432d782865"
       }
     ],
     "languageCode": "es",

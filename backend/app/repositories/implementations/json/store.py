@@ -17,7 +17,9 @@ class JsonStore[T]:
         self.adapter = adapter
 
     def read(self) -> T:
-        return self.adapter.validate_json(self.path.read_text(encoding="utf-8"))
+        # Windows cannot replace an open file; serialize reads with atomic writes.
+        with _lock:
+            return self.adapter.validate_json(self.path.read_text(encoding="utf-8"))
 
     def update[R](self, change: Callable[[T], R]) -> R:
         with _lock:

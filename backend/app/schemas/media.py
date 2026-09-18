@@ -25,6 +25,16 @@ class MediaAsset(EntityModel):
 
     @model_validator(mode="after")
     def validate_media_metadata(self) -> MediaAsset:
+        if (
+            not self.mime_type.lower().startswith(f"{self.media_type.value}/")
+            or not self.mime_type.split("/", 1)[-1]
+        ):
+            raise ValueError("mimeType must match mediaType and include a subtype")
+        if (
+            self.source in (MediaSource.USER_UPLOAD, MediaSource.CAMERA)
+            and self.owner_user_id is None
+        ):
+            raise ValueError("uploaded and camera assets require ownerUserId")
         if self.media_type is MediaType.IMAGE and self.duration_ms is not None:
             raise ValueError("image assets cannot have durationMs")
         if self.media_type is MediaType.AUDIO and (

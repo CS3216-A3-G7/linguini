@@ -1,7 +1,9 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.api.dependencies import get_task_service
 from app.api.errors import service_not_implemented
 from app.schemas.tasks import (
     SessionTaskPublic,
@@ -10,13 +12,16 @@ from app.schemas.tasks import (
     TaskActionResponse,
     TaskHint,
 )
+from app.services.tasks import TaskService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 @router.get("/{task_id}", response_model=SessionTaskPublic)
-async def get_task(task_id: UUID) -> SessionTaskPublic:
-    service_not_implemented("Get task")
+def get_task(
+    task_id: UUID, service: Annotated[TaskService, Depends(get_task_service)]
+) -> SessionTaskPublic:
+    return service.get(task_id)
 
 
 @router.post("/{task_id}/start", response_model=TaskActionResponse)

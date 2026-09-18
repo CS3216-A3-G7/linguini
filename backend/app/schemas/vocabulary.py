@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import AwareDatetime, Field
+from pydantic import AwareDatetime, Field, model_validator
 
 from app.schemas.base import ApiModel, EntityModel, LanguageCode, UnitScore, utc_now
 from app.schemas.enums import (
@@ -48,6 +48,12 @@ class UserVocabularyProgress(EntityModel):
     mastery_score: UnitScore = Decimal("0")
     first_learned_at: AwareDatetime | None = None
     last_practised_at: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def correct_attempts_cannot_exceed_exposures(self) -> UserVocabularyProgress:
+        if self.correct_attempt_count > self.exposure_count:
+            raise ValueError("correctAttemptCount cannot exceed exposureCount")
+        return self
 
 
 class VocabularyEncounter(EntityModel):
