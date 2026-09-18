@@ -1,3 +1,4 @@
+import { LoadingScreen } from "../components/LoadingScreen";
 import { useMemo, useState } from "react";
 import { Button, Card, IconButton, StatusPill, Tabs } from "../components/ui";
 import { FilterIcon, SpeakerIcon } from "../components/icons";
@@ -48,7 +49,7 @@ export function Vocabulary() {
     return <div className="stack"><h1>My vocabulary</h1><p role="alert">{vocabularyError} Reload to retry.</p></div>;
   }
   if (vocabularyLoading) {
-    return <div className="stack"><h1>My vocabulary</h1><p role="status">Loading vocabulary…</p></div>;
+    return <div className="stack"><h1>My vocabulary</h1><LoadingScreen label="Loading vocabulary…" /></div>;
   }
 
   const nextStatus: Record<VocabStatus, VocabStatus> = {

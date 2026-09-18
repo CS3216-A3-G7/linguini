@@ -51,10 +51,12 @@ def record_demo_event(
 
 
 @router.patch("/{session_id}/scene-objects", response_model=SessionDetailResponse)
-async def review_scene_objects(
-    session_id: UUID, request: ReviewSceneObjectsRequest
+def review_scene_objects(
+    session_id: UUID, request: ReviewSceneObjectsRequest, service: PracticeServiceDep
 ) -> SessionDetailResponse:
-    service_not_implemented("Review scene objects")
+    if service.scene_objects is None:
+        service_not_implemented("Review scene objects requires PostgreSQL session storage")
+    return service.review_objects(session_id, request)
 
 
 @router.post(
@@ -69,8 +71,10 @@ async def generate_session_plan(
 
 
 @router.get("/{session_id}/tasks", response_model=list[SessionTaskPublic])
-async def list_session_tasks(session_id: UUID) -> list[SessionTaskPublic]:
-    service_not_implemented("List session tasks")
+def list_session_tasks(session_id: UUID, service: PracticeServiceDep) -> list[SessionTaskPublic]:
+    if service.tasks is None:
+        service_not_implemented("Task storage requires PostgreSQL session storage")
+    return service.get(session_id).tasks
 
 
 @router.get("/{session_id}/summary", response_model=SessionSummaryResponse)
@@ -84,5 +88,5 @@ def complete_session(session_id: UUID, service: PracticeServiceDep) -> Session:
 
 
 @router.post("/{session_id}/abandon", response_model=Session)
-async def abandon_session(session_id: UUID) -> Session:
-    service_not_implemented("Abandon session")
+def abandon_session(session_id: UUID, service: PracticeServiceDep) -> Session:
+    return service.abandon(session_id)

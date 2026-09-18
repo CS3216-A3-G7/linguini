@@ -1,251 +1,185 @@
-﻿# Linguini backend
+# Linguini backend
 
-FastAPI/Pydantic v2 API contract skeleton for Linguini. See the
-[repository README](../README.md) for the frontend and overall project layout.
-
-## Current status
-
-- Versioned `/api/v1` routes cover health, users, home, media, sessions, tasks,
-  vocabulary, and journals.
-- Pydantic schemas describe language profiles, scene objects, learning tasks,
-  I-Spy attempts, journal revisions and suggestions, and AI observability data.
-- API JSON uses camelCase; Python attributes use snake_case.
-- Validators cover normalized bounding boxes, task content, attempt input modes,
-  and completion-state requirements. Public task responses exclude private answers.
-
-`GET /api/v1/health` returns `{"status":"ok"}`. `GET /api/v1/me` returns the existing
-`User` model from `app/data/users.json` through route → service → repository.
-`GET /api/v1/me/progress` loads XP, scenario progress, and leaderboard data.
-`GET /api/v1/me/vocabulary` loads the saved vocabulary list using the existing
-`CursorPage[DailyVocabularyItem]` contract. `GET /api/v1/preloaded-scenes` and
-`GET /api/v1/preloaded-scenes/{scene_id}` provide scene summaries and details.
-Profile, demo-session, and journal persistence are described below. Remaining handlers raise
-`501 Not Implemented` with error code `service_not_implemented` when reached;
-invalid requests can still receive FastAPI validation errors first.
-
-Authentication, database persistence, media processing, and AI
-integrations are not implemented. Journal services enforce one journal per user/local day.
-No API keys or database are required.
-The `tzdata` dependency supplies IANA timezone data for the existing User validator
-on systems such as Windows that do not provide it.
+FastAPI/Pydantic API with SQLAlchemy persistence in Supabase PostgreSQL. Prisma
+owns schema migrations; it is not the Python runtime client. API JSON uses camelCase
+and Python attributes use snake_case. See the [project README](../README.md) for the frontend.
 
 ## Setup
 
-Python 3.12 or newer is required. Start from the repository root.
-If `backend/.venv` already exists, skip the environment creation command.
-
-### Windows PowerShell
+Use Python 3.12+ and Node/npm. From `backend/` in PowerShell:
 
 ```powershell
-cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+npm ci
 Copy-Item .env.example .env.local
+```
+
+Skip creating the environment or copying the environment file if it already exists.
+Fill these variables in `backend/.env.local`:
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Backend PostgreSQL URI. In Supabase's Connect dialog, copy the direct or **session pooler** connection URI, replace the password, and use `sslmode=require`. Session pooler port is 5432; transaction pooler port 6543 is not supported by this backend. URL-encode special characters in credentials. |
+| `DIRECT_URL` | Prisma migration URI: direct connection or session pooler. Use a database role permitted to apply DDL. |
+| `DEMO_USER_ID` | UUID of an existing `users` row. The default example UUID must exist in your database to use `/me`. This is temporary demo identity, not authentication. |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins, including the port; defaults to `http://localhost:5173`. |
+
+Database URLs stay on the backend. No Supabase anon key, service-role key, or AI
+provider key is needed for database access. Do not append Prisma's `pgbouncer=true`
+option to a SQLAlchemy connection URI. SQLAlchemy uses the psycopg driver internally.
+
+```powershell
+npm run db:validate
+npm run db:deploy
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --env-file .env.local
 ```
 
-These commands use the virtual environment directly, so activation is optional.
-To activate it, run `.\.venv\Scripts\Activate.ps1`; then `python` refers to that
-environment for the rest of the terminal session.
+On macOS/Linux, use `python3 -m venv .venv`, `.venv/bin/python`, and `cp` instead.
+API docs: `http://127.0.0.1:8000/docs`; OpenAPI: `/openapi.json`.
+Set frontend `VITE_API_BASE_URL=http://127.0.0.1:8000` without `/api/v1`.
+Restart the appropriate server after changing environment settings.
 
-### macOS / Linux
+**PostgreSQL is required.** The old `USER_STORAGE`, `LANGUAGE_PROFILE_STORAGE`,
+`MEDIA_ASSET_STORAGE`, `VOCABULARY_STORAGE`, `SESSION_STORAGE`, and `JOURNAL_STORAGE`
+switches have been removed. Existing values are ignored and can be deleted from
+local environment files. Missing database configuration fails at startup; connection
+or query failures never fall back to JSON. The application creates one SQLAlchemy
+engine per process and disposes it at shutdown.
 
-```sh
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
-cp .env.example .env.local
-python -m uvicorn app.main:app --reload --env-file .env.local
+## Persistence and remaining static content
+
+| Data | Runtime storage |
+| --- | --- |
+| Users and language profiles | `users`, `language_profiles` |
+| Image/audio metadata | `media_assets` (file bytes are not stored here) |
+| Vocabulary | `vocabulary_items`, `vocabulary_translations`, `user_vocabulary_progress`, `vocabulary_encounters` |
+| Practice | `sessions`, `scene_objects`, `user_practice_progress` |
+| Tasks | `session_tasks`, `task_attempts`, `task_hints` |
+| Journals | `journals`, `journal_media`, `journal_revisions`, `journal_suggestions`, `journal_word_mentions` |
+| AI observability | `ai_generation_runs` |
+| Preloaded scene definitions, markers, demo questions and prompts | `preloaded_scenes` |
+
+The scene catalog is read from PostgreSQL through `PostgresSceneRepository`.
+`preloaded_scenes` stores a UUID, unique URL slug, language code/display name, title,
+description, art key, difficulty, media FK, sort order, active flag and timestamps.
+JSONB `content` holds the reusable markers/tasks/rounds/prompts and is validated
+against `PreloadedSceneDetail` when reading. Metadata comes from columns,
+not arbitrary content keys. The image FK restricts deletion; triggers require a
+shared preloaded image and prevent changing referenced media to another source/type.
+Inactive scenes are excluded from catalog and detail reads. Existing slugs and the
+frontend response contract are preserved. SVG artwork remains in the frontend.
+
+The built-in scene catalog is preserved in the
+`20260918090000_seed_preloaded_scenes` migration. Run `npm run db:deploy` to apply it.
+It inserts missing media IDs and scene slugs without overwriting existing rows.
+This supports fresh installations without a JSON file or an import command.
+
+The legacy `app/import_*.py` tools, JSON fixtures, and file-backed test adapters
+have been removed. Existing migrated user data stays in PostgreSQL. Fresh databases
+contain the catalog but no demo users or learner history; provision a user and set
+`DEMO_USER_ID` to that user's UUID before using the demo API.
+
+Repository interfaces and shared errors remain in `app/repositories/`;
+SQLAlchemy implementations live in `app/repositories/postgres/`. Services depend
+on these interfaces, while FastAPI dependencies supply PostgreSQL implementations.
+They are separate responsibilities rather than duplicate persistence code.
+
+## Behavior and constraints
+
+Users own language profiles; language pairs are unique per user and only one profile
+can be active. Switching profiles filters vocabulary and the scene catalog. Name,
+learning goal, preferences, level, and daily minutes persist in PostgreSQL. Browser
+camera/microphone permissions remain separate from saved preferences.
+
+Vocabulary reads use the active target language and its source-language translation
+in one database snapshot. Missing translations remain null. Trusted backend events
+use `PostgresVocabularyRepository.record_encounter` to atomically record an event
+and update counters. Stable IDs make event retries idempotent; conflicting reuse is
+rejected. Mastery/status are not inferred from counters. Composite foreign keys
+require every encounter's session to belong to its user, and its task to belong
+to that exact session. Missing parents and cross-user/session references are
+rejected even for direct SQL writes. These constraints establish ownership and
+existence; they do not prove an answer was evaluated or a task was completed.
+
+The `20260918100000_enforce_encounter_parents` migration validates existing history
+and fails atomically if invalid references exist. Before deploying it to an existing
+database, this query should return no rows:
+
+```sql
+SELECT e.id, e.user_id, e.session_id, e.session_task_id
+FROM public.vocabulary_encounters e
+LEFT JOIN public.sessions s ON s.id = e.session_id AND s.user_id = e.user_id
+LEFT JOIN public.session_tasks t ON t.id = e.session_task_id AND t.session_id = e.session_id
+WHERE s.id IS NULL OR t.id IS NULL;
 ```
 
-The editable install uses `backend/pyproject.toml` and includes the `dev` extra
-(HTTPX, pytest, and Ruff). Hatch explicitly packages the `app/` directory.
-Run these commands inside `backend/`, where the project configuration lives.
+Reconcile any results with real historical records before deployment; the migration
+does not fabricate parents, delete encounters, or adjust counters. Foreign keys use
+`NO ACTION`, deferred until transaction commit: individual sessions/tasks cannot be
+deleted while referenced, but deleting an entire user's aggregate can cascade
+atomically. Prisma records the relations; SQL defines the deferred-check behavior.
 
-## Local API
+Practice sessions and XP update in one transaction. Retrying a scored demo event
+awards XP once. Sessions are owned by the user/profile; a new active session can
+abandon the prior session for that profile. Normalized task records protect private
+answers, attempts, hints, and completion state. The demo frontend still uses the
+scene's scripted task payload and `sessions.demo_state`; do not remove that JSONB
+column until the frontend uses normalized task APIs throughout.
 
-| URL | Purpose |
-| --- | --- |
-| `http://127.0.0.1:8000/api/v1/health` | Health check |
-| `http://127.0.0.1:8000/docs` | Interactive Swagger UI |
-| `http://127.0.0.1:8000/redoc` | ReDoc API reference |
-| `http://127.0.0.1:8000/openapi.json` | Generated OpenAPI schema |
+Journals are unique per user/local date across all target languages. Saves append
+immutable revisions, with identical retries avoiding duplicate revisions. Media
+must be owned or preloaded images; audio must be owned. Suggestion acceptance
+requires the expected base revision and atomically creates a new revision.
+Annotation offsets use zero-based Unicode code points with an exclusive end;
+JavaScript UTF-16 offsets must be converted for supplementary characters. Child rows
+cascade when their journal is deleted; referenced media/vocabulary remain protected.
 
-In another terminal, run `cd frontend` from the repository root, install with
-`npm ci`, copy `.env.example` to `.env.local`, and run `npm run dev`.
-Open `http://localhost:5173/home`; the greeting requests `/api/v1/me`.
+AI runs record feature, model/prompt/schema versions, pending/succeeded/failed status,
+optional nonnegative BIGINT token counts and latency, validation outcome, error code,
+and input/output references. Null metrics mean unknown. Composite foreign keys
+ensure linked sessions/journals belong to the run's user. Ownerless runs are system
+jobs and cannot reference a session or journal. Deleting a linked user/session/journal
+also deletes its runs.
 
-| Variable | Location | Default / purpose |
-| --- | --- | --- |
-| `VITE_API_BASE_URL` | `frontend/.env.local` | `http://127.0.0.1:8000`, server origin without `/api/v1`; restart Vite after changes |
-| `CORS_ALLOWED_ORIGINS` | `backend/.env.local` | `http://localhost:5173`, comma-separated exact browser origins; restart backend after changes |
-| `DEMO_USER_ID` | `backend/.env.local` | `11111111-1111-4111-8111-111111111111`, UUID of the demo user |
+Trusted workers use `PostgresAiGenerationRunRepository(engine, user_id)` and
+`AiGenerationRunCompletion`. `create` starts a pending run with a stable UUID;
+matching retries return its current record. `finish` records succeeded or failed,
+with completion time defaulting to current UTC. Failure requires a nonblank error
+code. Concurrent completion serializes, identical retries succeed, and conflicting
+results are rejected. Identity/version fields and completed results are immutable.
+`get` and `list_runs` are owner-scoped; `user_id=None` means system runs only.
+Deduplicating run records does not provide a provider-job lease. Store storage
+identifiers in input/output references rather than raw prompts.
 
-Backend defaults work without an env file. The CLI `--env-file .env.local` loads
-the example configuration when copied. If Vite uses another port or host, add its
-exact origin to `CORS_ALLOWED_ORIGINS`. The JSON path is resolved relative to the
-backend module, independent of the working directory. This is a temporary demo
-lookup, not authentication. A missing user returns `404` (`user_not_found`);
-unreadable, malformed, or schema-invalid JSON returns a controlled `500`
-(`user_storage_error`).
+Tables use UUID identities and timezone-aware timestamps. Migrations define foreign
+keys, checks, update triggers, RLS, and revoked browser-role grants. All access is
+through backend repositories; the frontend must not query these tables directly.
 
-## Progress and vocabulary
+## Remaining integration work
 
-`app/data/progress.json` is an array of user-scoped progress snapshots.
-`app/data/vocabulary.json` is an array of existing `DailyVocabularyItem` models:
-each record contains a vocabulary item, translation, learner progress, and optional
-`sceneId`/`topic` metadata for the screen. The migrated demo has 12 words, three
-scenario-progress records, five leaderboard rows, and 1280 starting XP.
+Authentication, camera uploads/media processing, AI generation and speech evaluation
+are not implemented. AI runs are populated only when backend workers call the
+repository; ordinary frontend use does not fabricate run records. Vocabulary
+"Move" is still local frontend state. Demo scoring is not yet connected to the
+vocabulary encounter writer. Daily vocabulary, home aggregation, and other unfinished
+routes return an explicit 501. Journal eligible-photo/learned-word recommendations
+and automatic annotations remain unpopulated. Creating tables does not implement
+these provider or frontend flows.
 
-The route calls `LearningService` through FastAPI dependencies, then the
-`LearningRepository` interface and `JsonLearningRepository`. The configured user
-is checked before lookup. Vocabulary is filtered by its progress `userId`; progress
-snapshots are selected by `userId`. The current learner's leaderboard name comes
-from the existing user service. No database or authentication was added.
-
-Vocabulary accepts `limit` (1–100, default 50) and the previous response's
-`nextCursor`. Pass that cursor unchanged to fetch the next page; `nextCursor: null`
-marks the end. Invalid cursors return 400. Empty vocabulary returns an empty page;
-missing progress returns 404. Invalid JSON, invalid model data, and file read errors
-return a controlled 500. Daily vocabulary and individual-word GET routes remain 501.
-
-Start both apps using the setup commands above and open
-`http://localhost:5173/progress` or `http://localhost:5173/vocabulary`. If port 8000
-is occupied, start Uvicorn with `--port 8001` and set the frontend's
-`VITE_API_BASE_URL=http://127.0.0.1:8001`. CORS still allows the frontend origin
-`http://localhost:5173`. Reload the browser after changing demo JSON.
-
-Vocabulary Move still changes frontend state only. Practice XP is saved to JSON.
-
-### Persisted demo practice and journals
-
-Practice routes use `PracticeService` and `JsonPracticeRepository`. Session state
-and XP are written together to `app/data/progress.json`, under the user's language
-row, using the shared atomic JSON store. Create/resume/read/complete reuse the
-existing session routes. `POST /api/v1/sessions/{id}/demo-events` accepts an analysis,
-task, multiple-choice round, or clue event. It validates IDs against the scene,
-calculates XP on the server, and awards each action once per session, including
-concurrent retries. `demoState` on the existing session detail response restores
-the frontend. Create requests support the existing `idempotencyKey` field.
-
-`JournalService` and `JsonJournalRepository` use `app/data/journals.json` for journal
-metadata and revisions. Implemented routes: `GET /journals`, `GET /journal/today/context`,
-`PUT /journal/today`, `GET/PATCH /journals/{id}`, and `POST /journals/{id}/revisions`
-(all under `/api/v1`). Reads and edits check demo-user ownership. Daily creation
-uses the user's timezone and active profile. History includes all of their languages.
-Missing records return 404, conflicting actions 409, invalid input 422, and invalid
-JSON or failed file writes a controlled 500. Repeated identical content is idempotent.
-
-Run a single backend worker with the existing environment setup. No database,
-authentication, or additional environment variables are introduced. Demo answers
-remain visible in scene fixtures; free-form clues earn participation credit only.
-AI/media processing and unrelated placeholder routes remain unimplemented.
-`tests/test_persistence.py` covers reloads, concurrent duplicate events, scoring,
-completion, isolation, failed writes, journal revisions, and CORS for writes.
-
-## Checks
-
-### Persisted user and language profiles
-
-The existing `PATCH /api/v1/me` and language-profile GET/POST/PATCH endpoints now
-use services and JSON repositories. `users.json` also stores `learningGoal`,
-`microphoneEnabled`, and `cameraEnabled`; omitted fields retain their values.
-`language_profiles.json` holds each user's language pair, active flag, level,
-input preference, and daily minutes. New profiles become active; activating one
-deactivates only that user's other profiles in the same atomic file update.
-Duplicate language pairs return 409, unknown/other-user profile IDs return 404,
-and invalid request values return 422. Explicit null daily minutes clears the goal.
-
-Scene catalog/detail, vocabulary, and progress requests resolve the configured
-user's active target language. Scene and progress JSON now include `languageCode`;
-vocabulary already includes it. No active profile returns 409 with instructions
-to choose one. The supplied content is Spanish-only; other active languages return
-empty content, and mismatched scene-detail requests return 404. User and language
-selection remain demo identity selection via `DEMO_USER_ID`, not authentication.
-
-JSON writes validate data, hold a process-wide lock across read/modify/write, and
-replace the file atomically. Run a single backend worker. Onboarding uses separate
-user and language-profile writes; they are not a cross-file transaction. A failure
-is visible and can be retried. Malformed/unreadable storage and failed writes return
-controlled 500 errors without overwriting the original file on a failed replacement.
-Tests in `tests/test_language_profiles.py` exercise switching, persistence,
-cross-user isolation, one-active-profile enforcement, validation, and failure recovery.
-
-CORS now permits GET, POST, PATCH, PUT, and the Content-Type request header. Existing
-startup/environment commands are unchanged. To verify, choose French in `/profile`,
-reload, check empty `/practice` and `/vocabulary`, then switch back to Spanish.
-
-Scene data lives in `app/data/scenes.json`, containing the six migrated demo scenes.
-The existing `PreloadedScene` catalog model now includes `sceneId`, `art`, and
-`language`; its existing media metadata, title, description, and difficulty fields
-are retained. Details extend that model with typed demo items, tasks, rounds, and
-prompts. These are static demo content, separate from live `SessionTaskPublic`
-contracts. Demo answers remain client-visible to preserve the current practice
-flow; live AI evaluation is still unimplemented. Demo sessions now persist.
-
-Routes call `SceneService` through FastAPI dependencies and the `SceneRepository`
-interface, backed by `JsonSceneRepository`. The repository validates IDs, item
-references, and marker coordinates. An empty JSON array produces an empty catalog;
-unknown scene slugs return 404; invalid or unreadable storage produces a controlled
-500. `mediaAsset.storageKey` values such as `demo-art/street` identify bundled SVG
-artwork; they are not upload URLs. Frontend artwork still renders locally.
-
-Use the same local startup commands and API/CORS environment variables as above.
-Visit `/practice` or `/practice/calle-mayor/analysis` in the frontend. Tests in
-`tests/test_scenes.py` cover catalog/detail contracts, migrated content, missing
-scenes, empty data, bad JSON, invalid references, duplicate IDs, and CORS.
-
-From `backend/` on Windows, without activating the environment:
+## Tests
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe -m ruff check .
-.\.venv\Scripts\python.exe -m ruff format --check app/config.py app/api/dependencies.py app/repositories app/services tests/test_users.py
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-With the virtual environment activated on any platform:
+Without `TEST_DATABASE_URL`, PostgreSQL integration tests are skipped. For complete
+coverage, point `TEST_DATABASE_URL` to a **disposable migrated test database** and run
+the suite. Integration tests create and delete records; never use a live Supabase
+project as the test database. Pure schema/error-handling tests run without a database. Persistence and API tests
+use PostgreSQL, create their own records in Python, and clean up after themselves.
+Scene tests read the catalog installed by migrations; no test JSON files or alternate
+storage adapters are used. The tests exercise the production dependency graph.
 
-```sh
-python -m pytest
-python -m ruff check .
-python -m ruff format --check app/config.py app/api/dependencies.py app/repositories app/services tests/test_users.py
-```
-
-Tests cover the health response, core OpenAPI paths, explicit unimplemented-service
-errors, camelCase serialization, bounding boxes, task content, private-answer
-exclusion, and discriminated attempt inputs. They do not test end-to-end learning
-flows or database behavior. User tests cover JSON validation and read errors,
-service lookup, the complete current-user response, missing users, controlled
-storage errors, and allowed/disallowed CORS origins. Frontend checks are
-`npm run build` (including TypeScript) and `npm run lint`; no frontend test or
-formatter script is configured.
-
-`tests/test_learning.py` also covers the migrated progress/vocabulary data, user
-isolation, pagination, invalid cursors, empty results, missing users, controlled
-storage errors, and the remaining unimplemented vocabulary endpoints.
-
-## Layout
-
-```text
-backend/
-|-- app/
-|   |-- main.py           FastAPI app factory and application instance
-|   |-- api/
-|   |   |-- router.py     Versioned router assembly
-|   |   |-- errors.py     Shared unimplemented-service error
-|   |   `-- routes/       Route contracts grouped by feature
-|   `-- schemas/          Pydantic models and validation
-|-- tests/
-|   |-- test_openapi.py   Health and API contract checks
-|   `-- test_schemas.py   Model validation and serialization checks
-|-- .gitignore           Virtual environment and Python cache exclusions
-|-- pyproject.toml       Build, dependencies, pytest, and Ruff configuration
-`-- README.md
-```
-
-User domain logic lives in `app/services/users.py`, its repository interface in
-`app/repositories/users.py`, and the JSON adapter in
-`app/repositories/implementations/json/users.py`. FastAPI dependencies in
-`app/api/dependencies.py` wire these together. `app/config.py` reads demo/CORS
-environment settings; `app/data/users.json` contains the single demo user.
+Production sources are under `app/`, migrations under `prisma/migrations/`,
+and database/schema tests under `tests/`.

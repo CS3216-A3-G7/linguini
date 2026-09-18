@@ -1,3 +1,4 @@
+import { LoadingScreen } from "../components/LoadingScreen";
 import { useNavigate, useParams } from "react-router-dom";
 import { useCallback, useState } from "react";
 import { getJournal } from "../lib/api";
@@ -19,7 +20,7 @@ function JournalEntryDetail({ entryId }: { entryId: string }) {
   const load = useCallback((signal?: AbortSignal) => getJournal(entryId ?? "", signal), [entryId]);
   const { data: entry, setData, loading, error } = useApiData(load);
   const [editing, setEditing] = useState(false);
-  if (loading) return <p role="status">Loading journal entry…</p>;
+  if (loading) return <LoadingScreen label="Loading journal entry…" />;
   if (error) return <p role="alert">{error} Reload to retry.</p>;
 
   if (!entry) {

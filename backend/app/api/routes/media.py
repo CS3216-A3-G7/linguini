@@ -1,8 +1,9 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
-from app.api.dependencies import get_active_language, get_scene_service
+from app.api.dependencies import get_active_language, get_media_asset_service, get_scene_service
 from app.api.errors import service_not_implemented
 from app.schemas.media import (
     ConfirmMediaUploadRequest,
@@ -12,9 +13,18 @@ from app.schemas.media import (
     PreloadedScene,
 )
 from app.schemas.scenes import PreloadedSceneDetail
+from app.services.media_assets import MediaAssetService
 from app.services.scenes import SceneService
 
 router = APIRouter(tags=["media"])
+
+
+@router.get("/media/{asset_id}", response_model=MediaAsset)
+def get_media_asset(
+    asset_id: UUID,
+    service: Annotated[MediaAssetService, Depends(get_media_asset_service)],
+) -> MediaAsset:
+    return service.get_asset(asset_id)
 
 
 @router.post("/media/upload-url", response_model=CreateUploadUrlResponse)

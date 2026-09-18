@@ -58,16 +58,20 @@ def update_journal(
     response_model=JournalMedia,
     status_code=status.HTTP_201_CREATED,
 )
-async def add_journal_media(journal_id: UUID, request: AddJournalMediaRequest) -> JournalMedia:
-    service_not_implemented("Add journal media")
+def add_journal_media(
+    journal_id: UUID, request: AddJournalMediaRequest, service: JournalServiceDep
+) -> JournalMedia:
+    return service.add_media(journal_id, request)
 
 
 @router.delete(
     "/journals/{journal_id}/media/{media_asset_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def remove_journal_media(journal_id: UUID, media_asset_id: UUID) -> None:
-    service_not_implemented("Remove journal media")
+def remove_journal_media(
+    journal_id: UUID, media_asset_id: UUID, service: JournalServiceDep
+) -> None:
+    service.remove_media(journal_id, media_asset_id)
 
 
 @router.post(
@@ -98,18 +102,20 @@ async def generate_journal_suggestions(
     "/journal-suggestions/{suggestion_id}/accept",
     response_model=JournalSuggestion,
 )
-async def accept_journal_suggestion(suggestion_id: UUID) -> JournalSuggestion:
-    service_not_implemented("Accept journal suggestion")
+def accept_journal_suggestion(suggestion_id: UUID, service: JournalServiceDep) -> JournalSuggestion:
+    return service.review_suggestion(suggestion_id, accept=True)
 
 
 @router.post(
     "/journal-suggestions/{suggestion_id}/reject",
     response_model=JournalSuggestion,
 )
-async def reject_journal_suggestion(suggestion_id: UUID) -> JournalSuggestion:
-    service_not_implemented("Reject journal suggestion")
+def reject_journal_suggestion(suggestion_id: UUID, service: JournalServiceDep) -> JournalSuggestion:
+    return service.review_suggestion(suggestion_id, accept=False)
 
 
 @router.post("/journals/{journal_id}/complete", response_model=Journal)
-async def complete_journal(journal_id: UUID, request: CompleteJournalRequest) -> Journal:
-    service_not_implemented("Complete journal")
+def complete_journal(
+    journal_id: UUID, request: CompleteJournalRequest, service: JournalServiceDep
+) -> Journal:
+    return service.complete(journal_id, request.current_revision_id)

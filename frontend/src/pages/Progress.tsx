@@ -1,3 +1,4 @@
+import { LoadingScreen } from "../components/LoadingScreen";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, ProgressTrail, Tabs } from "../components/ui";
@@ -24,7 +25,7 @@ export function Progress() {
     return <div className="stack"><h1>Progress</h1><p role="alert">{progressError || vocabularyError} Reload to retry.</p></div>;
   }
   if (progressLoading || vocabularyLoading || !progress) {
-    return <div className="stack"><h1>Progress</h1><p role="status">Loading progress…</p></div>;
+    return <div className="stack"><h1>Progress</h1><LoadingScreen label="Loading progress…" /></div>;
   }
   const scenarioProgress = progress.scenarios;
 

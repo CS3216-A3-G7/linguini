@@ -8,12 +8,19 @@ from app.repositories.language_profiles import (
     LanguageProfileStorageError,
 )
 from app.repositories.learning import LearningStorageError
+from app.repositories.media_assets import MediaAssetConflictError, MediaAssetStorageError
 from app.repositories.practice import PracticeStorageError
+from app.repositories.scene_objects import (
+    SceneObjectNotFoundError,
+    SceneObjectReviewConflictError,
+)
 from app.repositories.scenes import SceneStorageError
+from app.repositories.tasks import TaskConflictError, TaskNotFoundError, TaskStorageError
 from app.repositories.users import UserRepositoryError
 from app.services.journals import JournalConflictError, JournalNotFoundError
 from app.services.language_profiles import NoActiveLanguageError
 from app.services.learning import InvalidCursorError, ProgressNotFoundError
+from app.services.media_assets import MediaAssetNotFoundError
 from app.services.practice import PracticeConflictError, PracticeNotFoundError
 from app.services.scenes import SceneNotFoundError
 from app.services.users import UserNotFoundError
@@ -21,6 +28,30 @@ from app.services.users import UserNotFoundError
 
 def register_learning_errors(app: FastAPI) -> None:
     errors = {
+        TaskNotFoundError: (404, "task_not_found", "Task or session not found."),
+        TaskConflictError: (409, "task_conflict", "Task record conflicts with the current state."),
+        TaskStorageError: (500, "task_storage_error", "Unable to load or save task records."),
+        SceneObjectNotFoundError: (
+            404,
+            "scene_object_not_found",
+            "Scene object or session not found.",
+        ),
+        SceneObjectReviewConflictError: (
+            409,
+            "scene_object_review_conflict",
+            "This session has already ended.",
+        ),
+        MediaAssetStorageError: (
+            500,
+            "media_asset_storage_error",
+            "Unable to load or save media metadata.",
+        ),
+        MediaAssetConflictError: (
+            409,
+            "media_asset_conflict",
+            "Media asset or storage key already exists.",
+        ),
+        MediaAssetNotFoundError: (404, "media_asset_not_found", "Media asset not found."),
         PracticeStorageError: (
             500,
             "practice_storage_error",
@@ -41,8 +72,7 @@ def register_learning_errors(app: FastAPI) -> None:
         JournalConflictError: (
             409,
             "journal_conflict",
-            "Today's journal uses another language. "
-            "Open it from journal history, or select its language.",
+            "Journal action conflicts with its language, references or current revision.",
         ),
         LanguageProfileStorageError: (
             500,

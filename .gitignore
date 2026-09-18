@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Local credentials (keep the setup templates tracked)
+.env
+.env.*
+!.env.example
+
+# Generated TypeScript build state and test coverage
+*.tsbuildinfo
+coverage/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

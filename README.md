@@ -11,17 +11,15 @@ vocabulary load from `/api/v1/me/progress` and `/api/v1/me/vocabulary`.
 Scene summaries load from `/api/v1/preloaded-scenes`; practice routes fetch
 `/api/v1/preloaded-scenes/{sceneId}` before rendering their scene content.
 The shared user and active language profile load from `/api/v1/me` and
-`/api/v1/me/language-profiles`. Profile edits and onboarding now save to backend
-JSON. Language selection filters scenes, vocabulary, and progress on the backend.
-Practice actions and XP now persist in backend JSON, as do journal entries and
+`/api/v1/me/language-profiles`. Profile edits and onboarding save to PostgreSQL. Language selection filters scenes, vocabulary, and progress on the backend.
+Practice actions and XP persist in PostgreSQL, as do journal entries and
 edits. Vocabulary status changes remain in memory. Scene images are SVG placeholders; word playback uses browser speech synthesis
 when available.
 
 The backend defines API routes and validated request/response schemas. Its health
 endpoint, user/profile edits, progress, vocabulary, scenes, demo sessions, and journal reads/writes work; remaining business route handlers return
-`501 Not Implemented` when reached. The demo user is read from a temporary JSON
-file through a service and repository. Authentication, databases, and AI services
-are not implemented. No API keys or database configuration are needed.
+`501 Not Implemented` when reached. The demo user is read from PostgreSQL through a service and repository.
+Database configuration is required; authentication and AI integrations are not implemented.
 
 ## Repository layout
 
@@ -80,6 +78,9 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 Copy-Item .env.example .env.local
+# Fill DATABASE_URL and DIRECT_URL in .env.local before continuing.
+npm ci
+npm run db:deploy
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --env-file .env.local
 ```
 
@@ -90,7 +91,7 @@ See the [backend README](backend/README.md) for macOS/Linux setup and API detail
 `frontend/.env.local` sets `VITE_API_BASE_URL=http://127.0.0.1:8000` (the server
 origin, without `/api/v1`). Restart Vite after changing it. `backend/.env.local`
 sets `CORS_ALLOWED_ORIGINS=http://localhost:5173` and `DEMO_USER_ID` to the UUID
-in `backend/app/data/users.json`. Allowed origins are comma-separated; include
+of an existing row in PostgreSQL `users`. Allowed origins are comma-separated; include
 the exact frontend origin, including port, if using another host or Vite port.
 Restart the backend after changing its environment. Both example files use
 matching defaults. No authentication is performed; `/me` always uses this demo ID.
@@ -100,21 +101,22 @@ command and set `VITE_API_BASE_URL=http://127.0.0.1:8001` in `frontend/.env.loca
 Open `/progress` or `/vocabulary` to see the integrated screens. Restart the
 backend after code changes unless it was started with `--reload`.
 
-`backend/app/data/progress.json` owns starting XP, scenario progress, and the
-leaderboard. `backend/app/data/vocabulary.json` owns saved words, translations,
-and learning statuses. Both are validated against Pydantic models on each read.
-Reload the browser after editing the JSON. The vocabulary client fetches every
-page; filters run locally. Loading and API errors are visible, with no mock-data
-fallback. Vocabulary status changes remain temporary in-memory changes.
-Journal history lives in `backend/app/data/journals.json`. Scene metadata,
-word markers, and bundled demo practice content now live in
-`backend/app/data/scenes.json`. The SVG artwork remains in frontend components.
+PostgreSQL stores users, language profiles, vocabulary, progress, sessions, tasks,
+media metadata, journals, and AI generation runs. Configure the database as described
+in the [backend README](backend/README.md). Runtime JSON storage and its environment
+switches have been removed. Vocabulary status changes remain temporary frontend
+state until that action is connected to a backend writer.
+
+The scene catalog, word markers, and bundled demo practice content live in PostgreSQL
+`preloaded_scenes`. Run `npm run db:deploy` from `backend/` to create the tables
+and seed missing catalog entries. No JSON imports are required.
+The SVG artwork remains in frontend components.
 
 The catalog retains the existing scene slugs, so practice links still work. Open
 `/practice` to select a scene or `/practice/calle-mayor/analysis` to test a direct
 link. Loading, empty catalog, missing scene, and API failures have visible states.
 Unknown scene IDs no longer fall back to the first scene. Reload the browser after
-editing scene JSON. Scene content remains static; camera uploads and AI generation
+editing database scene content. Scene content remains static; camera uploads and AI generation
 are not implemented. Demo multiple-choice answers are scored on the backend.
 
 ## Profile and language selection
@@ -125,8 +127,7 @@ edits use **Save profile**. Microphone and camera preferences are persisted too,
 but browser permissions remain separate. Onboarding configures this same demo
 user; it does not create an authenticated account.
 
-`backend/app/data/language_profiles.json` stores language profiles keyed by user
-ID, with at most one active profile per user. Switching language reloads content
+PostgreSQL `language_profiles` stores language profiles keyed by user ID, with at most one active profile per user. Switching language reloads content
 and reloads practice state for that profile. Your selection and per-language goals survive
 refreshes and backend restarts. Name changes appear in Home and the leaderboard.
 
@@ -141,8 +142,8 @@ not implemented.
 
 XP previously reset because it was only incremented in React state. Practice now
 creates/resumes a backend session and saves each action through
-`POST /api/v1/sessions/{id}/demo-events`. `progress.json` stores sessions and XP
-together, keyed by user and target language. The backend calculates awards; retries
+`POST /api/v1/sessions/{id}/demo-events`. PostgreSQL stores sessions and XP
+in one transaction, keyed by user and target language. The backend calculates awards; retries
 of the same action in the same session award XP once. Reloads and backend restarts
 preserve totals, completed tasks, answers, and clues. **Practise again** explicitly
 starts a new session. The browser stores only the session ID, not XP.
@@ -174,9 +175,6 @@ Use `VITE_API_BASE_URL=http://localhost:8000` in `frontend/.env.local` and
 `CORS_ALLOWED_ORIGINS=http://localhost:5173` in `backend/.env.local`.
 Open `http://localhost:5173/practice`, complete an action, then refresh `/progress`
 to verify saved XP. Restart Vite after changing its environment configuration.
-
-Run one backend process while using JSON persistence. Writes use a process lock
-and atomic file replacement; this is not a multi-worker database substitute.
 
 ## Frontend commands
 

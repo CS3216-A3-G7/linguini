@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, TypeAlias, Union
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import AwareDatetime, Field, model_validator
@@ -101,17 +101,15 @@ class ReflectionContent(ApiModel):
     allow_text: bool = True
 
 
-TaskPublicContent: TypeAlias = Annotated[
-    Union[
-        VocabularyIntroductionContent,
-        PronunciationPracticeContent,
-        GrammarExplanationContent,
-        GrammarPracticeContent,
-        SyntaxExplanationContent,
-        SentenceBuildingContent,
-        ISpyRoundContent,
-        ReflectionContent,
-    ],
+type TaskPublicContent = Annotated[
+    VocabularyIntroductionContent
+    | PronunciationPracticeContent
+    | GrammarExplanationContent
+    | GrammarPracticeContent
+    | SyntaxExplanationContent
+    | SentenceBuildingContent
+    | ISpyRoundContent
+    | ReflectionContent,
     Field(discriminator="kind"),
 ]
 
@@ -197,6 +195,12 @@ class TaskAttempt(EntityModel):
     feedback: JsonObject | None = None
     evaluation_details: JsonObject | None = None
 
+    @model_validator(mode="after")
+    def validate_audio_input(self) -> TaskAttempt:
+        if (self.input_mode is AttemptInputMode.SPEECH) != (self.audio_media_asset_id is not None):
+            raise ValueError("speech attempts require audioMediaAssetId; other modes cannot use it")
+        return self
+
 
 class TaskHint(EntityModel):
     session_task_id: UUID
@@ -230,13 +234,11 @@ class SubmitMultipleChoiceAttemptRequest(ApiModel):
     idempotency_key: Annotated[str, Field(min_length=8, max_length=200)] | None = None
 
 
-SubmitTaskAttemptRequest: TypeAlias = Annotated[
-    Union[
-        SubmitTextAttemptRequest,
-        SubmitSpeechAttemptRequest,
-        SubmitObjectSelectionAttemptRequest,
-        SubmitMultipleChoiceAttemptRequest,
-    ],
+type SubmitTaskAttemptRequest = Annotated[
+    SubmitTextAttemptRequest
+    | SubmitSpeechAttemptRequest
+    | SubmitObjectSelectionAttemptRequest
+    | SubmitMultipleChoiceAttemptRequest,
     Field(discriminator="input_mode"),
 ]
 
@@ -253,9 +255,7 @@ class SessionProgress(ApiModel):
 
     @model_validator(mode="after")
     def validate_counts(self) -> SessionProgress:
-        if self.terminal_task_count != (
-            self.completed_task_count + self.skipped_task_count
-        ):
+        if self.terminal_task_count != (self.completed_task_count + self.skipped_task_count):
             raise ValueError("terminal count must equal completed plus skipped")
         if self.terminal_task_count > self.total_task_count:
             raise ValueError("terminal count cannot exceed total count")

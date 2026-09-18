@@ -1,10 +1,8 @@
 """Environment configuration for the temporary demo integration."""
 
 import os
-from pathlib import Path
 from uuid import UUID
 
-DEMO_USERS_PATH = Path(__file__).parent / "data" / "users.json"
 DEFAULT_DEMO_USER_ID = "11111111-1111-4111-8111-111111111111"
 
 

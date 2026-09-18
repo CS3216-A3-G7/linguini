@@ -1,3 +1,4 @@
+import { LoadingScreen } from "../components/LoadingScreen";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Feedback, TopBar } from "../components/ui";
@@ -12,7 +13,7 @@ import type { JournalEntry } from "../data/types";
 
 export function JournalNew() {
   const { data, loading, error } = useApiData(getTodayJournal);
-  if (loading) return <p role="status">Loading today's journal…</p>;
+  if (loading) return <LoadingScreen label="Loading today's journal…" />;
   if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
   return <JournalForm key={data.entry?.id ?? "new"} entry={data.entry} date={data.date} />;
 }

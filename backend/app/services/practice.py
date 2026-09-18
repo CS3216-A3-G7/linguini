@@ -1,8 +1,11 @@
 from uuid import UUID
 
 from app.repositories.practice import PracticeRepository
+from app.repositories.scene_objects import SceneObjectRepository
+from app.repositories.tasks import TaskRepository
 from app.schemas.base import utc_now
 from app.schemas.enums import SessionStatus
+from app.schemas.media import ReviewSceneObjectsRequest
 from app.schemas.progress import ScenarioProgress, StoredProgress
 from app.schemas.sessions import (
     CreateSessionRequest,
@@ -12,6 +15,7 @@ from app.schemas.sessions import (
     SessionDetailResponse,
     StoredDemoSession,
 )
+from app.schemas.tasks import SessionProgress, SessionTaskPublic
 from app.services.language_profiles import LanguageProfileService
 from app.services.scenes import SceneService
 from app.services.users import UserService
@@ -32,11 +36,15 @@ class PracticeService:
         users: UserService,
         profiles: LanguageProfileService,
         scenes: SceneService,
+        scene_objects: SceneObjectRepository | None = None,
+        tasks: TaskRepository | None = None,
     ) -> None:
         self.repository = repository
         self.users = users
         self.profiles = profiles
         self.scenes = scenes
+        self.scene_objects = scene_objects
+        self.tasks = tasks
 
     def _profile(self):
         self.profiles.active_language()
@@ -46,8 +54,31 @@ class PracticeService:
     def _detail(run: StoredDemoSession) -> SessionDetailResponse:
         return SessionDetailResponse(session=run.session, demo_state=run.state)
 
-    def _find(self, rows: list[StoredProgress], session_id: UUID):
-        profile = self._profile()
+    def _attach_objects(self, detail: SessionDetailResponse) -> SessionDetailResponse:
+        if self.scene_objects is not None:
+            detail.scene_objects = self.scene_objects.list_for_session(
+                detail.session.id, detail.session.user_id
+            )
+        if self.tasks is not None:
+            records = self.tasks.list_for_session(detail.session.id, detail.session.user_id)
+            detail.tasks = [SessionTaskPublic.from_internal(task) for task in records]
+            if records:
+                completed = sum(task.status == "completed" for task in records)
+                skipped = sum(task.status == "skipped" for task in records)
+                detail.progress = SessionProgress(
+                    terminal_task_count=completed + skipped,
+                    completed_task_count=completed,
+                    skipped_task_count=skipped,
+                    total_task_count=len(records),
+                )
+                detail.next_task_id = next(
+                    (task.id for task in records if task.status not in {"completed", "skipped"}),
+                    None,
+                )
+        return detail
+
+    def _find(self, rows: list[StoredProgress], session_id: UUID, profile=None):
+        profile = profile or self._profile()
         for progress in rows:
             if progress.user_id != profile.user_id:
                 continue
@@ -58,7 +89,7 @@ class PracticeService:
 
     def get(self, session_id: UUID) -> SessionDetailResponse:
         _, run = self._find(self.repository.read(), session_id)
-        return self._detail(run)
+        return self._attach_objects(self._detail(run))
 
     def active(self) -> SessionDetailResponse | None:
         profile = self._profile()
@@ -70,7 +101,7 @@ class PracticeService:
             if run.session.language_profile_id == profile.id
             and run.session.status == SessionStatus.IN_PROGRESS
         ]
-        return self._detail(runs[-1]) if runs else None
+        return self._attach_objects(self._detail(runs[-1])) if runs else None
 
     def create(self, request: CreateSessionRequest) -> SessionDetailResponse:
         profile = self._profile()
@@ -107,14 +138,21 @@ class PracticeService:
                 )
                 rows.append(progress)
             for run in progress.practice_sessions:
-                if request.idempotency_key and run.idempotency_key == request.idempotency_key:
+                if (
+                    request.idempotency_key
+                    and run.idempotency_key == request.idempotency_key
+                    and run.session.language_profile_id == profile.id
+                ):
                     if run.session.scene_media_asset_id != request.media_asset_id:
                         raise PracticeConflictError(
                             "Idempotency key already used for another scene."
                         )
                     return self._detail(run)
             for previous in progress.practice_sessions:
-                if previous.session.status == SessionStatus.IN_PROGRESS:
+                if (
+                    previous.session.status == SessionStatus.IN_PROGRESS
+                    and previous.session.language_profile_id == profile.id
+                ):
                     previous.session.abandoned_at = utc_now()
                     previous.session.status = SessionStatus.ABANDONED
             run = StoredDemoSession(
@@ -131,12 +169,15 @@ class PracticeService:
             progress.practice_sessions.append(run)
             return self._detail(run)
 
-        return self.repository.change(change)
+        return self._attach_objects(self.repository.change(change))
 
     def record(self, session_id: UUID, event: DemoPracticeEventRequest) -> SessionDetailResponse:
+        profile = self._profile()
+        progress, initial = self._find(self.repository.read(), session_id, profile)
+        scene = self.scenes.get_scene(initial.state.scene_id, progress.language_code)
+
         def change(rows: list[StoredProgress]) -> SessionDetailResponse:
-            progress, run = self._find(rows, session_id)
-            scene = self.scenes.get_scene(run.state.scene_id, progress.language_code)
+            progress, run = self._find(rows, session_id, profile)
             state = run.state
             key = f"{event.kind}:{event.item_id}"
             duplicate = (
@@ -185,14 +226,17 @@ class PracticeService:
             run.session.updated_at = utc_now()
             return self._detail(run)
 
-        return self.repository.change(change)
+        return self._attach_objects(self.repository.change(change))
 
     def complete(self, session_id: UUID) -> Session:
+        profile = self._profile()
+        progress, initial = self._find(self.repository.read(), session_id, profile)
+        scene = self.scenes.get_scene(initial.state.scene_id, progress.language_code)
+
         def change(rows: list[StoredProgress]) -> Session:
-            progress, run = self._find(rows, session_id)
+            progress, run = self._find(rows, session_id, profile)
             if run.session.status == SessionStatus.COMPLETED:
                 return run.session
-            scene = self.scenes.get_scene(run.state.scene_id, progress.language_code)
             keys = {f"round:{row.id}" for row in scene.rounds} | {
                 f"clue:{row.id}" for row in scene.prompts
             }
@@ -213,9 +257,33 @@ class PracticeService:
                     status="completed",
                     spoken_items=len(scene.items),
                     total_items=len(scene.items),
-                    level=self._profile().proficiency_level,
+                    level=profile.proficiency_level,
                 )
             )
+            return run.session
+
+        return self.repository.change(change)
+
+    def review_objects(
+        self, session_id: UUID, request: ReviewSceneObjectsRequest
+    ) -> SessionDetailResponse:
+        _, run = self._find(self.repository.read(), session_id)
+        assert self.scene_objects is not None
+        self.scene_objects.review(session_id, run.session.user_id, request)
+        return self.get(session_id)
+
+    def abandon(self, session_id: UUID) -> Session:
+        profile = self._profile()
+
+        def change(rows: list[StoredProgress]) -> Session:
+            _, run = self._find(rows, session_id, profile)
+            if run.session.status == SessionStatus.ABANDONED:
+                return run.session
+            if run.session.status in {SessionStatus.COMPLETED, SessionStatus.FAILED}:
+                raise PracticeConflictError("This session has already ended.")
+            run.session.abandoned_at = utc_now()
+            run.session.status = SessionStatus.ABANDONED
+            run.session.updated_at = utc_now()
             return run.session
 
         return self.repository.change(change)
