@@ -1,3 +1,4 @@
+import { LoadingScreen } from "../components/LoadingScreen";
 import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { VocabStatus } from "../data/types";
@@ -10,7 +11,7 @@ import { useApiData } from "../lib/useApiData";
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const account = useAccount();
-  if (account.loading) return <p role="status">Loading your profile…</p>;
+  if (account.loading) return <LoadingScreen label="Loading your profile…" />;
   if (account.error) return <p role="alert">{account.error} Reload to retry.</p>;
   return <LoadedAppState key={account.activeProfile?.id ?? "no-language"} account={account}>{children}</LoadedAppState>;
 }

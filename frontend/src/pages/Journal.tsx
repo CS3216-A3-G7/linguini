@@ -1,3 +1,4 @@
+import { LoadingScreen } from "../components/LoadingScreen";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Mascot } from "../components/ui";
 import { PlusIcon } from "../components/icons";
@@ -19,7 +20,7 @@ function monthOf(date: string) {
 export function Journal() {
   const navigate = useNavigate();
   const { journal, journalLoading, journalError } = useAppState();
-  if (journalLoading) return <p role="status">Loading journal history…</p>;
+  if (journalLoading) return <LoadingScreen label="Loading journal history…" />;
   if (journalError) return <p role="alert">{journalError} Reload to retry.</p>;
 
   const months = journal.reduce<Record<string, typeof journal>>((groups, entry) => {

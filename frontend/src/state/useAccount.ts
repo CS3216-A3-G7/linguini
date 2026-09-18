@@ -41,6 +41,10 @@ export function useAccount() {
     return createLanguageProfile(code, minutes);
   }), [data, run]);
   const saveUser = useCallback((patch: UserPatch) => run(() => updateUser(patch)), [run]);
+  const activateLanguageProfile = useCallback((id: string) => run(async () => {
+    if (!data?.profiles.some((profile) => profile.id === id)) throw new Error("Language profile not found.");
+    return updateLanguageProfile(id, { isActive: true });
+  }), [data, run]);
   const completeOnboarding = useCallback((code: string, minutes: number, patch: UserPatch) => run(async () => {
     await updateUser(patch);
     const profile = data?.profiles.find((row) => row.targetLanguageCode === code && row.sourceLanguageCode === "en");
@@ -56,6 +60,8 @@ export function useAccount() {
     data, loading, error,
     user: data?.user ?? null,
     activeProfile,
+    languageProfiles: data?.profiles ?? [],
+    activateLanguageProfile,
     profileSaving, profileError, setLanguage, saveUser, saveLanguageProfile, completeOnboarding,
     learner: {
       name: data?.user.displayName ?? "",

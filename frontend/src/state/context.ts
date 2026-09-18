@@ -19,7 +19,7 @@ export type Session = {
   micReady: boolean;
 };
 
-export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof useAccount>, "user" | "activeProfile" | "profileSaving" | "profileError" | "setLanguage" | "saveUser" | "saveLanguageProfile" | "completeOnboarding"> & {
+export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof useAccount>, "user" | "activeProfile" | "languageProfiles" | "activateLanguageProfile" | "profileSaving" | "profileError" | "setLanguage" | "saveUser" | "saveLanguageProfile" | "completeOnboarding"> & {
   scenes: SceneSummary[];
   scenesLoading: boolean;
   scenesError: string | null;

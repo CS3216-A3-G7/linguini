@@ -1,17 +1,22 @@
-"""FastAPI wiring for the temporary JSON-backed user service."""
+"""FastAPI wiring for incremental migration from JSON to PostgreSQL."""
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, Request
 
 from app.config import DEMO_USERS_PATH, get_demo_user_id
+from app.database import get_language_profile_storage, get_user_storage
 from app.repositories.implementations.json.journals import JsonJournalRepository
 from app.repositories.implementations.json.language_profiles import JsonLanguageProfileRepository
 from app.repositories.implementations.json.learning import JsonLearningRepository
 from app.repositories.implementations.json.practice import JsonPracticeRepository
 from app.repositories.implementations.json.scenes import JsonSceneRepository
 from app.repositories.implementations.json.users import JsonUserRepository
+from app.repositories.implementations.postgres.language_profiles import (
+    PostgresLanguageProfileRepository,
+)
+from app.repositories.implementations.postgres.users import PostgresUserRepository
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
 from app.repositories.learning import LearningRepository
@@ -26,7 +31,9 @@ from app.services.scenes import SceneService
 from app.services.users import UserService
 
 
-def get_user_repository() -> UserRepository:
+def get_user_repository(request: Request) -> UserRepository:
+    if get_user_storage() == "postgres":
+        return PostgresUserRepository(request.app.state.database_engine)
     return JsonUserRepository(DEMO_USERS_PATH)
 
 
@@ -34,7 +41,9 @@ def get_journal_repository() -> JournalRepository:
     return JsonJournalRepository(DEMO_USERS_PATH.parent / "journals.json")
 
 
-def get_language_profile_repository() -> LanguageProfileRepository:
+def get_language_profile_repository(request: Request) -> LanguageProfileRepository:
+    if get_language_profile_storage() == "postgres":
+        return PostgresLanguageProfileRepository(request.app.state.database_engine)
     return JsonLanguageProfileRepository(DEMO_USERS_PATH.parent / "language_profiles.json")
 
 

@@ -1,0 +1,41 @@
+datasource db {
+  provider = "postgresql"
+}
+
+// Application identity stays stable while auth and other JSON stores migrate.
+// Prisma owns DDL; the Python backend uses SQLAlchemy Core for queries.
+model User {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authProviderId      String   @unique @map("auth_provider_id") @db.Text
+  displayName         String   @map("display_name") @db.VarChar(100)
+  email               String?  @db.VarChar(320)
+  timezone            String   @default("UTC") @db.Text
+  learningGoal        String   @default("") @map("learning_goal") @db.VarChar(300)
+  microphoneEnabled   Boolean  @default(true) @map("microphone_enabled")
+  cameraEnabled       Boolean  @default(true) @map("camera_enabled")
+  onboardingCompleted Boolean  @default(false) @map("onboarding_completed")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  languageProfiles    LanguageProfile[]
+
+  @@map("users")
+}
+
+// SQL migration also owns case-insensitive pair uniqueness and the partial
+// unique index allowing at most one active profile per user.
+model LanguageProfile {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sourceLanguageCode String   @map("source_language_code") @db.VarChar(35)
+  targetLanguageCode String   @map("target_language_code") @db.VarChar(35)
+  proficiencyLevel   String   @map("proficiency_level") @db.VarChar(2)
+  isActive           Boolean  @default(true) @map("is_active")
+  preferredInputMode String   @default("both") @map("preferred_input_mode") @db.VarChar(6)
+  dailyGoalMinutes   Int?     @map("daily_goal_minutes")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@map("language_profiles")
+}

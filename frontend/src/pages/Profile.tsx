@@ -1,16 +1,21 @@
+import { LoadingScreen } from "../components/LoadingScreen";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Mascot, Noodle } from "../components/ui";
+import { PlusIcon } from "../components/icons";
 import { languages } from "../config/languages";
 import { useAppState } from "../state/useAppState";
 import type { LanguageProfile } from "../lib/api";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { learner, setLanguage, saveUser, saveLanguageProfile, profileSaving, profileError, xp, vocabulary, journal, activeProfile } = useAppState();
+  const { learner, languageProfiles, activateLanguageProfile, saveUser, saveLanguageProfile, profileSaving, profileError, xp, vocabulary, journal, activeProfile } = useAppState();
   const [name, setName] = useState(learner.name);
   const [goal, setGoal] = useState(learner.goal);
   const [saved, setSaved] = useState(false);
+  const targetProfiles = languageProfiles.filter((profile, index, profiles) =>
+    profiles.findIndex((row) => row.targetLanguageCode.toLowerCase() === profile.targetLanguageCode.toLowerCase()) === index
+  );
   return (
     <div className="stack">
       <h1>Profile</h1>
@@ -42,16 +47,26 @@ export function Profile() {
         </div>
       </div>
 
-      {profileSaving ? <p role="status">Saving profile…</p> : null}
+      {profileSaving ? <LoadingScreen label="Saving profile…" /> : null}
       {profileError ? <p role="alert">{profileError}</p> : null}
 
       <div className="stack-2">
         <h2>Target language</h2>
         <div className="chip-row">
-          {languages.map((option) => <button key={option.code} type="button" disabled={profileSaving}
-            className={`chip${option.code === learner.languageCode ? " chip--selected" : ""}`}
-            aria-pressed={option.code === learner.languageCode}
-            onClick={() => { setSaved(false); void setLanguage(option.code); }}>{option.flag} {option.name}</button>)}
+          {targetProfiles.map((profile) => {
+            const code = profile.targetLanguageCode.toLowerCase();
+            const option = languages.find((language) => language.code === code);
+            const selected = code === learner.languageCode.toLowerCase();
+            return <button key={code} type="button" disabled={profileSaving}
+              className={`chip${selected ? " chip--selected" : ""}`}
+              aria-pressed={selected}
+              onClick={() => { if (!selected) { setSaved(false); void activateLanguageProfile(profile.id); } }}>
+              {option?.flag} {option?.name ?? profile.targetLanguageCode}
+            </button>;
+          })}
+          <button type="button" className="chip chip--static" disabled aria-label="Add target language" title="Add target language (coming soon)">
+            <PlusIcon />
+          </button>
         </div>
         <p className="small muted">Your selection is saved. Scenes, vocabulary, and progress follow this language. Demo content is currently available in Spanish only.</p>
       </div>
