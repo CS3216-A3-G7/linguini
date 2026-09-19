@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button, Card, IconButton, StatusPill, Tabs } from "../components/ui";
 import { FilterIcon, SpeakerIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { SceneVisual } from "../components/SceneVisual";
 import { getScene } from "../data/mock";
 import type { VocabStatus, WordClass } from "../data/types";
 import { speak } from "../lib/speech";
@@ -100,7 +100,7 @@ export function Vocabulary() {
           return (
             <div key={item.id} className="list__row" style={{ cursor: "default" }}>
               <span className="thumb">
-                <SceneArt scene={scene.art} />
+                <SceneVisual scene={scene} />
               </span>
               <div className="grow stack-2">
                 <div className="row">

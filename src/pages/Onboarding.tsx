@@ -45,11 +45,9 @@ export function Onboarding() {
     setStep((current) => current + 1);
   };
 
-  const back = () => (step === 0 ? navigate("/") : setStep((current) => current - 1));
-
   return (
     <div className="stack">
-      <TopBar title={steps[step]} onBack={back} help="Four short steps and you are ready to practise." />
+      <TopBar title={steps[step]} help="Four short steps and you are ready to practise." />
       <ProgressTrail value={step + 1} total={steps.length} label={`Step ${step + 1} of ${steps.length}`} />
 
       {step === 0 && (

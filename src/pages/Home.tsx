@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button, Card, ProgressTrail } from "../components/ui";
 import { ArrowRightIcon, BookIcon, CameraIcon, TrendIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { SceneVisual } from "../components/SceneVisual";
 import { getScene } from "../data/mock";
 import { useAppState } from "../state/useAppState";
 
@@ -20,8 +20,7 @@ export function Home() {
   return (
     <div className="stack" style={{ gap: "var(--space-6)" }}>
       <div className="stack-2">
-        <span className="label muted">Your {learner.language} practice</span>
-        <h1>Hello, {learner.name}</h1>
+        <h2>Hello, {learner.name}!</h2>
       </div>
 
       {hasSessionToContinue ? (
@@ -33,7 +32,7 @@ export function Home() {
             </div>
             <div className="row">
               <span className="thumb thumb--lg">
-                <SceneArt scene={sessionScene.art} />
+                <SceneVisual scene={sessionScene} />
               </span>
               <div className="grow stack-2">
                 <strong>{sessionScene.title}</strong>

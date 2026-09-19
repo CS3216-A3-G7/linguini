@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, ProgressTrail, TopBar } from "../components/ui";
+import { Button } from "../components/ui";
 import { ArrowRightIcon, CameraIcon, UploadIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { SceneVisual } from "../components/SceneVisual";
 import { scenes } from "../data/mock";
 import { useAppState } from "../state/useAppState";
 
@@ -25,21 +25,14 @@ export function PracticeSelect() {
 
   return (
     <div className="stack">
-      <TopBar
-        title="Step 1: Select environment"
-        onBack={() => navigate("/home")}
-        help="Your photo becomes the basis of this learning session."
-      />
-      <ProgressTrail value={1} total={3} label="Step 1 of 3" />
-
-      <h1>Choose your environment</h1>
+      <h1>Capture a Scene</h1>
       <p className="muted">Take a photo of the world around you, or start from a ready scene.</p>
 
       <div className="dashed-capture">
         {captured ? (
           <>
             <span className="thumb thumb--lg">
-              <SceneArt scene={scenes[0].art} />
+              <SceneVisual scene={scenes[0]} />
             </span>
             <p className="small muted">Photo captured — {scenes[0].title}</p>
           </>
@@ -48,12 +41,11 @@ export function PracticeSelect() {
             <span style={{ color: "var(--teal-dark)" }}>
               <CameraIcon size={44} />
             </span>
-            <p className="small muted center-text">Your photo goes here</p>
           </>
         )}
         <div className="row">
           <Button onClick={capture}>
-            <CameraIcon size={18} /> Open camera
+            <CameraIcon size={18} /> Click
           </Button>
           <Button variant="secondary" onClick={capture}>
             <UploadIcon size={18} /> Upload
@@ -62,7 +54,7 @@ export function PracticeSelect() {
       </div>
 
       <h2>Or practise with the below</h2>
-      <div className="grid-3">
+      <div className="grid-2">
         {scenes.map((scene) => (
           <button
             key={scene.id}
@@ -74,8 +66,8 @@ export function PracticeSelect() {
               setSelected(scene.id);
             }}
           >
-            <SceneArt scene={scene.art} />
-            <span className="small" style={{ fontWeight: 700 }}>
+            <SceneVisual scene={scene} />
+            <span className="small items-center justify-center" style={{ fontWeight: 700 }}>
               {scene.title}
             </span>
           </button>

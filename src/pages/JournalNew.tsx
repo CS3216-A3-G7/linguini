@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Feedback, TopBar } from "../components/ui";
-import { CameraIcon, UploadIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
-import type { SceneArtId } from "../components/SceneArt";
+import { UploadIcon } from "../components/icons";
+import type { JournalPhoto } from "../data/types";
+import { JournalPhotoVisual } from "../components/JournalPhotoVisual";
+import { SceneVisual } from "../components/SceneVisual";
 import { journalWordSuggestions, scenes } from "../data/mock";
 import { useAppState } from "../state/useAppState";
 
@@ -13,20 +14,43 @@ export function JournalNew() {
   const today = new Date();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [art, setArt] = useState<SceneArtId | null>(null);
+  const [photos, setPhotos] = useState<JournalPhoto[]>([]);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
+  const photoInput = useRef<HTMLInputElement>(null);
 
   const toggleWord = (word: string) =>
     setSelectedWords((current) =>
       current.includes(word) ? current.filter((item) => item !== word) : [...current, word],
     );
 
+  const toggleScenePhoto = (art: JournalPhoto & { kind: "scene" }) => {
+    setPhotos((current) => {
+      const isAdded = current.some((photo) => photo.kind === "scene" && photo.art === art.art);
+      return isAdded ? current.filter((photo) => photo.id !== art.id) : [...current, art];
+    });
+  };
+
+  const addUploadedPhotos = (files: FileList | null) => {
+    if (!files) return;
+    const uploads = Array.from(files).map((file) => ({
+      id: `upload-${file.name}-${file.lastModified}`,
+      kind: "upload" as const,
+      url: URL.createObjectURL(file),
+      alt: file.name,
+    }));
+    setPhotos((current) => [...current, ...uploads]);
+  };
+
+  const removePhoto = (photoId: string) => {
+    setPhotos((current) => current.filter((photo) => photo.id !== photoId));
+  };
+
   const save = () => {
     addJournalEntry({
       id: `j-${today.getTime()}`,
       date: today.toISOString().slice(0, 10),
       title: title.trim() || "Today's entry",
-      art: art ?? "street",
+      photos: photos.length ? photos : [{ id: "default-street", kind: "scene", art: "street" }],
       body: body.trim(),
       wordsUsed: selectedWords,
     });
@@ -37,9 +61,7 @@ export function JournalNew() {
     <div className="stack">
       <TopBar
         title={today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
-        onBack={() => navigate("/journal")}
       />
-      <h1>Add a new entry</h1>
 
       <div className="field">
         <label className="field__label" htmlFor="entry-title">
@@ -55,34 +77,64 @@ export function JournalNew() {
       </div>
 
       <div className="stack-2">
-        <span className="field__label">Photo</span>
-        {art ? (
-          <div className="scene">
-            <SceneArt scene={art} className="scene__art" />
+        <span className="field__label">Photos</span>
+        {photos.length ? (
+          <div className="photo-strip" aria-label={`${photos.length} photos added`}>
+            {photos.map((photo) => (
+              <div key={photo.id} className="photo-thumb">
+                <JournalPhotoVisual photo={photo} />
+                <button
+                  type="button"
+                  className="photo-thumb__remove"
+                  aria-label={`Remove ${photo.kind === "upload" ? photo.alt : "scene photo"}`}
+                  onClick={() => removePhoto(photo.id)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="dashed-capture">
             <span style={{ color: "var(--teal-dark)" }}>
               <UploadIcon size={40} />
             </span>
-            <p className="small muted">Upload an image or pick one from today</p>
+            <p className="small muted">Add a few photos from your day</p>
           </div>
         )}
         <div className="grid-3">
-          {scenes.slice(0, 3).map((scene) => (
+          {scenes.map((scene) => {
+            const scenePhoto = { id: `scene-${scene.art}`, kind: "scene" as const, art: scene.art };
+            const isSelected = photos.some(
+              (photo) => photo.kind === "scene" && photo.art === scene.art,
+            );
+            return (
             <button
               key={scene.id}
               type="button"
-              className={`scene-pick${art === scene.art ? " scene-pick--selected" : ""}`}
-              onClick={() => setArt(scene.art)}
+              className={`scene-pick${isSelected ? " scene-pick--selected" : ""}`}
+              aria-pressed={isSelected}
+              onClick={() => toggleScenePhoto(scenePhoto)}
             >
-              <SceneArt scene={scene.art} />
+              <SceneVisual scene={scene} />
               <span className="small">{scene.title}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
-        <Button variant="secondary" onClick={() => setArt("street")}>
-          <CameraIcon size={18} /> Take a photo
+        <input
+          ref={photoInput}
+          className="visually-hidden"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(event) => {
+            addUploadedPhotos(event.target.files);
+            event.target.value = "";
+          }}
+        />
+        <Button variant="secondary" block onClick={() => photoInput.current?.click()}>
+          <UploadIcon size={18} /> Add photos from device
         </Button>
       </div>
 

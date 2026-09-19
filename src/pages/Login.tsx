@@ -11,7 +11,7 @@ export function Login() {
 
   return (
     <div className="stack">
-      <TopBar title="Log in" onBack={() => navigate("/")} />
+      <TopBar title="Log in" />
       <div className="center-text stack-2" style={{ alignItems: "center" }}>
         <Mascot size={96} />
         <h1>Welcome back</h1>

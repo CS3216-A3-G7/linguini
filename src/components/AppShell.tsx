@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { BookIcon, CameraIcon, HomeIcon, PersonIcon, TrendIcon } from "./icons";
 import { BrandBar } from "./ui";
 
@@ -11,9 +11,12 @@ const items = [
 ];
 
 export function AppShell() {
+  const { pathname } = useLocation();
+  const isJournalDetail = pathname === "/journal/new" || /^\/journal\/[^/]+$/.test(pathname);
+
   return (
     <div className="shell">
-      <BrandBar />
+      <BrandBar back={isJournalDetail} />
       <main className="shell__content">
         <Outlet />
       </main>
@@ -35,9 +38,11 @@ export function AppShell() {
 
 /** Full-bleed shell for focused flows (onboarding, practice steps, I-Spy). */
 export function FocusShell() {
+  const { pathname } = useLocation();
+
   return (
     <div className="shell">
-      <BrandBar />
+      <BrandBar back={pathname !== "/"} />
       <main className="shell__content" style={{ paddingBottom: "var(--space-8)" }}>
         <Outlet />
       </main>

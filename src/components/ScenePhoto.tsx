@@ -1,4 +1,4 @@
-import { SceneArt } from "./SceneArt";
+import { SceneVisual } from "./SceneVisual";
 import type { LanguageItem, Scene } from "../data/types";
 
 type Props = {
@@ -12,7 +12,7 @@ export function ScenePhoto({ scene, items, activeItemId, onMarkerClick }: Props)
   const markers = items ?? scene.items;
   return (
     <div className="scene">
-      <SceneArt scene={scene.art} className="scene__art" />
+      <SceneVisual scene={scene} className="scene__art" />
       {markers.map((item) => {
         const active = item.id === activeItemId;
         const className = `scene__marker${active ? " scene__marker--active" : ""}`;

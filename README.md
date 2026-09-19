@@ -43,5 +43,5 @@ Other scripts: `npm run build` (typecheck + production build), `npm run lint`, `
 - `src/state/` — in-memory app state (XP, task completion, vocabulary status, journal entries)
 - `src/pages/` — one file per screen
 
-Scene photos are placeholder SVG illustrations (`src/components/SceneArt.tsx`); swap them for real
-images when the capture flow is connected.
+The ready scenes use real photos where available, while `src/components/SceneArt.tsx` remains the
+fallback illustration system for journal entries and incomplete image states.

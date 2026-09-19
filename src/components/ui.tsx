@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeftIcon, HelpIcon } from "./icons";
+import { ChevronLeftIcon, HelpIcon } from "./icons";
 import "./ui.css";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -18,10 +18,11 @@ export function Button({ variant = "primary", block, className = "", ...rest }: 
 export function IconButton({
   label,
   children,
+  className = "",
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; children: ReactNode }) {
   return (
-    <button type="button" className="icon-btn" aria-label={label} {...rest}>
+    <button type="button" className={["icon-btn", className].filter(Boolean).join(" ")} aria-label={label} {...rest}>
       {children}
     </button>
   );
@@ -46,21 +47,15 @@ export function Card({
 
 export function TopBar({
   title,
-  onBack,
   help,
   right,
 }: {
   title: string;
-  onBack?: () => void;
   help?: string;
   right?: ReactNode;
 }) {
-  const navigate = useNavigate();
   return (
     <div className="topbar">
-      <IconButton label="Go back" onClick={onBack ?? (() => navigate(-1))}>
-        <ArrowLeftIcon />
-      </IconButton>
       <span className="topbar__title">{title}</span>
       {right}
       {help ? (
@@ -89,9 +84,15 @@ export function Wordmark({ size = 26 }: { size?: number }) {
 }
 
 /** Persistent yellow Linguini wordmark shown at the top of every screen. */
-export function BrandBar() {
+export function BrandBar({ back = false }: { back?: boolean }) {
+  const navigate = useNavigate();
   return (
     <header className="brandbar" aria-label="Linguini">
+      {back ? (
+        <IconButton className="brandbar__back" label="Go back" onClick={() => navigate(-1)}>
+          <ChevronLeftIcon />
+        </IconButton>
+      ) : null}
       <img className="brandbar__wordmark" src="/linguini-wordmark.png" alt="Linguini" />
     </header>
   );

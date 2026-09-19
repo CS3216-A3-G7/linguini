@@ -58,6 +58,8 @@ export type Scene = {
   title: string;
   blurb: string;
   art: SceneArtId;
+  /** Real scene photo shown throughout the practice flow. */
+  imageUrl?: string;
   language: string;
   items: LanguageItem[];
   tasks: LearningTask[];
@@ -85,11 +87,15 @@ export type VocabRecord = {
   example: string;
 };
 
+export type JournalPhoto =
+  | { id: string; kind: "scene"; art: SceneArtId }
+  | { id: string; kind: "upload"; url: string; alt: string };
+
 export type JournalEntry = {
   id: string;
   date: string;
   title: string;
-  art: SceneArtId;
+  photos: JournalPhoto[];
   body: string;
   wordsUsed: string[];
 };

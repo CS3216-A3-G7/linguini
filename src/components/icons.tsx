@@ -71,7 +71,19 @@ export const ArrowRightIcon = ({ size = 20, className }: IconProps) => (
 
 export const ArrowLeftIcon = ({ size = 22, className }: IconProps) => (
   <svg {...base(size)} className={className}>
-    <path d="M20 12H5M10 7l-5 5 5 5" />
+  <path d="M20 12H5M10 7l-5 5 5 5" />
+  </svg>
+);
+
+export const ChevronLeftIcon = ({ size = 22, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m15 18-6-6 6-6" />
+  </svg>
+);
+
+export const ChevronRightIcon = ({ size = 22, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m9 18 6-6-6-6" />
   </svg>
 );
 

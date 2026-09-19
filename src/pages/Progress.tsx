@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, ProgressTrail, Tabs } from "../components/ui";
 import { ArrowRightIcon, PlayIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { SceneVisual } from "../components/SceneVisual";
 import { getScene, leaderboard, scenarioProgress } from "../data/mock";
 import { useAppState } from "../state/useAppState";
 
@@ -38,7 +38,7 @@ export function Progress() {
             <span className="label muted">I-Spy in progress</span>
             <div className="row">
               <span className="thumb">
-                <SceneArt scene={activeScene.art} />
+                <SceneVisual scene={activeScene} />
               </span>
               <div className="grow stack-2">
                 <strong>{activeScene.title}</strong>
@@ -86,7 +86,7 @@ export function Progress() {
               <Card key={row.sceneId} plain>
                 <div className="row">
                   <span className="thumb">
-                    <SceneArt scene={scene.art} />
+                    <SceneVisual scene={scene} />
                   </span>
                   <div className="grow stack-2">
                     <div className="spread">

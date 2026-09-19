@@ -13,7 +13,7 @@ export function SessionSummary() {
 
   return (
     <div className="stack">
-      <TopBar title="Session complete" onBack={() => navigate("/home")} />
+      <TopBar title="Session complete" />
       <div className="center-text stack-2" style={{ alignItems: "center" }}>
         <Mascot size={120} />
         <h1>Good job!</h1>

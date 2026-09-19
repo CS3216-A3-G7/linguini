@@ -1,25 +1,33 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, TopBar } from "../components/ui";
-import { PlusIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { Button, Card, IconButton, TopBar } from "../components/ui";
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
+import { JournalPhotoVisual } from "../components/JournalPhotoVisual";
 import { useAppState } from "../state/useAppState";
 
 export function JournalEntryPage() {
   const navigate = useNavigate();
   const { entryId } = useParams();
   const { journal, vocabulary } = useAppState();
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const entry = journal.find((item) => item.id === entryId);
 
   if (!entry) {
     return (
       <div className="stack">
-        <TopBar title="Entry not found" onBack={() => navigate("/journal")} />
+        <TopBar title="Entry not found" />
         <p className="muted">That entry is no longer here.</p>
       </div>
     );
   }
 
   const linked = vocabulary.filter((record) => entry.wordsUsed.includes(record.word));
+  const photoIndex = Math.min(activePhotoIndex, entry.photos.length - 1);
+  const activePhoto = entry.photos[photoIndex];
+
+  const changePhoto = (offset: number) => {
+    setActivePhotoIndex((current) => (current + offset + entry.photos.length) % entry.photos.length);
+  };
 
   return (
     <div className="stack">
@@ -29,11 +37,33 @@ export function JournalEntryPage() {
           day: "numeric",
           month: "short",
         })}
-        onBack={() => navigate("/journal")}
       />
       <h1>{entry.title}</h1>
-      <div className="scene">
-        <SceneArt scene={entry.art} className="scene__art" />
+      <div className="journal-carousel">
+        <div className="scene">
+          <JournalPhotoVisual photo={activePhoto} className="scene__art" />
+        </div>
+        {entry.photos.length > 1 ? (
+          <>
+            <IconButton
+              className="journal-carousel__control journal-carousel__control--previous"
+              label="Previous photo"
+              onClick={() => changePhoto(-1)}
+            >
+              <ChevronLeftIcon />
+            </IconButton>
+            <IconButton
+              className="journal-carousel__control journal-carousel__control--next"
+              label="Next photo"
+              onClick={() => changePhoto(1)}
+            >
+              <ChevronRightIcon />
+            </IconButton>
+            <span className="journal-carousel__count">
+              {photoIndex + 1} of {entry.photos.length}
+            </span>
+          </>
+        ) : null}
       </div>
       <Card plain>
         <p>{entry.body}</p>

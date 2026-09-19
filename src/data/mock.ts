@@ -31,9 +31,11 @@ export const languages = [
 export const scenes: Scene[] = [
   {
     id: "calle-mayor",
-    title: "A walk downtown",
-    blurb: "A busy street with a bus, trees and shopfronts.",
+    title: "Street",
+    blurb: "A busy street with everyday places and things to spot.",
     art: "street",
+    imageUrl:
+      "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=1600&q=85",
     language: "Spanish",
     items: [
       {
@@ -205,9 +207,10 @@ export const scenes: Scene[] = [
   },
   {
     id: "cafe-plaza",
-    title: "Café de la Plaza",
-    blurb: "Order a coffee and describe what is on the table.",
+    title: "Classroom",
+    blurb: "A bright classroom with objects to notice and describe.",
     art: "cafe",
+    imageUrl: "/scenes/classroom.jpg",
     language: "Spanish",
     items: [
       {
@@ -339,9 +342,10 @@ export const scenes: Scene[] = [
   },
   {
     id: "mercado-central",
-    title: "Mercado Central",
-    blurb: "Fruit stalls, prices and polite requests.",
+    title: "Grocery store",
+    blurb: "Fruit, shelves, and everyday words for a quick shop.",
     art: "market",
+    imageUrl: "/scenes/grocery-store.jpg",
     language: "Spanish",
     items: [
       {
@@ -426,9 +430,11 @@ export const scenes: Scene[] = [
   },
   {
     id: "mi-cuarto",
-    title: "My bedroom",
+    title: "Bedroom",
     blurb: "Everyday objects you can name before bed.",
     art: "bedroom",
+    imageUrl:
+      "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1600&q=85",
     language: "Spanish",
     items: [
       {
@@ -493,9 +499,11 @@ export const scenes: Scene[] = [
   },
   {
     id: "la-cocina",
-    title: "In the kitchen",
-    blurb: "Name what you cook with tonight.",
+    title: "Office",
+    blurb: "Useful words for the things you see at work.",
     art: "kitchen",
+    imageUrl:
+      "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=85",
     language: "Spanish",
     items: [
       {
@@ -560,9 +568,11 @@ export const scenes: Scene[] = [
   },
   {
     id: "el-parque",
-    title: "Parque del barrio",
-    blurb: "Trees, benches and weather talk.",
+    title: "Airport",
+    blurb: "Travel words for the terminal and the journey ahead.",
     art: "park",
+    imageUrl:
+      "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1600&q=85",
     language: "Spanish",
     items: [
       {
@@ -777,7 +787,7 @@ export const journalEntries: JournalEntry[] = [
     id: "j-1",
     date: "2026-09-14",
     title: "A walk downtown",
-    art: "street",
+    photos: [{ id: "j-1-street", kind: "scene", art: "street" }],
     body: "Hoy caminé por una calle tranquila y vi un árbol grande cerca del autobús. El autobús es amarillo y siempre llega tarde.",
     wordsUsed: ["la calle", "el árbol", "el autobús", "grande"],
   },
@@ -785,7 +795,7 @@ export const journalEntries: JournalEntry[] = [
     id: "j-2",
     date: "2026-09-11",
     title: "Morning coffee",
-    art: "cafe",
+    photos: [{ id: "j-2-cafe", kind: "scene", art: "cafe" }],
     body: "Pedí un café caliente en la plaza. La taza es pequeña y bonita. El camarero habló despacio conmigo.",
     wordsUsed: ["el café", "la taza", "caliente"],
   },
@@ -793,7 +803,7 @@ export const journalEntries: JournalEntry[] = [
     id: "j-3",
     date: "2026-09-08",
     title: "At the market",
-    art: "market",
+    photos: [{ id: "j-3-market", kind: "scene", art: "market" }],
     body: "Compré fruta fresca en el mercado. Dos manzanas rojas por un euro.",
     wordsUsed: ["el mercado", "la manzana", "fresco"],
   },

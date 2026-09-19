@@ -194,6 +194,8 @@ Use a cream panel with a color-coded left detail and a concise human message: �
 
 The home screen answers one question only: “What should I do next?” Lead with a short greeting and one dominant card. For a new learner, use a large, calm camera visual with minimal copy and a single tomato “Start learning” action. If practice is underway, replace that card with the current scene, a compact task trail, and one tomato “Continue learning” action. Preset scenes stay within the practice flow. Keep the Vocabulary and Progress shortcuts as two compact secondary buttons at the bottom until the navigation is revisited. After a learner has completed learning tasks, show one calm, secondary journal prompt beneath the main card.
 
+The scene-selection page is not a staged task and must not show a progress trail. Begin the trail only after the learner chooses or uploads an image, starting with image analysis and continuing through learning tasks.
+
 ### Choose vocabulary
 
 Place the captured photo at the center of the screen. Numbered markers map directly to selectable vocabulary chips underneath. Use tomato for the current selection and pasta / teal for supporting markers, maintaining high-contrast text. The primary action reads “Start I Spy” and remains fixed above the bottom navigation when the chip list scrolls.
@@ -206,6 +208,8 @@ Make the challenge feel focused: progress at top, scene photo next, a compact hi
 
 Treat the journal as proof of progress, not a dense database. Put a soft pasta-yellow encouragement panel above or below the list. Segment Review, Learned, and Mastered with text-first tabs. The active tab uses tomato fill; inactive tabs live on a pale cream rail. Each row should feel easy to revisit in under a second.
 
+The journal list is a single-month view. Use a centered month-and-year label (for example, “September 2026”) with standard previous and next month chevrons on either side. Filter entries to the chosen month and keep the chevrons active when that month is empty. A journal entry can collect multiple ready-scene or uploaded photos; display them as a single-photo carousel with previous/next chevrons and a clear position label.
+
 ## Navigation and layout
 
 ### Mobile
@@ -215,6 +219,7 @@ Treat the journal as proof of progress, not a dense database. Put a soft pasta-y
 - Keep bottom navigation on a cream surface with a top divider and safe-area padding.
 - Primary actions belong above the navigation and must not be hidden behind it.
 - Use full-width action buttons, except compact paired controls that still preserve 44px hit targets.
+- Put the single back control beside the centered wordmark in the shared header. Do not add a second back arrow inside a screen title bar. Root destinations (Home, Practice, Journal, Progress, Profile, and Welcome) remain wordmark-only.
 
 ### Current implementation guidance
 

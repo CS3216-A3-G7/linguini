@@ -326,6 +326,18 @@
   font-size: var(--text-h3);
 }
 
+.month-switcher {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.month-switcher h1 {
+  text-align: center;
+  font-size: var(--text-h2);
+}
+
 /* Brand */
 .wordmark {
   position: relative;
@@ -353,6 +365,13 @@
   justify-content: center;
   padding: var(--space-4) var(--space-4) var(--space-2);
   background: transparent;
+}
+
+.brandbar__back {
+  position: absolute;
+  left: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .brandbar__wordmark {
@@ -499,6 +518,18 @@
   font-size: var(--text-body);
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .textarea {
   min-height: 140px;
   resize: vertical;
@@ -541,15 +572,93 @@
   flex: none;
 }
 
-.thumb svg {
+.thumb svg,
+.thumb img {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
 }
 
 .thumb--lg {
   width: 96px;
   height: 72px;
+}
+
+.photo-strip {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding: var(--space-1);
+  scrollbar-width: thin;
+}
+
+.photo-thumb {
+  position: relative;
+  flex: 0 0 108px;
+  height: 80px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.photo-thumb img,
+.photo-thumb svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-thumb__remove {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--tomato);
+  color: #fffaf2;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.journal-carousel {
+  position: relative;
+}
+
+.journal-carousel__control {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  transform: translateY(-50%);
+  background: rgba(255, 250, 240, 0.92);
+  box-shadow: var(--shadow-card);
+}
+
+.journal-carousel__control--previous {
+  left: var(--space-2);
+}
+
+.journal-carousel__control--next {
+  right: var(--space-2);
+}
+
+.journal-carousel__count {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: rgba(38, 50, 56, 0.74);
+  color: #fffaf2;
+  font-size: var(--text-label);
+  font-weight: 800;
 }
 
 /* Mascot + noodle */
@@ -604,10 +713,12 @@
   background: #fff4e2;
 }
 
-.scene-pick svg {
+.scene-pick svg,
+.scene-pick img {
   width: 100%;
   border-radius: var(--radius-sm);
   aspect-ratio: 8 / 5;
+  object-fit: cover;
 }
 
 .dashed-capture {
