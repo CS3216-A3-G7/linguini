@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, IconButton, Mascot } from "../components/ui";
+import { Button, Card, IconButton } from "../components/ui";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { JournalPhotoVisual } from "../components/JournalPhotoVisual";
 import { useAppState } from "../state/useAppState";

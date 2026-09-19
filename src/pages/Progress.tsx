@@ -1,138 +1,78 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, ProgressTrail, Tabs } from "../components/ui";
-import { ArrowRightIcon, PlayIcon } from "../components/icons";
-import { SceneVisual } from "../components/SceneVisual";
-import { getScene, leaderboard, scenarioProgress } from "../data/mock";
+import { Button, Tabs } from "../components/ui";
+import { BookIcon } from "../components/icons";
+import { scenarioProgress } from "../data/mock";
 import { useAppState } from "../state/useAppState";
 
-type Filter = "all" | "in-progress" | "completed" | "mastered";
+type ProgressRange = "week" | "month" | "all";
 
-const filters: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "in-progress", label: "In progress" },
-  { id: "completed", label: "Completed" },
-  { id: "mastered", label: "Mastered" },
+const rangeOptions: { id: ProgressRange; label: string }[] = [
+  { id: "week", label: "This week" },
+  { id: "month", label: "This month" },
+  { id: "all", label: "All time" },
 ];
 
 export function Progress() {
   const navigate = useNavigate();
-  const { learner, xp, vocabulary } = useAppState();
-  const [filter, setFilter] = useState<Filter>("all");
+  const { vocabulary } = useAppState();
+  const [range, setRange] = useState<ProgressRange>("week");
 
-  const rows = scenarioProgress.filter((item) => filter === "all" || item.status === filter);
-  const board = leaderboard
-    .map((row) => (row.isYou ? { ...row, xp, name: learner.name } : row))
-    .sort((a, b) => b.xp - a.xp)
-    .map((row, index) => ({ ...row, rank: index + 1 }));
-  const active = scenarioProgress.find((item) => item.status === "in-progress");
-  const activeScene = active ? getScene(active.sceneId) : null;
+  const totalWords = vocabulary.length;
+  const totalMastered = vocabulary.filter((item) => item.status === "mastered").length;
+  const totalScenes = scenarioProgress.length;
+
+  const snapshots: Record<ProgressRange, { words: number; mastered: number; scenes: number }> = {
+    week: {
+      words: Math.min(totalWords, 4),
+      mastered: Math.min(totalMastered, 1),
+      scenes: Math.min(totalScenes, 1),
+    },
+    month: {
+      words: Math.min(totalWords, 8),
+      mastered: Math.min(totalMastered, 2),
+      scenes: Math.min(totalScenes, 2),
+    },
+    all: {
+      words: totalWords,
+      mastered: totalMastered,
+      scenes: totalScenes,
+    },
+  };
+
+  const snapshot = snapshots[range];
 
   return (
-    <div className="stack">
-      <h1>Progress</h1>
-
-      {activeScene && active ? (
-        <Card lifted>
-          <div className="stack-2">
-            <span className="label muted">I-Spy in progress</span>
-            <div className="row">
-              <span className="thumb">
-                <SceneVisual scene={activeScene} />
-              </span>
-              <div className="grow stack-2">
-                <strong>{activeScene.title}</strong>
-                <span className="small muted">{activeScene.blurb}</span>
-                <ProgressTrail
-                  value={active.spokenItems}
-                  total={active.totalItems}
-                  label={`${active.spokenItems} / ${active.totalItems} items spoken`}
-                />
-              </div>
-            </div>
-            <Button onClick={() => navigate(`/practice/${activeScene.id}/learn`)}>
-              <PlayIcon size={16} /> Resume scenario
-            </Button>
-          </div>
-        </Card>
-      ) : null}
-
-      <div className="stat-grid">
-        <div className="stat">
-          <div className="stat__value">{xp}</div>
-          <span className="small muted">Total XP</span>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{vocabulary.length}</div>
-          <span className="small muted">Words saved</span>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{scenarioProgress.length}</div>
-          <span className="small muted">Scenarios</span>
-        </div>
+    <div className="stack progress-page">
+      <div className="progress-page__header">
+        <h2>Progress</h2>
       </div>
+      <Button
+          variant="secondary"
+        className="progress-page__vocabulary"
+        onClick={() => navigate("/vocabulary")}
+      >
+          <span className="progress-page__vocabulary-icon" aria-hidden="true">
+            <BookIcon size={30} />
+          </span>
+          <span>My Vocabulary →</span>
+        </Button>
+      <Tabs options={rangeOptions} value={range} onChange={setRange} />
 
-      <Button variant="secondary" block onClick={() => navigate("/vocabulary")}>
-        My vocabulary <ArrowRightIcon />
-      </Button>
-
-      <div className="stack-2">
-        <h2>Scenarios</h2>
-        <Tabs options={filters} value={filter} onChange={setFilter} />
-        <div className="stack-2">
-          {rows.map((row) => {
-            const scene = getScene(row.sceneId);
-            return (
-              <Card key={row.sceneId} plain>
-                <div className="row">
-                  <span className="thumb">
-                    <SceneVisual scene={scene} />
-                  </span>
-                  <div className="grow stack-2">
-                    <div className="spread">
-                      <strong>{scene.title}</strong>
-                      <span className="pill pill--new">{row.level}</span>
-                    </div>
-                    <ProgressTrail
-                      value={row.spokenItems}
-                      total={row.totalItems}
-                      label={`${row.spokenItems}/${row.totalItems} spoken · ${row.status.replace("-", " ")}`}
-                    />
-                  </div>
-                </div>
-                <div style={{ marginTop: "var(--space-3)" }}>
-                  <Button
-                    variant="secondary"
-                    block
-                    onClick={() => navigate(`/practice/${scene.id}/learn`)}
-                  >
-                    {row.status === "in-progress" ? "Continue scenario" : "Replay scene"}
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
-          {rows.length === 0 ? <p className="small muted">Nothing here yet — start a scene.</p> : null}
+      <section className="progress-overview" aria-live="polite">
+        <div className="progress-overview__metric">
+          <strong>{snapshot.words}</strong>
+          <span>Words learned</span>
         </div>
-      </div>
-
-      <div className="stack-2">
-        <h2>Leaderboard</h2>
-        <Card>
-          <div className="list">
-            {board.map((row) => (
-              <div key={row.rank} className="list__row" style={{ cursor: "default" }}>
-                <span className="chip__marker">{row.rank}</span>
-                <span className="grow">
-                  <strong>{row.name}</strong>
-                  {row.isYou ? <span className="small muted"> · you</span> : null}
-                </span>
-                <span className="pill pill--xp">{row.xp} XP</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
+        <div className="progress-overview__metric">
+          <strong>{snapshot.mastered}</strong>
+          <span>Mastered</span>
+        </div>
+        <div className="progress-overview__metric">
+          <strong>{snapshot.scenes}</strong>
+          <span>Scenes</span>
+        </div>
+      </section>
     </div>
   );
 }

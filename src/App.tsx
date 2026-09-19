@@ -12,7 +12,6 @@ import { LearningTaskPage } from "./pages/LearningTaskPage";
 import { ISpyPhase1 } from "./pages/ISpyPhase1";
 import { ISpyPhase2 } from "./pages/ISpyPhase2";
 import { SessionSummary } from "./pages/SessionSummary";
-import { Progress } from "./pages/Progress";
 import { Vocabulary } from "./pages/Vocabulary";
 import { Journal } from "./pages/Journal";
 import { JournalEntryPage } from "./pages/JournalEntryPage";
@@ -37,7 +36,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/home" element={<Home />} />
         <Route path="/practice" element={<PracticeSelect />} />
-        <Route path="/progress" element={<Progress />} />
+        <Route path="/progress" element={<Navigate to="/vocabulary" replace />} />
         <Route path="/vocabulary" element={<Vocabulary />} />
         <Route path="/journal" element={<Journal />} />
         <Route path="/journal/new" element={<JournalNew />} />

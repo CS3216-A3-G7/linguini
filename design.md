@@ -225,7 +225,7 @@ Treat the journal as proof of progress, not a dense database. Put a soft pasta-y
 
 ### Vocabulary library
 
-Present each saved word as a calm paper card, matching the journal’s card language rather than a divided utility list. Give the target-language word clear teal emphasis on the left, align its translation to the right, and keep the example, word type, and topic together below. Use soft teal-green pills for word type and topic so they remain distinct from pasta-yellow actions and surfaces. Anchor pronunciation in a circular control at the card’s bottom-right corner. Open vocabulary filters in a bottom sheet rather than expanding the page; changes stay temporary until the learner selects the filled “Apply filters” action, while close, backdrop, or Escape dismisses the sheet without applying them.
+Vocabulary replaces Progress as a primary navigation destination. Open with a scene-first library: each real scene image introduces the words collected from that place, with target words, translations, and pronunciation controls grouped directly beneath it. A prominent teal book action at the top switches to the complete vocabulary list. Present that full list as calm paper cards, matching the journal’s card language rather than a divided utility list. Give the target-language word clear teal emphasis on the left, align its translation to the right, and keep the example, word type, and topic together below. Use soft teal-green pills for word type and topic so they remain distinct from pasta-yellow actions and surfaces. Anchor pronunciation in a circular control at the card’s bottom-right corner. Open vocabulary filters in a bottom sheet rather than expanding the page; changes stay temporary until the learner selects the filled “Apply filters” action, while close, backdrop, or Escape dismisses the sheet without applying them.
 
 ### Session summary
 
@@ -238,11 +238,11 @@ The journal list is a single-month view. Use a centered month-and-year label (fo
 ### Mobile
 
 - Design for 360px wide screens first; allow content padding of 16px, expanding to 20–24px on larger phones.
-- Use a persistent five-item bottom bar: Home, Practice, Journal, Progress, Profile. Each item has an icon and label; the active icon is filled tomato and its label is tomato.
+- Use a persistent five-item bottom bar: Home, Practice, Vocabulary, Journal, Profile. Vocabulary uses an open-book icon and occupies the center position; Journal uses a distinct notebook-and-pencil icon. Each item has an icon and label; the active icon is filled tomato and its label is tomato.
 - Keep bottom navigation on the same butter surface as the page, separated only by a quiet line and safe-area padding. It should recede behind the learning content rather than create a new color band.
 - Primary actions belong above the navigation and must not be hidden behind it.
 - Use full-width action buttons, except compact paired controls that still preserve 44px hit targets.
-- Put the single back control beside the centered wordmark in the shared header. Do not add a second back arrow inside a screen title bar. Root destinations (Home, Practice, Journal, Progress, Profile, and Welcome) remain wordmark-only.
+- Put the single back control beside the centered wordmark in the shared header. Do not add a second back arrow inside a screen title bar. Root destinations (Home, Practice, Journal, Vocabulary, Profile, and Welcome) remain wordmark-only.
 
 ### Current implementation guidance
 

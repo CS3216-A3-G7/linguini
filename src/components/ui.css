@@ -859,6 +859,104 @@
   gap: var(--space-3);
 }
 
+.vocabulary-page__header p {
+  margin-top: var(--space-1);
+}
+
+.vocabulary-page__view-toggle {
+  justify-content: flex-start;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 5px var(--space-4) 5px 6px;
+  font-size: var(--text-body);
+}
+
+.vocabulary-page__view-icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: #fffaf2;
+  color: var(--teal-dark);
+}
+
+.vocabulary-page__list-controls {
+  align-items: center;
+}
+
+.vocabulary-page__list-controls .tabs {
+  flex: 1;
+}
+
+.vocabulary-scenes {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.vocabulary-scene {
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-paper);
+}
+
+.vocabulary-scene__image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 8;
+  object-fit: cover;
+}
+
+.vocabulary-scene__content {
+  padding: var(--space-4);
+}
+
+.vocabulary-scene__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.vocabulary-scene__heading span {
+  flex: none;
+  color: var(--teal-dark);
+  font-size: var(--text-small);
+  font-weight: 800;
+}
+
+.vocabulary-scene__words {
+  display: grid;
+}
+
+.vocabulary-scene__word {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.vocabulary-scene__word > span {
+  display: grid;
+  gap: 1px;
+}
+
+.vocabulary-scene__word strong {
+  color: var(--teal-dark);
+  font-size: var(--text-body);
+}
+
+.vocabulary-scene__word small {
+  color: var(--ink-muted);
+  font-size: var(--text-small);
+}
+
 .vocabulary-filter-backdrop {
   position: fixed;
   z-index: 60;
@@ -1700,4 +1798,82 @@
 .summary__noodle {
   width: min(240px, 70%);
   margin-inline: auto;
+}
+
+/* Progress */
+.progress-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.progress-page__vocabulary {
+  justify-content: flex-start;
+  gap: var(--space-4);
+  min-height: 72px;
+  padding: var(--space-2) var(--space-5) var(--space-2) var(--space-3);
+  font-size: var(--text-h3);
+}
+
+.progress-page__vocabulary-icon {
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: #fffaf2;
+  color: var(--teal-dark);
+}
+
+.progress-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--sage);
+  box-shadow: var(--shadow-paper);
+}
+
+.progress-overview__metric {
+  display: flex;
+  min-width: 0;
+  min-height: 132px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-2);
+  text-align: center;
+}
+
+.progress-overview__metric + .progress-overview__metric {
+  border-left: 1px solid rgba(33, 113, 111, 0.18);
+}
+
+.progress-overview__metric strong {
+  color: var(--teal-dark);
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.progress-overview__metric span {
+  color: var(--ink);
+  font-size: var(--text-small);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+@media (max-width: 380px) {
+  .progress-page__vocabulary {
+    padding-right: var(--space-4);
+  }
+
+  .progress-overview__metric strong {
+    font-size: 34px;
+  }
 }

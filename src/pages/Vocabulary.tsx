@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, IconButton, Tabs } from "../components/ui";
-import { CloseIcon, FilterIcon, SpeakerIcon } from "../components/icons";
+import { BookIcon, CloseIcon, FilterIcon, SpeakerIcon } from "../components/icons";
+import { scenes } from "../data/mock";
 import type { VocabStatus, WordClass } from "../data/types";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
@@ -15,6 +16,7 @@ const wordClasses: (WordClass | "all")[] = ["all", "noun", "adjective", "preposi
 
 export function Vocabulary() {
   const { vocabulary } = useAppState();
+  const [view, setView] = useState<"scenes" | "list">("scenes");
   const [status, setStatus] = useState<VocabStatus>("learning");
   const [wordClass, setWordClass] = useState<WordClass | "all">("all");
   const [topic, setTopic] = useState<string>("all");
@@ -42,6 +44,17 @@ export function Vocabulary() {
       item.status === status &&
       (wordClass === "all" || item.wordClass === wordClass) &&
       (topic === "all" || item.topic === topic),
+  );
+
+  const sceneGroups = useMemo(
+    () =>
+      scenes
+        .map((scene) => ({
+          scene,
+          words: vocabulary.filter((item) => item.sceneId === scene.id),
+        }))
+        .filter((group) => group.words.length > 0),
+    [vocabulary],
   );
 
   const openFilters = () => {
@@ -79,22 +92,41 @@ export function Vocabulary() {
   }, [showFilters]);
 
   return (
-    <div className="stack">
-      <div className="spread">
-        <h1>My Vocabulary</h1>
-        <IconButton
-          label="Filters"
-          aria-haspopup="dialog"
-          aria-expanded={showFilters}
-          onClick={openFilters}
-        >
-          <FilterIcon />
-        </IconButton>
+    <div className="stack vocabulary-page">
+      <div className="vocabulary-page__header">
+        <div>
+          <h1>Vocabulary</h1>
+          <p className="small muted">Words collected from the places you explored.</p>
+        </div>
       </div>
 
-      <Tabs options={statusTabs} value={status} onChange={setStatus} />
+      <Button
+        variant="secondary"
+        className="vocabulary-page__view-toggle"
+        aria-pressed={view === "list"}
+        onClick={() => setView((current) => (current === "scenes" ? "list" : "scenes"))}
+      >
+        <span className="vocabulary-page__view-icon" aria-hidden="true">
+          <BookIcon size={22} />
+        </span>
+        <span>{view === "scenes" ? "View Vocabulary List" : "View Words by Scene"}</span>
+      </Button>
 
-      {showFilters ? (
+      {view === "list" ? (
+        <>
+          <div className="spread vocabulary-page__list-controls">
+            <Tabs options={statusTabs} value={status} onChange={setStatus} />
+            <IconButton
+              label="Filters"
+              aria-haspopup="dialog"
+              aria-expanded={showFilters}
+              onClick={openFilters}
+            >
+              <FilterIcon />
+            </IconButton>
+          </div>
+
+      {showFilters && view === "list" ? (
         <div
           className="vocabulary-filter-backdrop"
           onMouseDown={(event) => {
@@ -156,7 +188,7 @@ export function Vocabulary() {
         </div>
       ) : null}
 
-      <div className="list vocabulary-list">
+          <div className="list vocabulary-list">
         {rows.map((item) => (
           <article key={item.id} className="list__row vocabulary-card">
             <div className="grow vocabulary-card__content">
@@ -185,7 +217,7 @@ export function Vocabulary() {
             </div>
           </article>
         ))}
-      </div>
+          </div>
 
       {rows.length === 0 ? (
         <Card>
@@ -194,6 +226,42 @@ export function Vocabulary() {
           </p>
         </Card>
       ) : null}
+        </>
+      ) : (
+        <div className="vocabulary-scenes">
+          {sceneGroups.map(({ scene, words }) => (
+            <section key={scene.id} className="vocabulary-scene">
+              <img
+                className="vocabulary-scene__image"
+                src={scene.imageUrl}
+                alt={`${scene.title} scene where these words were learned`}
+              />
+              <div className="vocabulary-scene__content">
+                <div className="vocabulary-scene__heading">
+                  <h2>{scene.title}</h2>
+                  <span>{words.length} {words.length === 1 ? "word" : "words"}</span>
+                </div>
+                <div className="vocabulary-scene__words">
+                  {words.map((item) => (
+                    <div key={item.id} className="vocabulary-scene__word">
+                      <span>
+                        <strong>{item.word}</strong>
+                        <small>{item.translation}</small>
+                      </span>
+                      <IconButton
+                        label={`Hear ${item.word}`}
+                        onClick={() => speak(item.word)}
+                      >
+                        <SpeakerIcon size={18} />
+                      </IconButton>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

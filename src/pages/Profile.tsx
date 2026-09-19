@@ -13,20 +13,24 @@ export function Profile() {
 
       <Card lifted>
         <div className="row">
-          <Mascot size={72} />
-          <div className="grow stack-2">
-            <h2>{learner.name}</h2>
-            <span className="small muted">
-              {learner.languageFlag} {learner.language} · level {learner.level}
-            </span>
-            <div className="row">
-              <span className="pill pill--xp">{xp} XP</span>
-              <span className="pill pill--learning">🔥 {learner.streak} day streak</span>
-            </div>
+           <img
+              className="mascot"
+              src="pasta-assets/farfalle.png"
+              width={90}
+              height={90}
+              alt="Linguini mascot"
+            />
+            <div className="grow stack-2">
+              <h2>{learner.name}</h2>
+              <span className="small muted">
+                {learner.languageFlag} {learner.language} · 
+              </span>
+              <div className="row">
+                <span className="pill pill--xp">{xp} XP</span>
+              </div>
           </div>
         </div>
       </Card>
-
       <div className="stat-grid">
         <div className="stat">
           <div className="stat__value">{vocabulary.length}</div>
@@ -41,7 +45,7 @@ export function Profile() {
           <span className="small muted">Min / day</span>
         </div>
       </div>
-
+       <Noodle />
       <div className="stack-2">
         <h2>Target language</h2>
         <div className="chip-row">
@@ -92,16 +96,6 @@ export function Profile() {
           </div>
         </Card>
       </div>
-
-      <div className="stack-2">
-        <h2>Your goal</h2>
-        <Card>
-          <p className="small">{learner.goal}</p>
-        </Card>
-      </div>
-
-      <Noodle />
-
       <Button variant="secondary" block onClick={() => navigate("/")}>
         Log out
       </Button>

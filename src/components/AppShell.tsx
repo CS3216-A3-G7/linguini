@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { BookIcon, CameraIcon, HomeIcon, PersonIcon, TrendIcon } from "./icons";
+import { BookIcon, CameraIcon, HomeIcon, JournalIcon, PersonIcon } from "./icons";
 import { BrandBar } from "./ui";
 
 const items = [
   { to: "/home", label: "Home", Icon: HomeIcon },
   { to: "/practice", label: "Practice", Icon: CameraIcon },
-  { to: "/journal", label: "Journal", Icon: BookIcon },
-  { to: "/progress", label: "Progress", Icon: TrendIcon },
+  { to: "/vocabulary", label: "Vocabulary", Icon: BookIcon },
+  { to: "/journal", label: "Journal", Icon: JournalIcon },
   { to: "/profile", label: "Profile", Icon: PersonIcon },
 ];
 

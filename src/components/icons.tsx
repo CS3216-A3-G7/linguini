@@ -35,6 +35,14 @@ export const BookIcon = ({ size = 22, className }: IconProps) => (
   </svg>
 );
 
+export const JournalIcon = ({ size = 22, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M6 4h11a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+    <path d="M8 4v16M11 8h5M11 12h4" />
+    <path d="m12 17 4.8-4.8 1.8 1.8-4.8 4.8-2.3.5z" />
+  </svg>
+);
+
 export const TrendIcon = ({ size = 22, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M4 15.5 9 10l3.5 3.5L20 6" />
