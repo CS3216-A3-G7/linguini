@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Noodle, ProgressTrail, TopBar } from "../components/ui";
+import { Button, Card, ProgressTrail, TopBar } from "../components/ui";
 import { CameraIcon, CheckIcon, MicIcon } from "../components/icons";
 import { languages } from "../data/mock";
 import { useAppState } from "../state/useAppState";

@@ -25,14 +25,7 @@ export function Vocabulary() {
   const [draftTopic, setDraftTopic] = useState<string>("all");
   const filterSheetRef = useRef<HTMLDivElement>(null);
 
-  const statusTabs = useMemo(
-    () =>
-      statusLabels.map(({ id, label }) => ({
-        id,
-        label: `${label}`,
-      })),
-    [vocabulary],
-  );
+  const statusTabs = statusLabels.map(({ id, label }) => ({ id, label }));
 
   const topics = useMemo(
     () => ["all", ...Array.from(new Set(vocabulary.map((item) => item.topic)))],

@@ -9,7 +9,7 @@ const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 export function Home() {
   const navigate = useNavigate();
-  const { learner, session, vocabulary } = useAppState();
+  const { learner, session } = useAppState();
   const sessionScene = getScene(session.sceneId);
   const hasPracticeActivity =
     session.analysisScored || session.completedTaskIds.length > 0 || session.roundsPlayed > 0;
@@ -17,7 +17,6 @@ export function Home() {
     session.completedTaskIds.length === sessionScene.tasks.length &&
     session.roundsPlayed >= sessionScene.rounds.length + sessionScene.prompts.length;
   const hasSessionToContinue = hasPracticeActivity && !sessionIsComplete;
-  const wordsToReview = vocabulary.filter((word) => word.status !== "mastered").slice(0, 3);
   const completedDays = Math.min(learner.streak, WEEK_DAYS.length);
 
   return (

@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Mascot, TopBar } from "../components/ui";
-import { getScene, scenarioProgress } from "../data/mock";
+import { Button } from "../components/ui";
 
 export function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("roshni@linguini.app");
   const [password, setPassword] = useState("noodles");
-  const resumable = getScene(scenarioProgress[0].sceneId);
 
   return (
     <div className="stack">

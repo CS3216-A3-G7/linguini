@@ -37,15 +37,20 @@ export function PracticeAnalysis() {
   }, [scene.id, ensureSession]);
 
   useEffect(() => {
-    setDone(false);
-    setKeptItemIds(suggestedItems.map((item) => item.id));
-    setCustomItems([]);
-    setNewWord("");
-    setPendingWord("");
-    setAddError("");
+    const resetTimer = window.setTimeout(() => {
+      setDone(false);
+      setKeptItemIds(suggestedItems.map((item) => item.id));
+      setCustomItems([]);
+      setNewWord("");
+      setPendingWord("");
+      setAddError("");
+    }, 0);
 
     const timer = window.setTimeout(() => setDone(true), 1300);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(resetTimer);
+      window.clearTimeout(timer);
+    };
   }, [sceneId, suggestedItems]);
 
   useEffect(() => {

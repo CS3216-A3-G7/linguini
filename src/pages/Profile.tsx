@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
-import { ChevronRightIcon } from "../components/icons";
 import { useAppState } from "../state/useAppState";
 
 const avatars = [
