@@ -1,3 +1,4 @@
+import { MediaImage } from "../components/MediaImage";
 
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Noodle, ProgressTrail } from "../components/ui";
@@ -9,14 +10,13 @@ import { useAppState } from "../state/useAppState";
 
 export function Home() {
   const navigate = useNavigate();
-  const { startSession, progress, progressLoading, progressError, scenes, user, learner } = useAppState();
+  const { progress, progressLoading, progressError, scenes, user, learner } = useAppState();
   const resume = progress?.scenarios.find((item) => item.status === "in-progress");
   const resumeScene = scenes.find((scene) => scene.id === resume?.sceneId);
   const suggestions = scenes.slice(0, 3);
 
   const begin = (sceneId?: string) => {
     if (sceneId) {
-      startSession(sceneId);
       navigate(`/practice/${sceneId}/analysis`);
       return;
     }
@@ -50,24 +50,24 @@ export function Home() {
 
       {progressLoading ? <p role="status" className="small muted">Loading your active scenario…</p> : null}
       {progressError ? <p role="alert" className="small">{progressError} Reload to retry.</p> : null}
-      {resumeScene && resume ? (
+      {resume ? (
         <Card plain>
           <div className="stack-2">
             <span className="label muted">Pick up where you left off</span>
             <div className="row">
               <span className="thumb">
-                <SceneImage scene={resumeScene} />
+                <MediaImage assetId={resume.mediaAssetId} title={resume.title} imageUrl={resumeScene?.imageUrl} />
               </span>
               <div className="grow stack-2">
-                <strong>{resumeScene.title}</strong>
+                <strong>{resume.title}</strong>
                 <ProgressTrail
-                  value={resume.spokenItems}
-                  total={resume.totalItems}
-                  label={`${resume.spokenItems} / ${resume.totalItems} items found`}
+                  value={resume.completedTaskCount}
+                  total={resume.totalTaskCount}
+                  label={`${resume.completedTaskCount} / ${resume.totalTaskCount} tasks completed`}
                 />
               </div>
             </div>
-            <Button variant="secondary" onClick={() => begin(resumeScene.id)}>
+            <Button variant="secondary" onClick={() => navigate(`/practice/sessions/${resume.sessionId}/learn`)}>
               Continue scenario
             </Button>
           </div>

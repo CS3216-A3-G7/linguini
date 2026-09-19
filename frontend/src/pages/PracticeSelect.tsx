@@ -27,14 +27,18 @@ export function PracticeSelect() {
       if (requestKey.current?.asset !== uploaded.id) requestKey.current = { asset: uploaded.id, key: crypto.randomUUID() };
       try {
         const session = await createPractice(activeProfile.id, uploaded.id, requestKey.current.key);
-        navigate(`/practice/uploads/${session.session.id}/analysis`);
+        navigate(`/practice/sessions/${session.session.id}/analysis`);
       } catch (e) { setStartError(e instanceof Error ? e.message : "Unable to start analysis."); }
       finally { setStarting(false); }
       return;
     }
     if (!selected) return;
-    startSession(selected);
-    navigate(`/practice/${selected}/analysis`);
+    setStarting(true); setStartError(null);
+    try {
+      const detail = await startSession(selected);
+      navigate(`/practice/sessions/${detail.session.id}/analysis`);
+    } catch (e) { setStartError(e instanceof Error ? e.message : "Unable to start session."); }
+    finally { setStarting(false); }
   };
 
   return (

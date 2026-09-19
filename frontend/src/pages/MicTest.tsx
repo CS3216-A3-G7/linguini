@@ -17,13 +17,13 @@ export function MicTest() {
     setState("listening");
     window.setTimeout(() => {
       setState("working");
-      if (!scene.uploadedSessionId) setMicReady(true);
+      setMicReady(true);
     }, 1200);
   };
 
   const skip = () => {
     setState("unavailable");
-    if (!scene.uploadedSessionId) setMicReady(false);
+    setMicReady(false);
   };
 
   return (
@@ -82,12 +82,11 @@ export function MicTest() {
 
       <Button
         block
-        disabled={Boolean(scene.uploadedSessionId) || state === "idle" || state === "listening"}
-        onClick={() => { if (!scene.uploadedSessionId) navigate(`/practice/${scene.id}/learn`); }}
+        disabled={state === "idle" || state === "listening"}
+        onClick={() => { navigate(`/practice/sessions/${scene.sessionId}/learn`); }}
       >
         Start practice <ArrowRightIcon />
       </Button>
-      {scene.uploadedSessionId ? <p className="small muted">Practice for uploaded images is not available yet.</p> : null}
     </div>
   );
 }

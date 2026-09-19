@@ -16,43 +16,9 @@ export type LanguageItem = {
   exampleTranslation: string;
 };
 
-export type LearningTaskKind = "word" | "gender" | "syntax" | "phrase";
-
-export type LearningTask = {
-  id: string;
-  kind: LearningTaskKind;
-  title: string;
-  summary: string;
-  xp: number;
-  /** language items this task teaches */
-  itemIds: string[];
-  note?: string | null;
-};
-
-export type ISpyChoice = {
-  id: string;
-  label: string;
-};
-
-export type ISpyRound = {
-  id: string;
-  clue: string;
-  clueTranslation: string;
-  answerId: string;
-  choices: ISpyChoice[];
-  encouragement: string;
-};
-
-export type Phase2Prompt = {
-  id: string;
-  itemId: string;
-  suggestions: string[];
-  llmGuess: string;
-  feedback: string;
-};
-
 export type Scene = {
-  uploadedSessionId?: string;
+  sessionId?: string;
+  isUploaded?: boolean;
   imageUrl: string | null;
   mediaAssetId: string;
   languageCode: string;
@@ -61,18 +27,18 @@ export type Scene = {
   blurb: string;
   language: string;
   items: LanguageItem[];
-  tasks: LearningTask[];
-  rounds: ISpyRound[];
-  prompts: Phase2Prompt[];
 };
 
 export type SceneSummary = Pick<Scene, "id" | "mediaAssetId" | "imageUrl" | "title" | "blurb" | "language" | "languageCode">;
 
 export type ScenarioProgress = {
   sceneId: string;
+  sessionId: string;
+  mediaAssetId: string;
+  title: string;
   status: "in-progress" | "completed" | "mastered";
-  spokenItems: number;
-  totalItems: number;
+  completedTaskCount: number;
+  totalTaskCount: number;
   level: string;
 };
 

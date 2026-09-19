@@ -11,7 +11,7 @@ from app.schemas.media import (
     MediaAssetResponse,
     PreloadedScene,
 )
-from app.schemas.scenes import PreloadedSceneDetail
+from app.schemas.scenes import PreloadedSceneCatalogDetail
 from app.services.media_assets import MediaAssetService
 from app.services.scenes import SceneService
 
@@ -54,10 +54,13 @@ def list_preloaded_scenes(
     return service.list_scenes(language)
 
 
-@router.get("/preloaded-scenes/{scene_id}", response_model=PreloadedSceneDetail)
+@router.get("/preloaded-scenes/{scene_id}", response_model=PreloadedSceneCatalogDetail)
 def get_preloaded_scene(
     scene_id: str,
     service: Annotated[SceneService, Depends(get_scene_service)],
     language: Annotated[str, Depends(get_active_language)],
-) -> PreloadedSceneDetail:
-    return service.get_scene(scene_id, language)
+) -> PreloadedSceneCatalogDetail:
+    detail = service.get_scene(scene_id, language)
+    return PreloadedSceneCatalogDetail.model_validate(
+        detail.model_dump(include=set(PreloadedSceneCatalogDetail.model_fields))
+    )

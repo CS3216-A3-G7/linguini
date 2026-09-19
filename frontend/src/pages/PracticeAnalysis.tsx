@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Feedback, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, CheckIcon } from "../components/icons";
@@ -10,14 +10,7 @@ export function PracticeAnalysis() {
   const navigate = useNavigate();
   const scene = useScene();
   const { learner } = useAppState();
-  const [done, setDone] = useState(Boolean(scene.uploadedSessionId));
   const [activeItem, setActiveItem] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (scene.uploadedSessionId) return;
-    const timer = window.setTimeout(() => setDone(true), 1400);
-    return () => window.clearTimeout(timer);
-  }, [scene.id, scene.uploadedSessionId]);
 
   const nouns = scene.items.filter((item) => item.wordClass === "noun").length;
   const others = scene.items.length - nouns;
@@ -37,7 +30,7 @@ export function PracticeAnalysis() {
         </span>
       </div>
 
-      {scene.uploadedSessionId ? <p className="small muted">Preview mode: these are sample objects and positions, not detections from your photo.</p> : null}
+      {scene.isUploaded ? <p className="small muted">Preview mode: these are sample objects and positions, not detections from your photo.</p> : null}
 
       <ScenePhoto
         scene={scene}
@@ -63,8 +56,7 @@ export function PracticeAnalysis() {
         <p className="small muted">Tap a numbered marker to preview what Linguini found.</p>
       )}
 
-      {done ? (
-        <Feedback>
+      <Feedback>
           <span style={{ color: "var(--teal-dark)" }}>
             <CheckIcon />
           </span>
@@ -74,17 +66,9 @@ export function PracticeAnalysis() {
               {nouns} nouns, {others} describing and position words.
             </span>
           </div>
-        </Feedback>
-      ) : (
-        <Card>
-          <div className="stack-2">
-            <strong>Looking at your scene…</strong>
-            <ProgressTrail value={1} total={3} label="Finding objects" />
-          </div>
-        </Card>
-      )}
+      </Feedback>
 
-      <Button block disabled={!done} onClick={() => navigate(scene.uploadedSessionId ? `/practice/uploads/${scene.uploadedSessionId}/mic-test` : `/practice/${scene.id}/mic-test`)}>
+      <Button block onClick={() => navigate(`/practice/sessions/${scene.sessionId}/mic-test`)}>
         Continue to mic test <ArrowRightIcon />
       </Button>
     </div>

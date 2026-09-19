@@ -23,7 +23,12 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
   const journal = useApiData(getJournals);
   const setVocabulary = vocabulary.setData;
   const setJournal = journal.setData;
-  const practice = usePractice(account.user?.id ?? "", account.activeProfile?.id ?? "", progress.setData);
+  const setProgress = progress.setData;
+  const updateLearning = useCallback((data: Parameters<typeof setProgress>[0]) => {
+    setProgress(data);
+    void getVocabulary().then(setVocabulary).catch(() => { /* Reload can retry vocabulary. */ });
+  }, [setProgress, setVocabulary]);
+  const practice = usePractice(account.user?.id ?? "", account.activeProfile?.id ?? "", updateLearning);
   const [journalSaving, setJournalSaving] = useState(false);
   const [journalSaveError, setJournalSaveError] = useState<string | null>(null);
   const saving = useRef(false);

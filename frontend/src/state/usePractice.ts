@@ -1,97 +1,53 @@
 import { useCallback, useRef, useState } from "react";
-import { completePractice, createPractice, getActivePractice, getPractice, getProgress, getSceneDetail, recordPractice } from "../lib/api";
-import type { PracticeDetail, PracticeEvent, ProgressResponse } from "../lib/api";
+import { analyzePractice, completePractice, createPractice, getPractice, getProgress, getSceneDetail, taskAction } from "../lib/api";
+import type { PracticeDetail, ProgressResponse, TaskAnswer, TaskActionResult } from "../lib/api";
+import { applyTaskResult } from "../lib/practiceUpdates";
 
-const empty = { id: "", status: "", sceneId: "", completedTaskIds: [] as string[], scoredRoundIds: [] as string[], analysisScored: false, roundsPlayed: 0, correctRounds: 0, sessionXp: 0, micReady: false, answers: {} as Record<string, string>, clues: {} as Record<string, string> };
-
-export function usePractice(userId: string, profileId: string, updateProgress: (data: ProgressResponse) => void) {
-  const [session, setSession] = useState(empty);
-  const current = useRef(empty);
-  const loading = useRef<Promise<boolean> | null>(null);
-  const [sessionLoading, setLoading] = useState(false);
+export function usePractice(_userId: string, profileId: string, updateProgress: (data: ProgressResponse) => void) {
+  const [session, setSession] = useState<PracticeDetail | null>(null);
   const [practiceSaving, setSaving] = useState(false);
   const [practiceError, setError] = useState<string | null>(null);
-  const queue = useRef(Promise.resolve(true));
-  const retry = useRef<(() => Promise<boolean>) | null>(null);
-  const storageKey = `linguini-session:${userId}:${profileId}`;
-  const accept = useCallback((data: PracticeDetail) => {
-    const value = { ...data.demoState, id: data.session.id, status: data.session.status };
-    current.current = value;
-    setSession(value);
-    try { sessionStorage.setItem(storageKey, value.id); } catch { /* Server active session remains available. */ }
-  }, [storageKey]);
-
-  const load = useCallback(function loadScene(sceneId: string, force = false): Promise<boolean> {
-    if (loading.current) return loading.current.then(() => loadScene(sceneId, force));
-    if (!force && current.current.sceneId === sceneId && current.current.id) return Promise.resolve(true);
-    setLoading(true);
-    setError(null);
-    loading.current = (async () => {
-      try {
-        let found: PracticeDetail | null = null;
-        if (!force) {
-          let saved: string | null = null;
-          try { saved = sessionStorage.getItem(storageKey); } catch { /* Use the server's active session. */ }
-          if (saved) {
-            try { found = await getPractice(saved); } catch (error) {
-              if (!(error instanceof Error && error.message.includes("HTTP 404"))) throw error;
-            }
-          }
-          if (!found || found.demoState.sceneId !== sceneId) found = await getActivePractice();
-        }
-        if (!found || found.demoState.sceneId !== sceneId || found.session.status === "abandoned") {
-          const scene = await getSceneDetail(sceneId);
-          found = await createPractice(profileId, scene.mediaAssetId, crypto.randomUUID());
-        }
-        accept(found);
-        return true;
-      } catch (error) {
-        setError(error instanceof Error ? error.message : "Unable to load practice.");
-        return false;
-      } finally { loading.current = null; setLoading(false); }
-    })();
-    return loading.current;
-  }, [accept, profileId, storageKey]);
-
-  const enqueue = useCallback((action: () => Promise<void>): Promise<boolean> => {
-    const perform = async () => {
-      setSaving(true);
-      setError(null);
-      try {
-        await action();
-        updateProgress(await getProgress());
-        retry.current = null;
-        return true;
-      } catch (error) {
-        setError(error instanceof Error ? error.message : "Unable to save practice.");
-        retry.current = perform;
-        return false;
-      } finally { setSaving(false); }
-    };
-    const next = queue.current.then(perform);
-    queue.current = next;
-    return next;
-  }, [updateProgress]);
-  const record = useCallback((event: PracticeEvent) => {
-    const id = current.current.id;
-    return enqueue(async () => {
-      if (!id) throw new Error("Wait for the session to load.");
-      accept(await recordPractice(id, event));
-    });
-  }, [accept, enqueue]);
-  const ensureSession = useCallback((sceneId: string) => load(sceneId), [load]);
-  const startSession = useCallback((sceneId: string) => load(sceneId, true), [load]);
-  const completeTask = useCallback((id: string) => record({ kind: "task", itemId: id }), [record]);
-  const recordRound = useCallback((id: string, answer: string) => record({ kind: "round", itemId: id, answerId: answer }), [record]);
-  const recordClue = useCallback((id: string, text: string) => record({ kind: "clue", itemId: id, text }), [record]);
-  const completeSession = useCallback(() => enqueue(async () => {
-    const id = current.current.id;
-    if (!id) throw new Error("Wait for the session to load.");
-    await completePractice(id);
-    accept(await getPractice(id));
-  }), [accept, enqueue]);
-  const setMicReady = useCallback((ready: boolean) => setSession((value) => ({ ...value, micReady: ready })), []);
-  const retryPracticeSave = useCallback(() => retry.current?.() ?? Promise.resolve(false), []);
-  return { session, sessionLoading, practiceSaving, practiceError, ensureSession, startSession,
-    completeTask, recordRound, recordClue, completeSession, setMicReady, retryPracticeSave };
+  const busy = useRef(false);
+  const loadVersion = useRef(0);
+  const creation = useRef<{ asset: string; key: string } | null>(null);
+  const [micReady, setMicReady] = useState(false);
+  const loadSession = useCallback(async (id: string) => {
+    const version = ++loadVersion.current;
+    let data = await getPractice(id);
+    if (!data.session.planVersion && !["completed", "abandoned", "failed"].includes(data.session.status)) data = await analyzePractice(id);
+    if (version === loadVersion.current) setSession(data);
+    return data;
+  }, []);
+  const startSession = useCallback(async (sceneId: string) => {
+    const scene = await getSceneDetail(sceneId);
+    if (creation.current?.asset !== scene.mediaAssetId) creation.current = { asset: scene.mediaAssetId, key: crypto.randomUUID() };
+    const result = await createPractice(profileId, scene.mediaAssetId, creation.current.key);
+    creation.current = null;
+    return result;
+  }, [profileId]);
+  const actOnTask = useCallback(async (taskId: string, action: "complete" | "skip" | "attempts", answer?: TaskAnswer, key?: string): Promise<TaskActionResult | null> => {
+    if (!session || busy.current) return null;
+    busy.current = true; setSaving(true); setError(null);
+    try {
+      const result = await taskAction(taskId, action, answer ? { ...answer, idempotencyKey: key } : {});
+      setSession(value => applyTaskResult(value, session.session.id, result));
+      try { updateProgress(await getProgress()); }
+      catch { setError("Your task was saved. Reload to refresh the progress totals."); }
+      return result;
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to save task. Retry your action."); return null; }
+    finally { busy.current = false; setSaving(false); }
+  }, [session, updateProgress]);
+  const completeSession = useCallback(async () => {
+    if (!session || busy.current) return false;
+    busy.current = true; setSaving(true); setError(null);
+    try {
+      await completePractice(session.session.id);
+      const completed = await getPractice(session.session.id);
+      setSession(value => value?.session.id === completed.session.id ? completed : value);
+      updateProgress(await getProgress());
+      return true;
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to complete session."); return false; }
+    finally { busy.current = false; setSaving(false); }
+  }, [session, updateProgress]);
+  return { session, practiceSaving, practiceError, startSession, loadSession, actOnTask, completeSession, micReady, setMicReady };
 }

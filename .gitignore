@@ -21,6 +21,9 @@ dist-ssr
 *.tsbuildinfo
 coverage/
 
+# Local database backups; never commit user data
+.local-backups/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

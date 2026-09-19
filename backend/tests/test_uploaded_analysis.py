@@ -1,107 +1,114 @@
-from unittest.mock import MagicMock
+"""Deterministic plans and server-only evaluation, without a vision provider."""
+
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from pydantic import TypeAdapter
 
+from app.repositories.postgres.workflow import evaluate
+from app.repositories.practice import PracticeConflictError
+from app.schemas.enums import TaskKind
 from app.schemas.media import MediaAsset
-from app.schemas.sessions import CreateSessionRequest, DemoPracticeEventRequest
-from app.schemas.users import LanguageProfile
-from app.services.practice import PracticeConflictError, PracticeNotFoundError, PracticeService
+from app.schemas.sessions import Session
+from app.schemas.tasks import SessionTaskPublic, SubmitTaskAttemptRequest
+from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
+from app.services.session_plan import UPLOAD_WORDS, build_objects, build_tasks
 
 
-@pytest.fixture
-def context():
-    profile = LanguageProfile(
-        user_id=uuid4(),
-        source_language_code="en",
-        target_language_code="es",
-        proficiency_level="A1",
-    )
-    profiles = MagicMock()
-    profiles.list_profiles.return_value = [profile]
-    rows = []
-    repository = MagicMock()
-    repository.read.side_effect = lambda: rows
-    repository.change.side_effect = lambda fn: fn(rows)
+def make_plan(uploaded=True, language="es"):
     asset = MediaAsset(
-        owner_user_id=profile.user_id,
-        source="userUpload",
+        owner_user_id=uuid4() if uploaded else None,
+        source="userUpload" if uploaded else "preloaded",
         media_type="image",
-        storage_key="users/test/images/test.jpg",
+        storage_key="test.jpg",
         mime_type="image/jpeg",
     )
-    media = MagicMock()
-    media.get_by_ids.return_value = {asset.id: asset}
-    catalog = MagicMock()
-    catalog.list_scenes.return_value = []
-    objects = MagicMock()
-    saved = []
-    objects.list_for_session.side_effect = lambda *_: list(saved)
-
-    def save(_session, _user, results):
-        saved.extend(results)
-        return list(saved)
-
-    objects.save_analysis.side_effect = save
-    service = PracticeService(repository, MagicMock(), profiles, catalog, objects, None, media)
-    return service, profile, asset, catalog, objects, saved
-
-
-def test_uploaded_session_analysis_and_retry(context):
-    service, profile, asset, catalog, objects, saved = context
-    request = CreateSessionRequest(
-        language_profile_id=profile.id, media_asset_id=asset.id, idempotency_key="upload-test-key"
+    session = Session(
+        user_id=asset.owner_user_id or uuid4(),
+        language_profile_id=uuid4(),
+        scene_media_asset_id=asset.id,
     )
-    first = service.create(request)
-    assert service.create(request).session.id == first.session.id
-    assert first.scene_objects == []
-    assert first.analysis_mode == "placeholder"
-    catalog.list_scenes.assert_not_called()
-    analyzed = service.analyze(first.session.id)
-    assert [obj.detected_label for obj in analyzed.scene_objects] == ["chair", "table", "plant"]
-    assert all(
-        obj.media_asset_id == asset.id and obj.session_id == first.session.id for obj in saved
-    )
-    saved[0].selection_status = "rejected"
-    again = service.analyze(first.session.id)
-    assert again.scene_objects[0].selection_status == "rejected"
-    objects.save_analysis.assert_called_once()
-    service.abandon(first.session.id)
-    with pytest.raises(PracticeConflictError):
-        service.analyze(first.session.id)
 
-
-def test_foreign_upload_cannot_create_session(context):
-    service, profile, asset, *_ = context
-    asset.owner_user_id = uuid4()
-    with pytest.raises(PracticeNotFoundError):
-        service.create(
-            CreateSessionRequest(language_profile_id=profile.id, media_asset_id=asset.id)
+    def bootstrap(c, target, source, word, translation, part="noun", gender=None, example=None):
+        item = VocabularyItem(
+            language_code=target,
+            lemma=word,
+            display_text=word,
+            part_of_speech=part,
+            example_sentence=example,
+        )
+        return item, VocabularyTranslation(
+            vocabulary_item_id=item.id, source_language_code=source, translated_text=translation
         )
 
-
-def test_wrong_profile_and_unknown_session(context):
-    service, profile, asset, *_ = context
-    with pytest.raises(PracticeConflictError):
-        service.create(CreateSessionRequest(language_profile_id=uuid4(), media_asset_id=asset.id))
-    with pytest.raises(PracticeNotFoundError):
-        service.analyze(uuid4())
-
-
-@pytest.mark.parametrize("uploaded", [True, False])
-def test_analysis_events_cannot_award_xp(context, uploaded):
-    service, profile, asset, catalog, *_ = context
-    if not uploaded:
-        asset = asset.model_copy(update={"source": "preloaded", "owner_user_id": None})
-        service.media.get_by_ids.return_value = {asset.id: asset}
-        scene = MagicMock()
-        scene.media_asset.id = asset.id
-        scene.scene_id = "test-preloaded-scene"
-        catalog.list_scenes.return_value = [scene]
-    session = service.create(
-        CreateSessionRequest(language_profile_id=profile.id, media_asset_id=asset.id)
+    scene = (
+        None
+        if uploaded
+        else {
+            "content": {
+                "items": [
+                    dict(
+                        id="one",
+                        word="puerta",
+                        translation="door",
+                        wordClass="noun",
+                        x=99,
+                        y=99,
+                        example="La puerta es azul.",
+                    )
+                ]
+            }
+        }
     )
-    event = DemoPracticeEventRequest(kind="analysis")
-    for _ in range(3):
-        assert service.record(session.session.id, event).demo_state.session_xp == 0
-    assert service.repository.read()[0].xp == 0
+    with patch("app.services.session_plan.bootstrap_word", side_effect=bootstrap):
+        objects, words, translations = build_objects(
+            MagicMock(),
+            session,
+            asset,
+            {"target_language_code": language, "source_language_code": "en"},
+            scene,
+        )
+    return objects, build_tasks(session.id, objects, words, translations, uploaded)
+
+
+@pytest.mark.parametrize("uploaded", [False, True])
+def test_every_task_kind_is_persistable_skippable_and_private(uploaded):
+    objects, tasks = make_plan(uploaded)
+    assert {t.kind for t in tasks} == set(TaskKind)
+    assert len(tasks) == len(TaskKind)
+    assert all(o.selection_status == "accepted" and o.vocabulary_item_id for o in objects)
+    assert all(t.is_skippable and t.scene_object_id in {o.id for o in objects} for t in tasks)
+    for task in tasks:
+        public = SessionTaskPublic.from_internal(task).model_dump(mode="json")
+        assert "answerKey" not in public
+        assert "acceptedTextAnswers" not in str(public)
+
+
+@pytest.mark.parametrize("language", list(UPLOAD_WORDS))
+def test_upload_placeholders_cover_supported_languages(language):
+    objects, tasks = make_plan(language=language)
+    assert len(objects) == 3
+    assert all("?" not in o.confirmed_label for o in objects)
+    assert tasks[0].public_content.target_text == UPLOAD_WORDS[language][1][0]
+
+
+def attempt(data):
+    return TypeAdapter(SubmitTaskAttemptRequest).validate_python(data)
+
+
+def test_evaluation_uses_private_keys_and_checks_modes():
+    objects, tasks = make_plan()
+    pronunciation = tasks[1]
+    assert evaluate(pronunciation, attempt({"inputMode": "text", "text": "  MESA  "}))
+    assert not evaluate(pronunciation, attempt({"inputMode": "text", "text": "wrong"}))
+    with pytest.raises(PracticeConflictError):
+        evaluate(tasks[0], attempt({"inputMode": "text", "text": "mesa"}))
+    with pytest.raises(PracticeConflictError):
+        evaluate(tasks[6], attempt({"inputMode": "objectSelection", "sceneObjectId": str(uuid4())}))
+    assert evaluate(
+        tasks[6], attempt({"inputMode": "objectSelection", "sceneObjectId": str(objects[1].id)})
+    )
+    assert evaluate(tasks[7], attempt({"inputMode": "text", "text": "I practised today."})) is None
+    with pytest.raises(PracticeConflictError):
+        evaluate(pronunciation, attempt({"inputMode": "multipleChoice", "optionId": "mesa"}))

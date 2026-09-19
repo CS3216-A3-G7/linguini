@@ -19,7 +19,6 @@ model User {
   languageProfiles    LanguageProfile[]
   mediaAssets         MediaAsset[]
   vocabularyProgress  UserVocabularyProgress[]
-  practiceProgress    UserPracticeProgress[]
   aiRuns              AiGenerationRun[]
 
   @@map("users")
@@ -68,7 +67,7 @@ model PreloadedScene {
   @@map("preloaded_scenes")
 }
 
-// File bytes remain in object storage (or bundled demo artwork), not PostgreSQL.
+// File bytes remain in object storage not PostgreSQL.
 model MediaAsset {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerUserId String?  @map("owner_user_id") @db.Uuid
@@ -134,8 +133,6 @@ model Session {
   planVersion        String? @map("plan_version") @db.VarChar(100)
   failureCode        String? @map("failure_code") @db.VarChar(100)
   idempotencyKey     String? @map("idempotency_key") @db.VarChar(200)
-  // Demo UI state remains separate from normalized task/attempt records.
-  demoState          Json @map("demo_state") @db.JsonB
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   sceneObjects       SceneObject[]
@@ -176,21 +173,6 @@ model SceneObject {
   @@index([sessionId, mediaAssetId])
   @@index([vocabularyItemId])
   @@map("scene_objects")
-}
-
-// Transitional progress projection needed for atomic session/XP writes.
-model UserPracticeProgress {
-  userId       String @map("user_id") @db.Uuid
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  languageCode String @map("language_code") @db.VarChar(35)
-  xp           Int @default(0)
-  scenarios    Json @default("[]") @db.JsonB
-  leaderboard  Json @default("[]") @db.JsonB
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-
-  @@id([userId, languageCode])
-  @@map("user_practice_progress")
 }
 
 // SQL additionally enforces a case-insensitive unique source language per item.

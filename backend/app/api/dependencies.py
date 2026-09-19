@@ -17,15 +17,13 @@ from app.repositories.postgres.language_profiles import (
 )
 from app.repositories.postgres.media_assets import PostgresMediaAssetRepository
 from app.repositories.postgres.practice import (
-    PostgresPracticeRepository,
     SessionBackedLearningRepository,
 )
-from app.repositories.postgres.scene_objects import PostgresSceneObjectRepository
 from app.repositories.postgres.scenes import PostgresSceneRepository
 from app.repositories.postgres.tasks import PostgresTaskRepository
 from app.repositories.postgres.users import PostgresUserRepository
 from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
-from app.repositories.practice import PracticeRepository
+from app.repositories.postgres.workflow import PostgresWorkflowRepository
 from app.repositories.scenes import SceneRepository
 from app.repositories.users import UserRepository
 from app.services.image_storage import ImageStorage
@@ -93,7 +91,8 @@ def get_learning_repository(
     request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
 ) -> LearningRepository:
     return SessionBackedLearningRepository(
-        PostgresPracticeRepository(request.app.state.database_engine, demo_user_id),
+        request.app.state.database_engine,
+        demo_user_id,
         PostgresVocabularyRepository(request.app.state.database_engine),
     )
 
@@ -129,32 +128,26 @@ def get_scene_service(
 
 def get_practice_repository(
     request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
-) -> PracticeRepository:
-    return PostgresPracticeRepository(request.app.state.database_engine, demo_user_id)
+) -> PostgresWorkflowRepository:
+    return PostgresWorkflowRepository(request.app.state.database_engine, demo_user_id)
 
 
 def get_practice_service(
-    request: Request,
-    repository: Annotated[PracticeRepository, Depends(get_practice_repository)],
+    repository: Annotated[PostgresWorkflowRepository, Depends(get_practice_repository)],
     users: Annotated[UserService, Depends(get_user_service)],
     profiles: Annotated[LanguageProfileService, Depends(get_language_profile_service)],
-    scenes: Annotated[SceneService, Depends(get_scene_service)],
 ) -> PracticeService:
-    return PracticeService(
-        repository,
-        users,
-        profiles,
-        scenes,
-        PostgresSceneObjectRepository(request.app.state.database_engine),
-        PostgresTaskRepository(request.app.state.database_engine),
-        get_media_asset_repository(request),
-    )
+    return PracticeService(repository, users, profiles)
 
 
 def get_task_service(
     request: Request, users: Annotated[UserService, Depends(get_user_service)]
 ) -> TaskService:
-    return TaskService(PostgresTaskRepository(request.app.state.database_engine), users)
+    return TaskService(
+        PostgresTaskRepository(request.app.state.database_engine),
+        users,
+        request.app.state.database_engine,
+    )
 
 
 def get_learning_service(

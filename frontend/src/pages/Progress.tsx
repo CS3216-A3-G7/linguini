@@ -1,9 +1,9 @@
+import { MediaImage } from "../components/MediaImage";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, ProgressTrail, Tabs } from "../components/ui";
 import { ArrowRightIcon, PlayIcon } from "../components/icons";
-import { SceneImage } from "../components/SceneImage";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
 
@@ -40,27 +40,27 @@ export function Progress() {
   return (
     <div className="stack">
       <h1>Progress</h1>
-      <p className="small muted">XP is saved after each practice action.</p>
+      <p className="small muted">Introductions and evaluated answers add vocabulary credit.</p>
 
-      {activeScene && active ? (
+      {active ? (
         <Card lifted>
           <div className="stack-2">
             <span className="label muted">I-Spy in progress</span>
             <div className="row">
               <span className="thumb">
-                <SceneImage scene={activeScene} />
+                <MediaImage assetId={active.mediaAssetId} title={active.title} imageUrl={activeScene?.imageUrl} />
               </span>
               <div className="grow stack-2">
-                <strong>{activeScene.title}</strong>
-                <span className="small muted">{activeScene.blurb}</span>
+                <strong>{active.title}</strong>
+                <span className="small muted">{activeScene?.blurb}</span>
                 <ProgressTrail
-                  value={active.spokenItems}
-                  total={active.totalItems}
-                  label={`${active.spokenItems} / ${active.totalItems} items spoken`}
+                  value={active.completedTaskCount}
+                  total={active.totalTaskCount}
+                  label={`${active.completedTaskCount} / ${active.totalTaskCount} tasks completed`}
                 />
               </div>
             </div>
-            <Button onClick={() => navigate(`/practice/${activeScene.id}/learn`)}>
+            <Button onClick={() => navigate(`/practice/sessions/${active.sessionId}/learn`)}>
               <PlayIcon size={16} /> Resume scenario
             </Button>
           </div>
@@ -93,22 +93,21 @@ export function Progress() {
         <div className="stack-2">
           {rows.map((row) => {
             const scene = scenes.find((candidate) => candidate.id === row.sceneId);
-            if (!scene) return <p key={row.sceneId} className="small muted">Scene unavailable: {row.sceneId}</p>;
             return (
               <Card key={row.sceneId} plain>
                 <div className="row">
                   <span className="thumb">
-                    <SceneImage scene={scene} />
+                    <MediaImage assetId={row.mediaAssetId} title={row.title} imageUrl={scene?.imageUrl} />
                   </span>
                   <div className="grow stack-2">
                     <div className="spread">
-                      <strong>{scene.title}</strong>
+                      <strong>{row.title}</strong>
                       <span className="pill pill--new">{row.level}</span>
                     </div>
                     <ProgressTrail
-                      value={row.spokenItems}
-                      total={row.totalItems}
-                      label={`${row.spokenItems}/${row.totalItems} spoken · ${row.status.replace("-", " ")}`}
+                      value={row.completedTaskCount}
+                      total={row.totalTaskCount}
+                      label={`${row.completedTaskCount}/${row.totalTaskCount} completed · ${row.status.replace("-", " ")}`}
                     />
                   </div>
                 </div>
@@ -116,9 +115,9 @@ export function Progress() {
                   <Button
                     variant="secondary"
                     block
-                    onClick={() => navigate(`/practice/${scene.id}/learn`)}
+                    onClick={() => navigate(`/practice/sessions/${row.sessionId}/${row.status === "in-progress" ? "learn" : "summary"}`)}
                   >
-                    {row.status === "in-progress" ? "Continue scenario" : "Replay scene"}
+                    {row.status === "in-progress" ? "Continue scenario" : "View summary"}
                   </Button>
                 </div>
               </Card>

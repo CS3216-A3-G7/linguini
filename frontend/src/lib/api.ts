@@ -143,10 +143,10 @@ export async function getScenes(signal?: AbortSignal): Promise<SceneSummary[]> {
 }
 
 export async function getSceneDetail(id: string, signal?: AbortSignal): Promise<Scene> {
-  const row = await request<PreloadedScene & Pick<Scene, "items" | "tasks" | "rounds" | "prompts">>(
+  const row = await request<PreloadedScene & Pick<Scene, "items">>(
     `/api/v1/preloaded-scenes/${encodeURIComponent(id)}`, signal,
   );
-  return { ...sceneSummary(row), items: row.items, tasks: row.tasks, rounds: row.rounds, prompts: row.prompts };
+  return { ...sceneSummary(row), items: row.items };
 }
 
 export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]> {
@@ -206,32 +206,51 @@ export async function saveJournal(draft: JournalDraft, profileId: string, id?: s
   return getJournal(row.id);
 }
 
+export type TaskContent =
+  | { kind: "vocabularyIntroduction"; title: string; targetText: string; translation: string; partOfSpeech: WordClass; exampleSentence: string | null }
+  | { kind: "pronunciationPractice"; prompt: string; targetText: string }
+  | { kind: "grammarExplanation"; title: string; explanation: string; examples: string[] }
+  | { kind: "grammarPractice"; prompt: string; options: string[] }
+  | { kind: "syntaxExplanation"; title: string; sentencePattern: string; explanation: string; examples: string[] }
+  | { kind: "sentenceBuilding"; prompt: string; sourceText: string | null; tokenBank: string[] }
+  | { kind: "ispyRound"; clue: string; clueTranslation?: string | null; encouragement?: string | null; options: { optionId: string; label: string; sceneObjectId: string }[] }
+  | { kind: "reflection"; prompt: string };
+export interface SessionTask {
+  id: string; kind: TaskContent["kind"]; phase: "learning" | "ispy";
+  status: "pending" | "inProgress" | "completed" | "skipped";
+  isSkippable: true; orderIndex: number; publicContent: TaskContent;
+  vocabularyItemId: string | null; sceneObjectId: string | null;
+}
+export interface SessionProgress {
+  completedTaskCount: number; skippedTaskCount: number; terminalTaskCount: number; totalTaskCount: number;
+}
 export interface PracticeDetail {
-  session: { id: string; status: string; sceneMediaAssetId: string };
+  session: { id: string; status: string; sceneMediaAssetId: string; planVersion: string | null };
+  mediaAsset: { id: string; source: "preloaded" | "camera" | "userUpload" };
+  sceneId: string | null; title: string;
   analysisMode: "placeholder" | null;
   sceneObjects: SceneObject[];
-  demoState: {
-    answers: Record<string, string>; clues: Record<string, string>;
-    sceneId: string; completedTaskIds: string[]; scoredRoundIds: string[];
-    analysisScored: boolean; roundsPlayed: number; correctRounds: number; sessionXp: number; micReady: boolean;
-  };
+  vocabulary: { id: string; displayText: string; partOfSpeech: WordClass; gender: string | null; exampleSentence: string | null; languageCode: string }[];
+  translations: { vocabularyItemId: string; translatedText: string }[];
+  tasks: SessionTask[]; nextTaskId: string | null; progress: SessionProgress;
 }
 export interface SceneObject {
-  id: string;
-  detectedLabel: string;
-  confirmedLabel: string | null;
+  id: string; detectedLabel: string; confirmedLabel: string | null; vocabularyItemId: string | null;
   selectionStatus: "suggested" | "accepted" | "rejected" | "corrected";
   boundingBox: { x: number | string; y: number | string; width: number | string; height: number | string };
 }
+export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string };
+export interface TaskActionResult {
+  task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;
+  attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null } | null;
+}
 export const getMedia = (id: string) => request<UploadedImage>(`/api/v1/media/${id}`);
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
-export const reviewPracticeObjects = (id: string, objects: { sceneObjectId: string; selectionStatus: SceneObject["selectionStatus"]; confirmedLabel: string | null }[]) =>
-  write<PracticeDetail>(`/api/v1/sessions/${id}/scene-objects`, "PATCH", { objects });
-export interface PracticeEvent { kind: "analysis" | "task" | "round" | "clue"; itemId?: string; answerId?: string; text?: string }
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);
 export const getActivePractice = () => request<PracticeDetail | null>("/api/v1/sessions/active");
 export const createPractice = (profileId: string, assetId: string, key: string) => write<PracticeDetail>("/api/v1/sessions", "POST", {
   languageProfileId: profileId, mediaAssetId: assetId, idempotencyKey: key,
 });
-export const recordPractice = (id: string, event: PracticeEvent) => write<PracticeDetail>(`/api/v1/sessions/${id}/demo-events`, "POST", event);
+export const taskAction = (id: string, action: "start" | "complete" | "skip" | "attempts", body: unknown = {}) => write<TaskActionResult>(`/api/v1/tasks/${id}/${action}`, "POST", body);
 export const completePractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/complete`, "POST", {});
+export const getPracticeSummary = (id: string) => request<{ progress: SessionProgress; learnedVocabularyIds: string[]; xpEarned: number; ispyCorrectCount: number; ispyAttemptCount: number }>(`/api/v1/sessions/${id}/summary`);

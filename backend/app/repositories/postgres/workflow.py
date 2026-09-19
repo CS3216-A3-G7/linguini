@@ -1,0 +1,601 @@
+"""Atomic normalized session workflow. Locks serialize each user's transitions."""
+
+from contextlib import contextmanager
+from uuid import uuid5
+
+from sqlalchemy import case, func, insert, select, update
+from sqlalchemy.dialects.postgresql import insert as upsert
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.repositories.postgres.language_profiles import language_profiles
+from app.repositories.postgres.media_assets import media_assets
+from app.repositories.postgres.practice import sessions
+from app.repositories.postgres.scene_objects import object_values, parse_object, scene_objects
+from app.repositories.postgres.scenes import preloaded_scenes
+from app.repositories.postgres.tasks import entity_values, session_tasks, task_attempts
+from app.repositories.postgres.users import users
+from app.repositories.postgres.vocabulary import (
+    user_vocabulary_progress,
+    vocabulary_encounters,
+    vocabulary_items,
+    vocabulary_translations,
+)
+from app.repositories.practice import (
+    PracticeConflictError,
+    PracticeNotFoundError,
+    PracticeStorageError,
+)
+from app.schemas.base import utc_now
+from app.schemas.media import MediaAsset
+from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
+from app.schemas.tasks import (
+    SessionProgress,
+    SessionTask,
+    SessionTaskPublic,
+    TaskActionResponse,
+    TaskAttempt,
+)
+from app.schemas.vocabulary import (
+    UserVocabularyProgress,
+    VocabularyEncounter,
+    VocabularyItem,
+    VocabularyTranslation,
+)
+from app.services.session_plan import build_objects, build_tasks
+
+TERMINAL = {"completed", "abandoned", "failed"}
+READ_TASKS = {"vocabularyIntroduction", "grammarExplanation", "syntaxExplanation"}
+
+
+def task_progress(tasks):
+    complete = sum(t.status == "completed" for t in tasks)
+    skipped = sum(t.status == "skipped" for t in tasks)
+    return SessionProgress(
+        completed_task_count=complete,
+        skipped_task_count=skipped,
+        terminal_task_count=complete + skipped,
+        total_task_count=len(tasks),
+    )
+
+
+def parse_session(row):
+    return Session.model_validate({k: row[k] for k in Session.model_fields})
+
+
+class PostgresWorkflowRepository:
+    def __init__(self, engine, user_id):
+        self.engine, self.user_id = engine, user_id
+
+    @contextmanager
+    def transaction(self):
+        try:
+            with self.engine.begin() as connection:
+                if (
+                    connection.execute(
+                        select(users.c.id).where(users.c.id == self.user_id).with_for_update()
+                    ).scalar_one_or_none()
+                    is None
+                ):
+                    raise PracticeNotFoundError("User not found.")
+                yield connection
+        except SQLAlchemyError as exc:
+            raise PracticeStorageError("Unable to save the session workflow.") from exc
+
+    def _session(self, c, session_id, profile_id=None):
+        query = select(sessions).where(
+            sessions.c.id == session_id, sessions.c.user_id == self.user_id
+        )
+        if profile_id:
+            query = query.where(sessions.c.language_profile_id == profile_id)
+        row = c.execute(query).mappings().one_or_none()
+        if row is None:
+            raise PracticeNotFoundError("Session not found.")
+        return parse_session(row)
+
+    def _tasks(self, c, session_id):
+        return [
+            SessionTask.model_validate(dict(r))
+            for r in c.execute(
+                select(session_tasks)
+                .where(session_tasks.c.session_id == session_id)
+                .order_by(session_tasks.c.order_index)
+            ).mappings()
+        ]
+
+    def _detail(self, c, session):
+        asset = MediaAsset.model_validate(
+            dict(
+                c.execute(
+                    select(media_assets).where(media_assets.c.id == session.scene_media_asset_id)
+                )
+                .mappings()
+                .one()
+            )
+        )
+        scene = (
+            c.execute(
+                select(preloaded_scenes.c.slug, preloaded_scenes.c.title).where(
+                    preloaded_scenes.c.media_asset_id == asset.id
+                )
+            )
+            .mappings()
+            .first()
+            if asset.source == "preloaded"
+            else None
+        )
+        objects = [
+            parse_object(r)
+            for r in c.execute(
+                select(scene_objects)
+                .where(scene_objects.c.session_id == session.id)
+                .order_by(scene_objects.c.created_at, scene_objects.c.id)
+            ).mappings()
+        ]
+        ids = [o.vocabulary_item_id for o in objects if o.vocabulary_item_id]
+        words = [
+            VocabularyItem.model_validate(dict(r))
+            for r in c.execute(
+                select(vocabulary_items).where(vocabulary_items.c.id.in_(ids))
+            ).mappings()
+        ]
+        source = c.execute(
+            select(language_profiles.c.source_language_code).where(
+                language_profiles.c.id == session.language_profile_id
+            )
+        ).scalar_one()
+        translations = [
+            VocabularyTranslation.model_validate(dict(r))
+            for r in c.execute(
+                select(vocabulary_translations).where(
+                    vocabulary_translations.c.vocabulary_item_id.in_(ids),
+                    func.lower(vocabulary_translations.c.source_language_code) == source.lower(),
+                )
+            ).mappings()
+        ]
+        tasks = self._tasks(c, session.id)
+        return SessionDetailResponse(
+            session=session,
+            media_asset=asset,
+            scene_id=scene["slug"] if scene else None,
+            title=scene["title"] if scene else "Your uploaded photo",
+            analysis_mode=None if asset.source == "preloaded" else "placeholder",
+            scene_objects=objects,
+            vocabulary=words,
+            translations=translations,
+            tasks=[SessionTaskPublic.from_internal(t) for t in tasks],
+            progress=task_progress(tasks),
+            next_task_id=next(
+                (t.id for t in tasks if t.status not in {"completed", "skipped"}), None
+            ),
+        )
+
+    def get(self, session_id, profile_id=None):
+        with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
+            return self._detail(c, self._session(c, session_id, profile_id))
+
+    def active(self, profile_id):
+        with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
+            row = (
+                c.execute(
+                    select(sessions)
+                    .where(
+                        sessions.c.user_id == self.user_id,
+                        sessions.c.language_profile_id == profile_id,
+                        sessions.c.status.not_in(TERMINAL),
+                    )
+                    .order_by(sessions.c.created_at.desc())
+                )
+                .mappings()
+                .first()
+            )
+            return self._detail(c, parse_session(row)) if row else None
+
+    def create(self, request):
+        with self.transaction() as c:
+            profile = (
+                c.execute(
+                    select(language_profiles).where(
+                        language_profiles.c.id == request.language_profile_id,
+                        language_profiles.c.user_id == self.user_id,
+                        language_profiles.c.is_active.is_(True),
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if profile is None:
+                raise PracticeConflictError("Select the active language profile.")
+            asset = (
+                c.execute(select(media_assets).where(media_assets.c.id == request.media_asset_id))
+                .mappings()
+                .one_or_none()
+            )
+            if (
+                not asset
+                or asset["media_type"] != "image"
+                or not (
+                    (asset["source"] == "preloaded" and asset["owner_user_id"] is None)
+                    or (
+                        asset["source"] in {"camera", "userUpload"}
+                        and asset["owner_user_id"] == self.user_id
+                    )
+                )
+            ):
+                raise PracticeNotFoundError("Image not found.")
+            if (
+                asset["source"] == "preloaded"
+                and c.execute(
+                    select(preloaded_scenes.c.id).where(
+                        preloaded_scenes.c.media_asset_id == asset["id"],
+                        preloaded_scenes.c.is_active.is_(True),
+                        func.lower(preloaded_scenes.c.language_code)
+                        == profile["target_language_code"].lower(),
+                    )
+                ).first()
+                is None
+            ):
+                raise PracticeNotFoundError("Scene not found for this language.")
+            if request.idempotency_key:
+                existing = (
+                    c.execute(
+                        select(sessions).where(
+                            sessions.c.user_id == self.user_id,
+                            sessions.c.language_profile_id == request.language_profile_id,
+                            sessions.c.idempotency_key == request.idempotency_key,
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if existing:
+                    if existing["scene_media_asset_id"] != request.media_asset_id:
+                        raise PracticeConflictError("This request key was used for another image.")
+                    return self._detail(c, parse_session(existing))
+            c.execute(
+                update(sessions)
+                .where(
+                    sessions.c.user_id == self.user_id,
+                    sessions.c.language_profile_id == request.language_profile_id,
+                    sessions.c.status.not_in(TERMINAL),
+                )
+                .values(status="abandoned", abandoned_at=utc_now())
+            )
+            session = Session(
+                user_id=self.user_id,
+                language_profile_id=request.language_profile_id,
+                scene_media_asset_id=request.media_asset_id,
+            )
+            c.execute(
+                insert(sessions).values(
+                    **session.model_dump(by_alias=False), idempotency_key=request.idempotency_key
+                )
+            )
+            return self._detail(c, session)
+
+    def analyze(self, session_id, profile_id):
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.plan_version:
+                return self._detail(c, session)
+            if session.status in TERMINAL:
+                raise PracticeConflictError("Cannot analyze a terminal session.")
+            asset = MediaAsset.model_validate(
+                dict(
+                    c.execute(
+                        select(media_assets).where(
+                            media_assets.c.id == session.scene_media_asset_id
+                        )
+                    )
+                    .mappings()
+                    .one()
+                )
+            )
+            profile = (
+                c.execute(
+                    select(language_profiles).where(
+                        language_profiles.c.id == session.language_profile_id
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            scene = (
+                c.execute(
+                    select(preloaded_scenes).where(preloaded_scenes.c.media_asset_id == asset.id)
+                )
+                .mappings()
+                .first()
+                if asset.source == "preloaded"
+                else None
+            )
+            if asset.source == "preloaded" and scene is None:
+                raise PracticeNotFoundError("Curated scene not found.")
+            objects, words, translations = build_objects(c, session, asset, profile, scene)
+            for obj in objects:
+                c.execute(insert(scene_objects).values(**object_values(obj)))
+            for task in build_tasks(
+                session.id, objects, words, translations, asset.source != "preloaded"
+            ):
+                c.execute(insert(session_tasks).values(**entity_values(task)))
+            c.execute(
+                update(sessions)
+                .where(sessions.c.id == session.id)
+                .values(
+                    status="inProgress",
+                    started_at=utc_now(),
+                    plan_version="placeholder-upload-v1"
+                    if asset.source != "preloaded"
+                    else "placeholder-preloaded-v1",
+                )
+            )
+            return self._detail(c, self._session(c, session.id))
+
+    def finish(self, session_id, profile_id, abandon=False):
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            target = "abandoned" if abandon else "completed"
+            if session.status == target:
+                return session
+            if session.status in TERMINAL:
+                raise PracticeConflictError("Session is already terminal.")
+            tasks = self._tasks(c, session.id)
+            if not abandon and (
+                not tasks or any(t.status not in {"completed", "skipped"} for t in tasks)
+            ):
+                raise PracticeConflictError("Complete or skip every task first.")
+            c.execute(
+                update(sessions)
+                .where(sessions.c.id == session.id)
+                .values(
+                    status=target,
+                    **({"abandoned_at": utc_now()} if abandon else {"completed_at": utc_now()}),
+                )
+            )
+            return self._session(c, session.id)
+
+    def summary(self, session_id, profile_id):
+        with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
+            session = self._session(c, session_id, profile_id)
+            learned = (
+                c.execute(
+                    select(vocabulary_encounters.c.vocabulary_item_id)
+                    .where(
+                        vocabulary_encounters.c.session_id == session.id,
+                        vocabulary_encounters.c.user_id == self.user_id,
+                    )
+                    .distinct()
+                )
+                .scalars()
+                .all()
+            )
+            return SessionSummaryResponse(
+                session=session,
+                progress=task_progress(self._tasks(c, session.id)),
+                learned_vocabulary_ids=learned,
+                xp_earned=c.execute(
+                    select(func.count())
+                    .select_from(vocabulary_encounters)
+                    .where(
+                        vocabulary_encounters.c.session_id == session.id,
+                        vocabulary_encounters.c.user_id == self.user_id,
+                    )
+                ).scalar_one()
+                * 5,
+                **self._ispy_summary(c, session.id),
+            )
+
+    def _ispy_summary(self, c, session_id):
+        outcomes = (
+            c.execute(
+                select(task_attempts.c.is_correct)
+                .join(session_tasks, session_tasks.c.id == task_attempts.c.session_task_id)
+                .where(
+                    session_tasks.c.session_id == session_id, session_tasks.c.kind == "ispyRound"
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return {
+            "ispy_correct_count": sum(outcome is True for outcome in outcomes),
+            "ispy_attempt_count": sum(outcome is not None for outcome in outcomes),
+        }
+
+    def _encounter(self, c, task, event_id, outcome, introduced=False):
+        if not task.vocabulary_item_id:
+            return
+        initial = UserVocabularyProgress(
+            user_id=self.user_id, vocabulary_item_id=task.vocabulary_item_id
+        )
+        c.execute(
+            upsert(user_vocabulary_progress)
+            .values(**initial.model_dump(by_alias=False))
+            .on_conflict_do_nothing(index_elements=["user_id", "vocabulary_item_id"])
+        )
+        event = VocabularyEncounter(
+            id=uuid5(event_id, "vocabulary"),
+            user_id=self.user_id,
+            vocabulary_item_id=task.vocabulary_item_id,
+            session_id=task.session_id,
+            session_task_id=task.id,
+            encounter_type="introduced" if introduced else "practised",
+            outcome=outcome,
+        )
+        saved = c.execute(
+            upsert(vocabulary_encounters)
+            .values(**event.model_dump(by_alias=False))
+            .on_conflict_do_nothing(index_elements=["id"])
+            .returning(vocabulary_encounters.c.id)
+        ).scalar_one_or_none()
+        if saved:
+            values = dict(
+                status=case(
+                    (user_vocabulary_progress.c.status == "new", "learning"),
+                    else_=user_vocabulary_progress.c.status,
+                ),
+                exposure_count=user_vocabulary_progress.c.exposure_count + 1,
+                correct_attempt_count=user_vocabulary_progress.c.correct_attempt_count
+                + int(outcome == "correct"),
+                first_learned_at=func.coalesce(
+                    user_vocabulary_progress.c.first_learned_at, event.occurred_at
+                ),
+            )
+            if not introduced:
+                values["last_practised_at"] = event.occurred_at
+            c.execute(
+                update(user_vocabulary_progress)
+                .where(
+                    user_vocabulary_progress.c.user_id == self.user_id,
+                    user_vocabulary_progress.c.vocabulary_item_id == task.vocabulary_item_id,
+                )
+                .values(**values)
+            )
+
+    def task_action(self, task_id, action, request=None):
+        with self.transaction() as c:
+            row = (
+                c.execute(
+                    select(session_tasks)
+                    .join(sessions, sessions.c.id == session_tasks.c.session_id)
+                    .join(
+                        language_profiles, language_profiles.c.id == sessions.c.language_profile_id
+                    )
+                    .where(
+                        session_tasks.c.id == task_id,
+                        sessions.c.user_id == self.user_id,
+                        language_profiles.c.is_active.is_(True),
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if row is None:
+                raise PracticeNotFoundError("Task not found.")
+            task = SessionTask.model_validate(dict(row))
+            session = self._session(c, task.session_id)
+            attempt = None
+            if action == "attempt":
+                payload = request.model_dump(
+                    mode="json", by_alias=False, exclude={"idempotency_key"}
+                )
+                attempt_id = uuid5(
+                    task.id, "attempt:" + (request.idempotency_key or "single-evaluation")
+                )
+                saved = (
+                    c.execute(select(task_attempts).where(task_attempts.c.id == attempt_id))
+                    .mappings()
+                    .one_or_none()
+                )
+                if saved:
+                    attempt = TaskAttempt.model_validate(dict(saved))
+                    if attempt.response_payload != payload:
+                        raise PracticeConflictError("Attempt key already used for another answer.")
+            retry = (
+                attempt is not None
+                or (action == "complete" and task.status == "completed")
+                or (action == "skip" and task.status == "skipped")
+            )
+            if not retry:
+                if session.status != "inProgress" or task.status in {"completed", "skipped"}:
+                    raise PracticeConflictError("Task or session is not active.")
+                values = {}
+                if action == "start":
+                    values = dict(status="inProgress", started_at=task.started_at or utc_now())
+                elif action == "skip":
+                    values = dict(
+                        status="skipped", skipped_at=utc_now(), skip_reason=request.reason
+                    )
+                elif action == "complete":
+                    if task.kind not in READ_TASKS:
+                        raise PracticeConflictError("Submit an answer or skip this task.")
+                    values = dict(
+                        status="completed",
+                        completed_at=utc_now(),
+                        started_at=task.started_at or utc_now(),
+                    )
+                    if task.kind == "vocabularyIntroduction":
+                        self._encounter(c, task, task.id, "completed", introduced=True)
+                elif action == "attempt":
+                    correct = evaluate(task, request)
+                    attempt = TaskAttempt(
+                        id=attempt_id,
+                        session_task_id=task.id,
+                        attempt_number=1,
+                        input_mode=request.input_mode,
+                        response_payload=payload,
+                        is_correct=correct,
+                        score=None if correct is None else int(correct),
+                        feedback={
+                            "message": "Reflection recorded."
+                            if correct is None
+                            else (
+                                "Correct."
+                                if correct
+                                else "Not quite. Review this word and try it in another session."
+                            )
+                        },
+                    )
+                    c.execute(insert(task_attempts).values(**entity_values(attempt)))
+                    self._encounter(
+                        c,
+                        task,
+                        attempt.id,
+                        "completed" if correct is None else ("correct" if correct else "incorrect"),
+                    )
+                    values = dict(
+                        status="completed",
+                        completed_at=utc_now(),
+                        started_at=task.started_at or utc_now(),
+                    )
+                else:
+                    raise PracticeConflictError("Unknown task action.")
+                c.execute(
+                    update(session_tasks).where(session_tasks.c.id == task.id).values(**values)
+                )
+            tasks = self._tasks(c, task.session_id)
+            return TaskActionResponse(
+                task=SessionTaskPublic.from_internal(next(t for t in tasks if t.id == task.id)),
+                attempt=attempt,
+                next_task_id=next(
+                    (t.id for t in tasks if t.status not in {"completed", "skipped"}), None
+                ),
+                session_progress=task_progress(tasks),
+            )
+
+
+def evaluate(task, request):
+    """Small deterministic evaluator; never accepts client scores or answer keys."""
+    mode = request.input_mode
+    if task.kind in READ_TASKS:
+        raise PracticeConflictError("This task is completed by reading it.")
+    allowed = {
+        "pronunciationPractice": {"text"},
+        "grammarPractice": {"text", "multipleChoice"},
+        "sentenceBuilding": {"text"},
+        "ispyRound": {"objectSelection", "multipleChoice"},
+        "reflection": {"text"},
+    }
+    if mode not in allowed.get(task.kind, set()):
+        raise PracticeConflictError(
+            "Input mode is not supported for this task. Use typing or the offered choices."
+        )
+    if task.kind == "reflection":
+        return None
+    key = task.answer_key
+    if key is None:
+        raise PracticeConflictError("Task has no evaluation key.")
+    if mode == "objectSelection":
+        if request.scene_object_id not in {o.scene_object_id for o in task.public_content.options}:
+            raise PracticeConflictError("Select an object offered by this task.")
+        return request.scene_object_id == key.correct_scene_object_id
+    if mode == "multipleChoice":
+        options = task.public_content.options
+        offered = {o.option_id for o in options} if task.kind == "ispyRound" else set(options)
+        if request.option_id not in offered:
+            raise PracticeConflictError("Select one of the offered choices.")
+        return request.option_id == key.correct_option_id
+
+    def normalize(value):
+        return " ".join(value.casefold().strip().split()).rstrip(".!?\u3002")  # noqa: B005
+
+    return normalize(request.text) in {normalize(a) for a in key.accepted_text_answers}
