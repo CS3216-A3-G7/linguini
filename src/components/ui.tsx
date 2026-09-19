@@ -1,6 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeftIcon, HelpIcon } from "./icons";
+import { ChevronLeftIcon, CloseIcon, HelpIcon } from "./icons";
 import "./ui.css";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -54,16 +54,65 @@ export function TopBar({
   help?: string;
   right?: ReactNode;
 }) {
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const titleId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isHelpOpen) return;
+
+    closeButtonRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsHelpOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isHelpOpen]);
+
   return (
-    <div className="topbar">
-      <span className="topbar__title">{title}</span>
-      {right}
-      {help ? (
-        <IconButton label="What happens here?" title={help} onClick={() => window.alert(help)}>
-          <HelpIcon />
-        </IconButton>
+    <>
+      <div className="topbar">
+        <span className="topbar__title">{title}</span>
+        {right}
+        {help ? (
+          <IconButton
+            label="What happens here?"
+            aria-haspopup="dialog"
+            aria-expanded={isHelpOpen}
+            onClick={() => setIsHelpOpen(true)}
+          >
+            <HelpIcon />
+          </IconButton>
+        ) : null}
+      </div>
+
+      {help && isHelpOpen ? (
+        <div className="help-modal__backdrop" onMouseDown={() => setIsHelpOpen(false)}>
+          <section
+            className="help-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="help-modal__header">
+              <h2 id={titleId}>About this step</h2>
+              <IconButton
+                ref={closeButtonRef}
+                label="Close information"
+                onClick={() => setIsHelpOpen(false)}
+              >
+                <CloseIcon />
+              </IconButton>
+            </div>
+            <p>{help}</p>
+            <Button block onClick={() => setIsHelpOpen(false)}>
+              Got it
+            </Button>
+          </section>
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }
 
