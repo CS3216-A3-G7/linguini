@@ -67,7 +67,13 @@ export function Journal() {
       {visibleEntries.length === 0 ? (
         <Card>
           <div className="stack-2 center-text" style={{ alignItems: "center" }}>
-            <Mascot size={96} />
+            <img
+              className="mascot"
+              src="/linguini-logo.png"
+              width={120}
+              height={120}
+              alt="Linguini mascot"
+            />
             <strong>No entries this month</strong>
             <p className="small muted">A few sentences a day goes a long way.</p>
           </div>
