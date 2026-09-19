@@ -76,11 +76,11 @@ Choose licensed fonts with rounded, human shapes rather than a branded competito
 
 | Role | Recommended family | Weight | Desktop / mobile | Notes |
 |---|---|---:|---:|---|
-| Headings | **Nunito Sans** | 800 | 52–64 / 32–40 | Friendly and rounded without competing with the custom wordmark |
+| Headings | **Baloo 2** | 700–800 | 52–64 / 32–40 | Warm, rounded headings that support the custom wordmark without copying it |
 | UI & body | **Nunito Sans** | 400–800 | 16 / 16 | Clear at small sizes; use 700–800 for controls |
 | Numbers / metadata | **Nunito Sans** | 700–800 | 12–16 / 12–16 | Use tabular numerals where progress is compared |
 
-Use sentence case throughout. The supplied wordmark is the only expressive display lettering; use Nunito Sans at 800 for headings and keep body text calm and conversational. Avoid all-caps except tiny status labels if needed.
+Use sentence case throughout. The supplied wordmark is the only expressive display lettering; use Baloo 2 at 700–800 for headings and keep Nunito Sans body text calm and conversational. Avoid all-caps except tiny status labels if needed.
 
 ### Type scale
 
@@ -280,7 +280,7 @@ Warm, direct, and observant. Use short sentences, active verbs, and concrete cue
   --line: #D9D2C3;
   --focus: #166C84;
 
-  --font-display: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Baloo 2", ui-rounded, sans-serif;
   --font-ui: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
 
   --radius-sm: 12px;

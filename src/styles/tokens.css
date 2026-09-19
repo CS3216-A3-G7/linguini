@@ -14,7 +14,7 @@
   --danger: #c94e2c;
   --focus: #166c84;
 
-  --font-display: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Baloo 2", ui-rounded, sans-serif;
   --font-ui: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
 
   --text-display: clamp(32px, 5vw, 64px);
