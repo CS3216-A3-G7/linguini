@@ -1,94 +1,83 @@
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Noodle, ProgressTrail } from "../components/ui";
-import { ArrowRightIcon, BookIcon, CameraIcon, MicIcon, TrendIcon } from "../components/icons";
+import { Button, Card, ProgressTrail } from "../components/ui";
+import { ArrowRightIcon, BookIcon, CameraIcon, TrendIcon } from "../components/icons";
 import { SceneArt } from "../components/SceneArt";
-import { getScene, scenarioProgress, scenes } from "../data/mock";
+import { getScene } from "../data/mock";
 import { useAppState } from "../state/useAppState";
 
 export function Home() {
   const navigate = useNavigate();
-  const { learner, xp, vocabulary, journal, startSession } = useAppState();
-  const resume = scenarioProgress.find((item) => item.status === "in-progress");
-  const resumeScene = resume ? getScene(resume.sceneId) : null;
-  const suggestions = scenes.slice(0, 3);
-
-  const begin = (sceneId?: string) => {
-    if (sceneId) {
-      startSession(sceneId);
-      navigate(`/practice/${sceneId}/analysis`);
-      return;
-    }
-    navigate("/practice");
-  };
+  const { learner, session } = useAppState();
+  const sessionScene = getScene(session.sceneId);
+  const hasPracticeActivity =
+    session.analysisScored || session.completedTaskIds.length > 0 || session.roundsPlayed > 0;
+  const sessionIsComplete =
+    session.completedTaskIds.length === sessionScene.tasks.length &&
+    session.roundsPlayed >= sessionScene.rounds.length + sessionScene.prompts.length;
+  const hasSessionToContinue = hasPracticeActivity && !sessionIsComplete;
+  const hasWordsToUse = session.completedTaskIds.length > 0;
 
   return (
-    <div className="stack">
+    <div className="stack" style={{ gap: "var(--space-6)" }}>
       <div className="stack-2">
-        <h1>Hello, {learner.name}!</h1>
+        <span className="label muted">Your {learner.language} practice</span>
+        <h1>Hello, {learner.name}</h1>
       </div>
 
-      <Card lifted>
-        <div className="stack">
-          <div className="spread">
-            <div>
-              <h2>Start a new practice</h2>
-              <p className="small muted">Snap a scene, learn the words, then play I-Spy.</p>
+      {hasSessionToContinue ? (
+        <Card lifted>
+          <div className="stack">
+            <div className="stack-2">
+              <span className="label muted">Ready when you are</span>
+              <h2>Continue your practice</h2>
             </div>
-            <span aria-hidden="true" className="row" style={{ color: "var(--teal-dark)" }}>
-              <MicIcon />
-              <CameraIcon />
-            </span>
-          </div>
-          <Button block onClick={() => begin()}>
-            Choose an environment <ArrowRightIcon />
-          </Button>
-        </div>
-      </Card>
-
-      {resumeScene && resume ? (
-        <Card plain>
-          <div className="stack-2">
-            <span className="label muted">Pick up where you left off</span>
             <div className="row">
-              <span className="thumb">
-                <SceneArt scene={resumeScene.art} />
+              <span className="thumb thumb--lg">
+                <SceneArt scene={sessionScene.art} />
               </span>
               <div className="grow stack-2">
-                <strong>{resumeScene.title}</strong>
+                <strong>{sessionScene.title}</strong>
                 <ProgressTrail
-                  value={resume.spokenItems}
-                  total={resume.totalItems}
-                  label={`${resume.spokenItems} / ${resume.totalItems} items found`}
+                  value={session.completedTaskIds.length}
+                  total={sessionScene.tasks.length}
+                  label={`${session.completedTaskIds.length} of ${sessionScene.tasks.length} learning tasks complete`}
                 />
               </div>
             </div>
-            <Button variant="secondary" onClick={() => begin(resumeScene.id)}>
-              Continue scenario
+            <Button block onClick={() => navigate(`/practice/${sessionScene.id}/learn`)}>
+              Continue learning <ArrowRightIcon />
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <Card lifted>
+          <div className="stack">
+            <div className="home-camera-visual" aria-hidden="true">
+              <CameraIcon size={82} />
+            </div>
+            <div className="stack-2">
+              <h2>Capture a scene</h2>
+              <p className="small muted">Your photo becomes today&apos;s lesson.</p>
+            </div>
+            <Button block onClick={() => navigate("/practice")}>
+              Start learning <ArrowRightIcon />
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {hasWordsToUse ? (
+        <Card plain>
+          <div className="stack-2">
+            <span className="label muted">A small next step</span>
+            <h2>Use today&apos;s words</h2>
+            <p className="small muted">Write a few sentences while your new vocabulary is fresh.</p>
+            <Button variant="secondary" block onClick={() => navigate("/journal/new")}>
+              <BookIcon size={18} /> Write journal entry
             </Button>
           </div>
         </Card>
       ) : null}
-
-      <Noodle />
-
-      <div className="stack-2">
-        <h2>Or practise with a ready scene</h2>
-        <div className="grid-3">
-          {suggestions.map((scene) => (
-            <button
-              key={scene.id}
-              type="button"
-              className="scene-pick"
-              onClick={() => begin(scene.id)}
-            >
-              <SceneArt scene={scene.art} />
-              <span className="small" style={{ fontWeight: 700 }}>
-                {scene.title}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div className="grid-2">
         <Button variant="secondary" onClick={() => navigate("/vocabulary")}>

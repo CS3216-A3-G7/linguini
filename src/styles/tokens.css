@@ -1,19 +1,20 @@
 :root {
-  --tomato: #e85d32;
-  --tomato-pressed: #c94e2c;
-  --pasta: #f9b233;
-  --butter: #fff9ed;
-  --cream: #fff1d2;
+  --tomato: #ef5b32;
+  --tomato-pressed: #c84725;
+  --pasta: #f9ae22;
+  --butter: #FBF8EF;
+  --cream: #fff2d6;
+  --paper: #fffdf8;
   --sage: #dcebdd;
   --teal: #2e9c99;
   --teal-dark: #21716f;
   --ink: #263238;
   --ink-muted: #667579;
-  --line: #d9d2c3;
+  --line: #ded7c8;
   --danger: #c94e2c;
   --focus: #166c84;
 
-  --font-display: "Fredoka", "Arial Rounded MT Bold", ui-rounded, sans-serif;
+  --font-display: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
   --font-ui: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
 
   --text-display: clamp(32px, 5vw, 64px);
@@ -39,9 +40,10 @@
   --radius-lg: 28px;
   --radius-pill: 999px;
   --stroke: 2px;
-  --shadow-card: 0 6px 14px rgba(38, 50, 56, 0.1);
+  --shadow-card: 0 8px 22px rgba(86, 67, 34, 0.1);
+  --shadow-paper: 0 2px 0 rgba(255, 255, 255, 0.7) inset, 0 8px 20px rgba(86, 67, 34, 0.07);
   --shadow-action: 0 4px 0 var(--tomato-pressed);
 
   --nav-height: 68px;
-  --content-max: 480px;
+  --content-max: 520px;
 }

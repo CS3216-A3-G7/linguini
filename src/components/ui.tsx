@@ -91,8 +91,8 @@ export function Wordmark({ size = 26 }: { size?: number }) {
 /** Persistent yellow Linguini wordmark shown at the top of every screen. */
 export function BrandBar() {
   return (
-    <header className="brandbar">
-      <Wordmark />
+    <header className="brandbar" aria-label="Linguini">
+      <img className="brandbar__wordmark" src="/linguini-wordmark.png" alt="Linguini" />
     </header>
   );
 }
@@ -174,29 +174,13 @@ export function Noodle({ className = "noodle-divider" }: { className?: string })
 
 export function Mascot({ size = 96 }: { size?: number }) {
   return (
-    <svg
+    <img
       className="mascot"
+      src="/linguini-logo.svg"
       width={size}
       height={size}
-      viewBox="0 0 120 120"
-      fill="none"
-      role="img"
-      aria-label="Linguini mascot"
-    >
-      <rect x="6" y="6" width="108" height="108" rx="26" fill="#FFF6E4" />
-      <circle cx="60" cy="58" r="34" fill="#F9B233" />
-      <circle cx="60" cy="58" r="40" stroke="#E85D32" strokeWidth="5" fill="none" />
-      <circle cx="49" cy="50" r="4" fill="#C94E2C" />
-      <circle cx="71" cy="50" r="4" fill="#C94E2C" />
-      <path d="M50 66c4 5 16 5 20 0" stroke="#C94E2C" strokeWidth="4" strokeLinecap="round" />
-      <path
-        d="M28 58c-8-6-2-18 8-14s2 20-8 28c-8 7 6 18 20 12s20-8 30-2"
-        stroke="#E85D32"
-        strokeWidth="5"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
+      alt="Linguini mascot"
+    />
   );
 }
 

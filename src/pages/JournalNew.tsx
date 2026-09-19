@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Feedback, TopBar } from "../components/ui";
+import { Button, Feedback, TopBar } from "../components/ui";
 import { CameraIcon, UploadIcon } from "../components/icons";
 import { SceneArt } from "../components/SceneArt";
 import type { SceneArtId } from "../components/SceneArt";

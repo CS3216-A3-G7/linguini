@@ -2,6 +2,22 @@
 
 > **A curious language-learning companion, served in small real-world moments.**
 
+## Product loop
+
+Linguini is organized around one repeatable promise: **notice a real place, learn the
+words inside it, play with those words, then use them in a journal.** The visual design
+should make that loop feel like one friendly trail rather than four unrelated features.
+
+1. **Capture:** upload a personal photo or choose a ready-made scene.
+2. **Choose:** review useful objects and select what matters.
+3. **Learn:** build confidence with pronunciation, meaning, examples, and phrases.
+4. **Play I-Spy:** Linguini gives clues first; then the learner describes an object back.
+5. **Reflect:** write a journal entry using the words discovered that day.
+
+The primary route through the product is always visible as a small progress trail. Review,
+vocabulary, progress, and profile are supporting routes and should never compete with the
+next step in the loop.
+
 ## Product character
 
 Linguini helps learners notice language in the world around them: capture a scene, choose what matters, play a quick visual game, and collect discoveries in a personal word journal. The experience should feel sunny, tactile, and reassuring—like a small illustrated field notebook with a mischievous noodle guide.
@@ -16,6 +32,7 @@ Keep the learning product legible and game-like, but avoid copying any competito
 - **Marker-and-menu outlines:** dark-teal hand-drawn-style contours with subtly imperfect geometry; never thick black cartoon outlines.
 - **Food-memory warmth:** buttery surfaces, tomato CTAs, herb-teal confirmation, and pasta-yellow moments of discovery.
 - **Real-world learning:** photographic scenes paired with illustrated overlays, vocabulary chips, and a journal-like record—not a fantasy-character world.
+- **The wordmark is the welcome:** use the supplied orange-yellow “Linguini” wordmark with its looping underline as the visual anchor at the top of the first screen view. Keep it centered, airy, and integrated into the butter page background without a divider; it scrolls away naturally with the page.
 
 ## Design principles
 
@@ -59,11 +76,11 @@ Choose licensed fonts with rounded, human shapes rather than a branded competito
 
 | Role | Recommended family | Weight | Desktop / mobile | Notes |
 |---|---|---:|---:|---|
-| Display | **Fredoka** | 600–700 | 52–64 / 32–40 | Friendly, compact headings with a soft bounce |
+| Headings | **Nunito Sans** | 800 | 52–64 / 32–40 | Friendly and rounded without competing with the custom wordmark |
 | UI & body | **Nunito Sans** | 400–800 | 16 / 16 | Clear at small sizes; use 700–800 for controls |
 | Numbers / metadata | **Nunito Sans** | 700–800 | 12–16 / 12–16 | Use tabular numerals where progress is compared |
 
-Use sentence case throughout. Headings can be expressive, but keep body text calm and conversational. Avoid all-caps except tiny status labels if needed.
+Use sentence case throughout. The supplied wordmark is the only expressive display lettering; use Nunito Sans at 800 for headings and keep body text calm and conversational. Avoid all-caps except tiny status labels if needed.
 
 ### Type scale
 
@@ -134,11 +151,18 @@ Tomato fill with cream or white label, 18px radius, 48px minimum height, and a 4
 
 ### Secondary button
 
-Cream or transparent fill, 2px teal outline, teal-dark label, 48px minimum height. Use when an action is meaningful but not the screen’s main route. Avoid placing more than one secondary button beside a primary action on small screens.
+Teal fill with a cream or white label, 18px radius, 48px minimum height, and a 4px dark-teal bottom edge. Use when an action is meaningful but not the screen’s main route. Avoid placing more than one secondary button beside a primary action on small screens.
 
 ### Quiet button / icon button
 
 No filled container by default; use teal-dark text or icon with a minimum 44 × 44px hit area. Add a cream hover/pressed surface, not a new border.
+
+### Button consistency rules
+
+- Use **primary** for the one forward-moving action: tomato fill, tomato border, white label, and the same 4px tomato press edge everywhere.
+- Use **secondary** for a meaningful alternative: teal fill, white label, teal border, and the same 4px press edge as primary buttons.
+- Use **quiet** only for supporting actions such as “Show English”, “Back home”, and close controls. It has no outline or shadow.
+- Do not create a new button treatment inside a page. Answer choices, vocabulary chips, scene tiles, and task rows are selectable learning controls, not action buttons, so their selected/correct/incorrect states are the only deliberate exceptions.
 
 ### Vocabulary chip
 
@@ -168,7 +192,7 @@ Use a cream panel with a color-coded left detail and a concise human message: �
 
 ### Capture a scene
 
-The home screen invites the learner to begin with their surroundings. Lead with a clear title and a short, practical explanation. The empty photo area is a soft illustrated landscape with a dashed contour and a large camera symbol. The tomato “Open camera” button sits directly beneath it. A small noodle curl and two short spark marks frame the moment; do not surround the entire screen with decoration.
+The home screen answers one question only: “What should I do next?” Lead with a short greeting and one dominant card. For a new learner, use a large, calm camera visual with minimal copy and a single tomato “Start learning” action. If practice is underway, replace that card with the current scene, a compact task trail, and one tomato “Continue learning” action. Preset scenes stay within the practice flow. Keep the Vocabulary and Progress shortcuts as two compact secondary buttons at the bottom until the navigation is revisited. After a learner has completed learning tasks, show one calm, secondary journal prompt beneath the main card.
 
 ### Choose vocabulary
 
@@ -191,6 +215,15 @@ Treat the journal as proof of progress, not a dense database. Put a soft pasta-y
 - Keep bottom navigation on a cream surface with a top divider and safe-area padding.
 - Primary actions belong above the navigation and must not be hidden behind it.
 - Use full-width action buttons, except compact paired controls that still preserve 44px hit targets.
+
+### Current implementation guidance
+
+- Use the supplied `public/linguini-logo.svg` for the mascot/icon mark; do not redraw it in individual pages.
+- Keep `BrandBar`, `Button`, `Card`, `ScenePhoto`, `Tabs`, and `ProgressTrail` as the shared source of truth for page styling.
+- The page background is warm butter with a subtle pasta-yellow lift near the header. Elevated surfaces are paper/cream, never stark white or glassy.
+- Tomato is reserved for the one dominant action and active navigation. Teal is the confidence/confirmation color. Pasta yellow is reserved for progress, rewards, and the wordmark.
+- Prefer one large scene or learning panel per screen. Journal and vocabulary rows should remain calm and connected by dividers.
+- On the mobile canvas, target 360px first: 16px side padding, 48px controls, 44px icon hit areas, and safe-area space below fixed navigation.
 
 ### Tablet and web
 
@@ -247,7 +280,7 @@ Warm, direct, and observant. Use short sentences, active verbs, and concrete cue
   --line: #D9D2C3;
   --focus: #166C84;
 
-  --font-display: "Fredoka", "Arial Rounded MT Bold", ui-rounded, sans-serif;
+  --font-display: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
   --font-ui: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
 
   --radius-sm: 12px;
