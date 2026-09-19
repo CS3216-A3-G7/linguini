@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button, IconButton, ProgressTrail } from "../components/ui";
-import { ArrowRightIcon, SpeakerIcon } from "../components/icons";
+import { ArrowRightIcon, CloseIcon, SpeakerIcon } from "../components/icons";
 import { getScene } from "../data/mock";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
@@ -63,7 +63,12 @@ export function LearningTaskPage() {
       />
 
       <div className="stack-2">
-        <h1>{task.title}</h1>
+        <div className="learning-title-row">
+          <h1>{task.title}</h1>
+          <Button variant="quiet" className="learning-exit" onClick={() => navigate("/home")}> 
+            <CloseIcon size={18} /> Exit
+          </Button>
+        </div>
         <p className="muted">{task.summary}</p>
       </div>
 

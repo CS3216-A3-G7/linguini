@@ -11,9 +11,14 @@ export function Login() {
 
   return (
     <div className="stack">
-      <TopBar title="Log in" />
       <div className="center-text stack-2" style={{ alignItems: "center" }}>
-        <Mascot size={96} />
+        <img
+          className="mascot"
+          src="/linguini-logo.png"
+          width={120}
+          height={120}
+          alt="Linguini mascot"
+        />
         <h1>Welcome back</h1>
         <p className="muted">Your café session is waiting where you left it.</p>
       </div>
@@ -52,16 +57,7 @@ export function Login() {
           Log in
         </Button>
       </form>
-      <Card>
-        <div className="stack-2">
-          <span className="label muted">Interrupted session</span>
-          <strong>{resumable.title}</strong>
-          <p className="small muted">{resumable.blurb}</p>
-          <Button variant="secondary" onClick={() => navigate(`/practice/${resumable.id}/learn`)}>
-            Resume after login
-          </Button>
-        </div>
-      </Card>
+      
       <p className="small muted center-text">
         New here?{" "}
         <button type="button" className="btn btn--quiet" onClick={() => navigate("/onboarding")}>

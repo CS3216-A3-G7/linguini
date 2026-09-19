@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, XpPill } from "../components/ui";
-import { ArrowRightIcon, CheckIcon } from "../components/icons";
+import { ArrowRightIcon, CheckIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
 import { getScene } from "../data/mock";
 import { useAppState } from "../state/useAppState";
@@ -27,7 +27,12 @@ export function Learn() {
   return (
     <div className="stack learn-page">
       <div className="stack-2">
-        <h1>Learning tasks</h1>
+        <div className="learning-title-row">
+          <h1>Learning tasks</h1>
+          <Button variant="quiet" className="learning-exit" onClick={() => navigate("/home")}> 
+            <CloseIcon size={18} /> Exit
+          </Button>
+        </div>
         <p className="muted">Build confidence with each short activity.</p>
       </div>
 
@@ -65,6 +70,7 @@ export function Learn() {
           {completed.length === 0 ? "Begin tasks" : "Continue tasks"} <ArrowRightIcon />
         </Button>
       )}
+
     </div>
   );
 }
