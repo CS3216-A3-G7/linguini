@@ -1,8 +1,6 @@
-import { useMemo, useState } from "react";
-import { Button, Card, IconButton, StatusPill, Tabs } from "../components/ui";
-import { FilterIcon, SpeakerIcon } from "../components/icons";
-import { SceneVisual } from "../components/SceneVisual";
-import { getScene } from "../data/mock";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Card, IconButton, Tabs } from "../components/ui";
+import { CloseIcon, FilterIcon, SpeakerIcon } from "../components/icons";
 import type { VocabStatus, WordClass } from "../data/types";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
@@ -16,17 +14,20 @@ const statusLabels: { id: VocabStatus; label: string }[] = [
 const wordClasses: (WordClass | "all")[] = ["all", "noun", "adjective", "preposition", "phrase"];
 
 export function Vocabulary() {
-  const { vocabulary, setVocabStatus } = useAppState();
+  const { vocabulary } = useAppState();
   const [status, setStatus] = useState<VocabStatus>("learning");
   const [wordClass, setWordClass] = useState<WordClass | "all">("all");
   const [topic, setTopic] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [draftWordClass, setDraftWordClass] = useState<WordClass | "all">("all");
+  const [draftTopic, setDraftTopic] = useState<string>("all");
+  const filterSheetRef = useRef<HTMLDivElement>(null);
 
   const statusTabs = useMemo(
     () =>
       statusLabels.map(({ id, label }) => ({
         id,
-        label: `${label} (${vocabulary.filter((item) => item.status === id).length})`,
+        label: `${label}`,
       })),
     [vocabulary],
   );
@@ -43,90 +44,147 @@ export function Vocabulary() {
       (topic === "all" || item.topic === topic),
   );
 
-  const nextStatus: Record<VocabStatus, VocabStatus> = {
-    new: "learning",
-    learning: "mastered",
-    mastered: "new",
+  const openFilters = () => {
+    setDraftWordClass(wordClass);
+    setDraftTopic(topic);
+    setShowFilters(true);
   };
+
+  const closeFilters = () => setShowFilters(false);
+
+  const applyFilters = () => {
+    setWordClass(draftWordClass);
+    setTopic(draftTopic);
+    setShowFilters(false);
+  };
+
+  useEffect(() => {
+    if (!showFilters) return;
+
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    filterSheetRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeFilters();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [showFilters]);
 
   return (
     <div className="stack">
       <div className="spread">
-        <h1>My vocabulary</h1>
-        <IconButton label="Filters" onClick={() => setShowFilters((current) => !current)}>
+        <h1>My Vocabulary</h1>
+        <IconButton
+          label="Filters"
+          aria-haspopup="dialog"
+          aria-expanded={showFilters}
+          onClick={openFilters}
+        >
           <FilterIcon />
         </IconButton>
       </div>
-      <p className="muted">Everything you found in your own scenes.</p>
 
       <Tabs options={statusTabs} value={status} onChange={setStatus} />
 
       {showFilters ? (
-        <Card plain>
-          <div className="stack-2">
-            <span className="label muted">Word type</span>
-            <div className="chip-row">
-              {wordClasses.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={`chip${option === wordClass ? " chip--selected" : ""}`}
-                  onClick={() => setWordClass(option)}
-                >
-                  {option}
-                </button>
-              ))}
+        <div
+          className="vocabulary-filter-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeFilters();
+          }}
+        >
+          <div
+            ref={filterSheetRef}
+            className="vocabulary-filter-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="vocabulary-filter-title"
+          >
+            <span className="vocabulary-filter-sheet__handle" aria-hidden="true" />
+
+            <div className="vocabulary-filter-sheet__header">
+              <h2 id="vocabulary-filter-title">Filter vocabulary</h2>
+              <IconButton label="Close filters" onClick={closeFilters}>
+                <CloseIcon />
+              </IconButton>
             </div>
-            <span className="label muted">Topic</span>
-            <div className="chip-row">
-              {topics.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={`chip${option === topic ? " chip--selected" : ""}`}
-                  onClick={() => setTopic(option)}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
+
+            <fieldset className="vocabulary-filter-group">
+              <legend>Word type</legend>
+              <div className="chip-row">
+                {wordClasses.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={`chip${option === draftWordClass ? " chip--selected" : ""}`}
+                    onClick={() => setDraftWordClass(option)}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="vocabulary-filter-group">
+              <legend>Topic</legend>
+              <div className="chip-row">
+                {topics.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={`chip${option === draftTopic ? " chip--selected" : ""}`}
+                    onClick={() => setDraftTopic(option)}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <Button block className="vocabulary-filter-sheet__apply" onClick={applyFilters}>
+              Apply filters
+            </Button>
           </div>
-        </Card>
+        </div>
       ) : null}
 
-      <div className="list">
-        {rows.map((item) => {
-          const scene = getScene(item.sceneId);
-          return (
-            <div key={item.id} className="list__row" style={{ cursor: "default" }}>
-              <span className="thumb">
-                <SceneVisual scene={scene} />
-              </span>
-              <div className="grow stack-2">
-                <div className="row">
-                  <strong>{item.word}</strong>
-                  <IconButton label={`Hear ${item.word}`} onClick={() => speak(item.word)}>
-                    <SpeakerIcon size={18} />
-                  </IconButton>
+      <div className="list vocabulary-list">
+        {rows.map((item) => (
+          <article key={item.id} className="list__row vocabulary-card">
+            <div className="grow vocabulary-card__content">
+              <div className="vocabulary-card__heading">
+                <strong className="vocabulary-card__title">{item.word}</strong>
+                <div className="vocabulary-card__right">
+                  <p className="vocabulary-card__translation">{item.translation}</p>
                 </div>
-                <span className="small muted">{item.translation}</span>
-                <span className="small muted">{item.example}</span>
-                <div className="row">
-                  <StatusPill status={item.status} />
+              </div>
+
+              <p className="vocabulary-card__example">{item.example}</p>
+
+              <div className="vocabulary-card__footer">
+                <div className="vocabulary-card__tags">
                   <span className="pill pill--new">{item.wordClass}</span>
                   <span className="pill pill--new">{item.topic}</span>
                 </div>
+                <IconButton
+                  className="vocabulary-card__audio"
+                  label={`Hear ${item.word}`}
+                  onClick={() => speak(item.word)}
+                >
+                  <SpeakerIcon size={18} />
+                </IconButton>
               </div>
-              <Button
-                variant="quiet"
-                aria-label={`Move ${item.word} to ${nextStatus[item.status]}`}
-                onClick={() => setVocabStatus(item.id, nextStatus[item.status])}
-              >
-                Move
-              </Button>
             </div>
-          );
-        })}
+          </article>
+        ))}
       </div>
 
       {rows.length === 0 ? (

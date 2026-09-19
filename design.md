@@ -223,6 +223,10 @@ Make the challenge feel focused: progress at top, scene photo next, a compact hi
 
 Treat the journal as proof of progress, not a dense database. Put a soft pasta-yellow encouragement panel above or below the list. Segment Review, Learned, and Mastered with text-first tabs. The active tab uses tomato fill; inactive tabs live on a pale cream rail. Each row should feel easy to revisit in under a second.
 
+### Vocabulary library
+
+Present each saved word as a calm paper card, matching the journal’s card language rather than a divided utility list. Give the target-language word clear teal emphasis on the left, align its translation to the right, and keep the example, word type, and topic together below. Use soft teal-green pills for word type and topic so they remain distinct from pasta-yellow actions and surfaces. Anchor pronunciation in a circular control at the card’s bottom-right corner. Open vocabulary filters in a bottom sheet rather than expanding the page; changes stay temporary until the learner selects the filled “Apply filters” action, while close, backdrop, or Escape dismisses the sheet without applying them.
+
 ### Session summary
 
 Make the completion state feel celebratory without becoming noisy. Center the noodle flourish beneath the congratulatory heading. Present the three session statistics with strong dark labels, large teal values, and a light sage-green surface so the results remain legible at a glance.
@@ -246,7 +250,7 @@ The journal list is a single-month view. Use a centered month-and-year label (fo
 - Keep `BrandBar`, `Button`, `Card`, `ScenePhoto`, `Tabs`, and `ProgressTrail` as the shared source of truth for page styling.
 - The page background is warm butter with a subtle pasta-yellow lift near the header. The shared wordmark sits on a richer pasta-cream strip (`#F7E6B4`) without a divider; elevated surfaces are paper/cream, never stark white or glassy.
 - Tomato is reserved for the one dominant action and active navigation. Teal is the confidence/confirmation color. Pasta yellow is reserved for progress, rewards, and the wordmark.
-- Prefer one large scene or learning panel per screen. Journal and vocabulary rows should remain calm and connected by dividers.
+- Prefer one large scene or learning panel per screen. Journal and vocabulary collections use calm paper cards with consistent spacing and restrained elevation.
 - On the mobile canvas, target 360px first: 16px side padding, 48px controls, 44px icon hit areas, and safe-area space below fixed navigation.
 
 ### Tablet and web
