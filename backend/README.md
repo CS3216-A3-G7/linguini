@@ -24,6 +24,7 @@ Fill these variables in `backend/.env.local`:
 | `DIRECT_URL` | Prisma migration URI: direct connection or session pooler. Use a database role permitted to apply DDL. |
 | `DEMO_USER_ID` | UUID of an existing `users` row. The default example UUID must exist in your database to use `/me`. This is temporary demo identity, not authentication. |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins, including the port; defaults to `http://localhost:5173`. |
+| `MEDIA_PUBLIC_BASE_URL` | Public Supabase Storage bucket URL, e.g. `https://PROJECT.supabase.co/storage/v1/object/public/media-assets`. Shared base URL for public media assets in this bucket. |
 
 Database URLs stay on the backend. No Supabase anon key, service-role key, or AI
 provider key is needed for database access. Do not append Prisma's `pgbouncer=true`
@@ -48,6 +49,46 @@ or query failures never fall back to JSON. The application creates one SQLAlchem
 engine per process and disposes it at shutdown.
 
 ## Persistence and remaining static content
+
+### Preloaded scene images
+
+For a private bucket, set these backend-only variables in `backend/.env.local`:
+
+```dotenv
+MEDIA_STORAGE_PRIVATE=true
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+MEDIA_STORAGE_BUCKET=media-assets
+SUPABASE_SERVICE_ROLE_KEY=your-server-service-role-key
+```
+
+The service-role key is available in the project's API key settings. Never put it
+in a `VITE_*` variable or frontend code. The backend signs only the assets linked
+to the requested preloaded scenes and returns one-hour download URLs in `imageUrl`.
+Each scene fetch issues fresh URLs; reload the page if an old URL has expired.
+Signing failures return a 503 error instead of silently using a public URL.
+`MEDIA_PUBLIC_BASE_URL` is ignored in private mode. Restart the backend after
+changing configuration. Keep `storage_key` bucket-relative, for example
+`preloaded/scenes/bedroom.jpg`; no schema migration is needed.
+
+For a public bucket, set `MEDIA_STORAGE_PRIVATE=false` and follow the configuration below.
+
+Upload the scene image files to a public Supabase Storage bucket and set
+`MEDIA_PUBLIC_BASE_URL` in `backend/.env.local` to that bucket's public URL.
+Set each linked `media_assets.storage_key` to its raw, bucket-relative object path,
+for example `preloaded/scenes/bedroom.jpg` (without the bucket name). Set the asset's MIME type,
+width, and height to match the uploaded file. An existing absolute HTTP(S) image URL
+in `storage_key` also works without the base URL setting. Restart the backend after
+changing environment variables.
+
+Scene list and detail responses include `imageUrl`; the frontend uses it in catalog
+cards and learning/practice views. Practice displays the full image without cropping,
+so marker coordinates remain percentages of the image. If you replace an illustration
+with a different photo, update the scene content's item coordinates to match it.
+Seeded `demo-art/*` keys have no remote image URL. Missing URLs or failed image
+downloads display an "Image unavailable" placeholder in scene views. Database seed migrations
+create metadata only; they do not upload files. This configuration serves public
+preloaded images; use the private mode above for private buckets.
+See [Supabase public URLs](https://supabase.com/docs/reference/javascript/file-buckets-getpublicurl).
 
 | Data | Runtime storage |
 | --- | --- |

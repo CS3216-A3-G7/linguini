@@ -256,6 +256,19 @@
   aspect-ratio: 8 / 5;
 }
 
+/* Keep the full image in practice so percentage markers stay aligned. */
+.scene-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+}
+
+/* Never place object markers over a missing image. */
+.scene-image--error ~ .scene__marker {
+  display: none;
+}
+
 .scene__marker {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -518,10 +531,11 @@
   flex: none;
 }
 
-.thumb svg {
+.thumb .scene-image {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
 }
 
 .thumb--lg {
@@ -580,10 +594,11 @@
   background: #fff4e2;
 }
 
-.scene-pick svg {
+.scene-pick .scene-image {
   width: 100%;
   border-radius: var(--radius-sm);
   aspect-ratio: 8 / 5;
+  object-fit: cover;
 }
 
 .dashed-capture {
@@ -705,4 +720,19 @@
   font-family: var(--font-display);
   font-size: var(--text-h2);
   color: var(--teal-dark);
+}
+
+/* Keep missing-image feedback legible in both thumbnails and full scenes. */
+.scene-image.scene-image--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 8 / 5;
+  padding: 0.25rem;
+  background: var(--cream);
+  color: var(--teal-dark);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.3;
+  text-align: center;
 }

@@ -21,6 +21,7 @@ from app.services.journals import JournalConflictError, JournalNotFoundError
 from app.services.language_profiles import NoActiveLanguageError
 from app.services.learning import InvalidCursorError, ProgressNotFoundError
 from app.services.media_assets import MediaAssetNotFoundError
+from app.services.media_urls import MediaUrlError
 from app.services.practice import PracticeConflictError, PracticeNotFoundError
 from app.services.scenes import SceneNotFoundError
 from app.services.users import UserNotFoundError
@@ -28,6 +29,11 @@ from app.services.users import UserNotFoundError
 
 def register_learning_errors(app: FastAPI) -> None:
     errors = {
+        MediaUrlError: (
+            503,
+            "media_url_error",
+            "Unable to load scene images. Check backend Storage configuration and retry.",
+        ),
         TaskNotFoundError: (404, "task_not_found", "Task or session not found."),
         TaskConflictError: (409, "task_conflict", "Task record conflicts with the current state."),
         TaskStorageError: (500, "task_storage_error", "Unable to load or save task records."),

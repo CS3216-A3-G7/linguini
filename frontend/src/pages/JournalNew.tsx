@@ -3,8 +3,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Feedback, TopBar } from "../components/ui";
 import { UploadIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
-import type { SceneArtId } from "../components/SceneArt";
+import { JournalImage } from "../components/JournalImage";
+import { SceneImage } from "../components/SceneImage";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
 import { getTodayJournal } from "../lib/api";
@@ -26,7 +26,7 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
   const today = new Date(`${date}T12:00:00`);
   const [title, setTitle] = useState(entry?.title ?? "");
   const [body, setBody] = useState(entry?.body ?? "");
-  const [art, setArt] = useState<SceneArtId | null>(entry?.art ?? null);
+  const [mediaAssetId, setMediaAssetId] = useState<string | null>(entry?.mediaAssetId ?? null);
   const [selectedWords, setSelectedWords] = useState<string[]>(entry?.wordsUsed ?? []);
 
   const toggleWord = (word: string) =>
@@ -37,7 +37,7 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
   const save = async () => {
     const saved = await saveJournalEntry({
       title: title.trim() || "Today's entry",
-      art: art ?? "street",
+      mediaAssetId,
       body: body.trim(),
       wordsUsed: selectedWords,
     }, entry?.id);
@@ -70,29 +70,29 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
       </div>
 
       <div className="stack-2">
-        <span className="field__label">Illustration</span>
-        {art ? (
+        <span className="field__label">Scene image</span>
+        {mediaAssetId ? (
           <div className="scene">
-            <SceneArt scene={art} className="scene__art" />
+            <JournalImage title={title || "Journal scene"} imageUrl={mediaAssetId === entry?.mediaAssetId ? entry.imageUrl : scenes.find((scene) => scene.mediaAssetId === mediaAssetId)?.imageUrl ?? null} className="scene__art" />
           </div>
         ) : (
           <div className="dashed-capture">
             <span style={{ color: "var(--teal-dark)" }}>
               <UploadIcon size={40} />
             </span>
-            <p className="small muted">Choose a scene illustration below</p>
+            <p className="small muted">Choose a scene image below</p>
           </div>
         )}
         <div className="grid-3">
           <SceneCatalogStatus />
-          {scenes.slice(0, 3).map((scene) => (
+          {scenes.map((scene) => (
             <button
               key={scene.id}
               type="button"
-              className={`scene-pick${art === scene.art ? " scene-pick--selected" : ""}`}
-              onClick={() => setArt(scene.art)}
+              className={`scene-pick${mediaAssetId === scene.mediaAssetId ? " scene-pick--selected" : ""}`}
+              onClick={() => setMediaAssetId(scene.mediaAssetId)}
             >
-              <SceneArt scene={scene.art} />
+              <SceneImage scene={scene} />
               <span className="small">{scene.title}</span>
             </button>
           ))}

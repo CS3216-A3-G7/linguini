@@ -23,7 +23,6 @@ from app.schemas.vocabulary import DailyVocabularyItem
 
 class Journal(EntityModel):
     title: Annotated[str, Field(max_length=200)] = "Today's entry"
-    art: Literal["street", "cafe", "market", "bedroom", "kitchen", "park"] = "street"
     selected_words: list[NonEmptyText] = Field(default_factory=list)
     user_id: UUID
     language_profile_id: UUID
@@ -102,16 +101,16 @@ class JournalWordMention(EntityModel):
 
 
 class UpsertTodayJournalRequest(ApiModel):
+    media_asset_id: UUID | None = None
     language_profile_id: UUID
     title: Annotated[str, Field(max_length=200)] = "Today's entry"
-    art: Literal["street", "cafe", "market", "bedroom", "kitchen", "park"] = "street"
     selected_words: list[NonEmptyText] = Field(default_factory=list)
     content: Annotated[str, Field(min_length=1, max_length=20_000)] | None = None
 
 
 class UpdateJournalRequest(ApiModel):
+    media_asset_id: UUID | None = None
     title: Annotated[str, Field(max_length=200)] | None = None
-    art: Literal["street", "cafe", "market", "bedroom", "kitchen", "park"] | None = None
     selected_words: list[NonEmptyText] | None = None
     content: Annotated[str, Field(min_length=1, max_length=20_000)] | None = None
     audio_media_asset_id: UUID | None = None
@@ -145,6 +144,7 @@ class JournalTodayContextResponse(ApiModel):
 
 
 class JournalDetailResponse(ApiModel):
+    image_url: str | None = None
     journal: Journal
     media: list[JournalMedia] = Field(default_factory=list)
     revisions: list[JournalRevision] = Field(default_factory=list)

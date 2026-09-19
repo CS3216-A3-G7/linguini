@@ -334,7 +334,6 @@ model Journal {
   localDate         DateTime @map("local_date") @db.Date
   timezone          String @db.Text
   title             String @default("Today's entry") @db.VarChar(200)
-  art               String @default("street") @db.VarChar(7)
   selectedWords     Json @default("[]") @map("selected_words") @db.JsonB
   status            String @default("draft") @db.VarChar(9)
   currentRevisionId String? @map("current_revision_id") @db.Uuid

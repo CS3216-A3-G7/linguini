@@ -53,7 +53,6 @@ journals = Table(
     Column("local_date", Date, nullable=False),
     Column("timezone", Text, nullable=False),
     Column("title", String(200), nullable=False),
-    Column("art", String(7), nullable=False),
     Column("selected_words", JSONB, nullable=False),
     Column("status", String(9), nullable=False),
     Column("current_revision_id", Uuid),
@@ -227,7 +226,6 @@ class PostgresJournalRepository:
                             mutable = {
                                 "journals": {
                                     "title",
-                                    "art",
                                     "selected_words",
                                     "status",
                                     "current_revision_id",

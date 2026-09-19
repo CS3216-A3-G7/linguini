@@ -93,17 +93,17 @@ export function getProgress(signal?: AbortSignal): Promise<ProgressResponse> {
 }
 
 interface PreloadedScene {
+  imageUrl?: string | null;
   mediaAsset: { id: string };
   languageCode: string;
   sceneId: string;
   title: string;
   description: string | null;
-  art: Scene["art"];
   language: string;
 }
 
 function sceneSummary(row: PreloadedScene): SceneSummary {
-  return { id: row.sceneId, mediaAssetId: row.mediaAsset.id, title: row.title, blurb: row.description ?? "", art: row.art, language: row.language, languageCode: row.languageCode };
+  return { id: row.sceneId, mediaAssetId: row.mediaAsset.id, imageUrl: row.imageUrl ?? null, title: row.title, blurb: row.description ?? "", language: row.language, languageCode: row.languageCode };
 }
 
 export async function getScenes(signal?: AbortSignal): Promise<SceneSummary[]> {
@@ -143,16 +143,18 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
 
 interface JournalRecord {
   id: string; languageProfileId: string; localDate: string; title: string;
-  art: JournalEntry["art"]; selectedWords: string[]; currentRevisionId: string | null;
+  selectedWords: string[]; currentRevisionId: string | null;
 }
 interface JournalDetail {
+  media: { mediaAssetId: string; displayOrder: number }[];
+  imageUrl?: string | null;
   journal: JournalRecord;
   revisions: { id: string; content: string }[];
 }
 function journalEntry(detail: JournalDetail): JournalEntry {
   const row = detail.journal;
   return { id: row.id, languageProfileId: row.languageProfileId, date: row.localDate,
-    title: row.title, art: row.art, wordsUsed: row.selectedWords,
+    title: row.title, mediaAssetId: [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.mediaAssetId ?? null, imageUrl: detail.imageUrl ?? null, wordsUsed: row.selectedWords,
     body: detail.revisions.find((revision) => revision.id === row.currentRevisionId)?.content ?? "" };
 }
 export async function getJournals(signal?: AbortSignal): Promise<JournalEntry[]> {
@@ -165,9 +167,9 @@ export async function getTodayJournal(signal?: AbortSignal) {
   const context = await request<{ localDate: string; journal: JournalRecord | null }>("/api/v1/journal/today/context", signal);
   return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null };
 }
-export type JournalDraft = Pick<JournalEntry, "title" | "art" | "body" | "wordsUsed">;
+export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed">;
 export async function saveJournal(draft: JournalDraft, profileId: string, id?: string) {
-  const body = { title: draft.title, art: draft.art, content: draft.body, selectedWords: draft.wordsUsed };
+  const body = { title: draft.title, mediaAssetId: draft.mediaAssetId, content: draft.body, selectedWords: draft.wordsUsed };
   const row = id ? await write<JournalRecord>(`/api/v1/journals/${id}`, "PATCH", body)
     : await write<JournalRecord>("/api/v1/journal/today", "PUT", { ...body, languageProfileId: profileId });
   return getJournal(row.id);

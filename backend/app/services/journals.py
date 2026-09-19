@@ -18,6 +18,7 @@ from app.schemas.journals import (
     UpsertTodayJournalRequest,
 )
 from app.services.language_profiles import LanguageProfileService
+from app.services.media_urls import PrivateMediaUrls, public_media_url
 from app.services.users import UserService
 
 
@@ -28,11 +29,43 @@ class JournalService:
         users: UserService,
         profiles: LanguageProfileService,
         media: MediaAssetRepository | None = None,
+        media_public_base_url: str | None = None,
+        private_media_urls: PrivateMediaUrls | None = None,
     ) -> None:
         self.repository = repository
         self.users = users
         self.profiles = profiles
         self.media = media
+        self.media_public_base_url = media_public_base_url
+        self.private_media_urls = private_media_urls
+
+    def _with_images(self, rows: list[JournalDetailResponse]) -> list[JournalDetailResponse]:
+        covers = {
+            row.journal.id: min(row.media, key=lambda media: media.display_order).media_asset_id
+            for row in rows
+            if row.media
+        }
+        assets = self.media.get_by_ids(list(covers.values())) if self.media and covers else {}
+        keys = {}
+        for row in rows:
+            asset = assets.get(covers.get(row.journal.id))
+            if (
+                asset
+                and asset.media_type == MediaType.IMAGE
+                and (
+                    asset.owner_user_id == row.journal.user_id
+                    or asset.source == MediaSource.PRELOADED
+                )
+            ):
+                keys[row.journal.id] = asset.storage_key
+        urls = (
+            self.private_media_urls.resolve(list(keys.values()))
+            if self.private_media_urls
+            else {key: public_media_url(key, self.media_public_base_url) for key in keys.values()}
+        )
+        return [
+            row.model_copy(update={"image_url": urls.get(keys.get(row.journal.id))}) for row in rows
+        ]
 
     @staticmethod
     def _find(rows, journal_id, user_id):
@@ -65,10 +98,12 @@ class JournalService:
 
     def list_entries(self) -> list[JournalDetailResponse]:
         user = self.users.get_current_user()
-        return sorted(
-            (row for row in self.repository.read() if row.journal.user_id == user.id),
-            key=lambda row: row.journal.local_date,
-            reverse=True,
+        return self._with_images(
+            sorted(
+                (row for row in self.repository.read() if row.journal.user_id == user.id),
+                key=lambda row: row.journal.local_date,
+                reverse=True,
+            )
         )
 
     def get_entry(self, journal_id: UUID) -> JournalDetailResponse:
@@ -103,8 +138,31 @@ class JournalService:
         entry.journal.updated_at = utc_now()
         return revision
 
+    @staticmethod
+    def _set_cover(entry: JournalDetailResponse, asset_id: UUID | None) -> None:
+        cover = min(entry.media, key=lambda row: row.display_order, default=None)
+        if cover is not None and cover.media_asset_id == asset_id:
+            return
+        order = cover.display_order if cover else 0
+        if cover:
+            entry.media.remove(cover)
+        if asset_id is not None:
+            existing = next((row for row in entry.media if row.media_asset_id == asset_id), None)
+            if existing:
+                existing.display_order = order
+            else:
+                entry.media.append(
+                    JournalMedia(
+                        journal_id=entry.journal.id,
+                        media_asset_id=asset_id,
+                        display_order=order,
+                    )
+                )
+
     def upsert_today(self, request: UpsertTodayJournalRequest) -> Journal:
         user = self.users.get_current_user()
+        if request.media_asset_id is not None:
+            self._check_media(request.media_asset_id, user.id, MediaType.IMAGE)
         if not any(
             row.id == request.language_profile_id and row.is_active
             for row in self.profiles.list_profiles()
@@ -137,15 +195,18 @@ class JournalService:
                 )
             if request.content is not None:
                 entry.journal.title = request.title
-                entry.journal.art = request.art
                 entry.journal.selected_words = request.selected_words
                 self._revision(entry, request.content)
+            if "media_asset_id" in request.model_fields_set:
+                self._set_cover(entry, request.media_asset_id)
             return entry.journal
 
         return self.repository.change(change)
 
     def update(self, journal_id: UUID, request: UpdateJournalRequest) -> Journal:
         user = self.users.get_current_user()
+        if request.media_asset_id is not None:
+            self._check_media(request.media_asset_id, user.id, MediaType.IMAGE)
         if request.audio_media_asset_id is not None:
             self._check_media(request.audio_media_asset_id, user.id, MediaType.AUDIO)
 
@@ -161,10 +222,14 @@ class JournalService:
             if entry is None:
                 raise JournalNotFoundError("Journal not found.")
             for field, value in request.model_dump(exclude_unset=True, by_alias=False).items():
-                if field != "content" and (value is not None or field == "audio_media_asset_id"):
+                if field not in ("content", "media_asset_id") and (
+                    value is not None or field == "audio_media_asset_id"
+                ):
                     setattr(entry.journal, field, value)
             if request.content is not None:
                 self._revision(entry, request.content)
+            if "media_asset_id" in request.model_fields_set:
+                self._set_cover(entry, request.media_asset_id)
             entry.journal.updated_at = utc_now()
             return entry.journal
 

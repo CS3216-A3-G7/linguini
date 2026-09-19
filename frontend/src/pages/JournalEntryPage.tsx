@@ -6,7 +6,7 @@ import { useApiData } from "../lib/useApiData";
 import { JournalForm } from "./JournalNew";
 import { Button, Card, TopBar } from "../components/ui";
 import { PlusIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { JournalImage } from "../components/JournalImage";
 import { useAppState } from "../state/useAppState";
 
 export function JournalEntryPage() {
@@ -48,7 +48,7 @@ function JournalEntryDetail({ entryId }: { entryId: string }) {
       <h1>{entry.title}</h1>
       <Button variant="secondary" onClick={() => setEditing(true)}>Edit entry</Button>
       <div className="scene">
-        <SceneArt scene={entry.art} className="scene__art" />
+        <JournalImage title={entry.title} imageUrl={entry.imageUrl} className="scene__art" />
       </div>
       <Card plain>
         <p>{entry.body}</p>

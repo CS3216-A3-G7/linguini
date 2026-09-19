@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, CameraIcon, UploadIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { SceneImage } from "../components/SceneImage";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
 
@@ -41,7 +41,7 @@ export function PracticeSelect() {
         {captured ? (
           <>
             <span className="thumb thumb--lg">
-              <SceneArt scene={scenes[0].art} />
+              <SceneImage scene={scenes[0]} />
             </span>
             <p className="small muted">Photo captured — {scenes[0].title}</p>
           </>
@@ -76,7 +76,7 @@ export function PracticeSelect() {
               setSelected(scene.id);
             }}
           >
-            <SceneArt scene={scene.art} />
+            <SceneImage scene={scene} />
             <span className="small" style={{ fontWeight: 700 }}>
               {scene.title}
             </span>

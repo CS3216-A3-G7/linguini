@@ -2,7 +2,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Mascot } from "../components/ui";
 import { PlusIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { JournalImage } from "../components/JournalImage";
 import { useAppState } from "../state/useAppState";
 
 function formatDate(date: string) {
@@ -60,7 +60,7 @@ export function Journal() {
                 onClick={() => navigate(`/journal/${entry.id}`)}
               >
                 <span className="thumb thumb--lg">
-                  <SceneArt scene={entry.art} />
+                  <JournalImage title={entry.title} imageUrl={entry.imageUrl} />
                 </span>
                 <span className="grow stack-2">
                   <strong>{entry.title}</strong>

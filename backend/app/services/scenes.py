@@ -3,6 +3,7 @@ from app.repositories.scenes import SceneRepository
 from app.schemas.enums import MediaSource
 from app.schemas.media import PreloadedScene
 from app.schemas.scenes import PreloadedSceneDetail
+from app.services.media_urls import PrivateMediaUrls, public_media_url
 
 
 class SceneNotFoundError(Exception):
@@ -11,21 +12,47 @@ class SceneNotFoundError(Exception):
 
 class SceneService:
     def __init__(
-        self, repository: SceneRepository, media: MediaAssetRepository | None = None
+        self,
+        repository: SceneRepository,
+        media: MediaAssetRepository | None = None,
+        media_public_base_url: str | None = None,
+        private_media_urls: PrivateMediaUrls | None = None,
     ) -> None:
         self.repository = repository
         self.media = media
+        self.media_public_base_url = media_public_base_url
+        self.private_media_urls = private_media_urls
 
     def _hydrate_media(self, rows: list[PreloadedSceneDetail]) -> list[PreloadedSceneDetail]:
-        if self.media is None:
-            return rows
-        assets = self.media.get_by_ids([row.media_asset.id for row in rows])
-        result = []
+        assets = (
+            self.media.get_by_ids([row.media_asset.id for row in rows])
+            if self.media is not None
+            else {row.media_asset.id: row.media_asset for row in rows}
+        )
         for row in rows:
             asset = assets.get(row.media_asset.id)
             if asset is None or asset.source is not MediaSource.PRELOADED:
                 raise MediaAssetStorageError("Preloaded scene media is missing or not shared.")
-            result.append(row.model_copy(update={"media_asset": asset}))
+        urls = (
+            self.private_media_urls.resolve(
+                [assets[row.media_asset.id].storage_key for row in rows]
+            )
+            if self.private_media_urls is not None
+            else {}
+        )
+        result = []
+        for row in rows:
+            asset = assets[row.media_asset.id]
+            result.append(
+                row.model_copy(
+                    update={
+                        "media_asset": asset,
+                        "image_url": urls.get(asset.storage_key)
+                        if self.private_media_urls
+                        else public_media_url(asset.storage_key, self.media_public_base_url),
+                    }
+                )
+            )
         return result
 
     def list_scenes(self, language_code: str | None = None) -> list[PreloadedScene]:

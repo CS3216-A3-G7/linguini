@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, ProgressTrail, Tabs } from "../components/ui";
 import { ArrowRightIcon, PlayIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { SceneImage } from "../components/SceneImage";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
 
@@ -48,7 +48,7 @@ export function Progress() {
             <span className="label muted">I-Spy in progress</span>
             <div className="row">
               <span className="thumb">
-                <SceneArt scene={activeScene.art} />
+                <SceneImage scene={activeScene} />
               </span>
               <div className="grow stack-2">
                 <strong>{activeScene.title}</strong>
@@ -98,7 +98,7 @@ export function Progress() {
               <Card key={row.sceneId} plain>
                 <div className="row">
                   <span className="thumb">
-                    <SceneArt scene={scene.art} />
+                    <SceneImage scene={scene} />
                   </span>
                   <div className="grow stack-2">
                     <div className="spread">

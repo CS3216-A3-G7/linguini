@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Noodle, ProgressTrail } from "../components/ui";
 import { ArrowRightIcon, BookIcon, CameraIcon, MicIcon, TrendIcon } from "../components/icons";
-import { SceneArt } from "../components/SceneArt";
+import { SceneImage } from "../components/SceneImage";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
 
@@ -56,7 +56,7 @@ export function Home() {
             <span className="label muted">Pick up where you left off</span>
             <div className="row">
               <span className="thumb">
-                <SceneArt scene={resumeScene.art} />
+                <SceneImage scene={resumeScene} />
               </span>
               <div className="grow stack-2">
                 <strong>{resumeScene.title}</strong>
@@ -87,7 +87,7 @@ export function Home() {
               className="scene-pick"
               onClick={() => begin(scene.id)}
             >
-              <SceneArt scene={scene.art} />
+              <SceneImage scene={scene} />
               <span className="small" style={{ fontWeight: 700 }}>
                 {scene.title}
               </span>

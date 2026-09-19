@@ -18,7 +18,8 @@ from app.schemas.scenes import PreloadedSceneDetail
 def store_scene(connection, scene):
     connection.execute(insert(media_assets).values(**scene.media_asset.model_dump(by_alias=False)))
     values = scene.model_dump(
-        by_alias=False, exclude={"items", "tasks", "rounds", "prompts", "media_asset", "scene_id"}
+        by_alias=False,
+        exclude={"items", "tasks", "rounds", "prompts", "media_asset", "scene_id", "image_url"},
     )
     connection.execute(
         insert(preloaded_scenes).values(

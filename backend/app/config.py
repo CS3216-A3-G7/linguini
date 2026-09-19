@@ -3,7 +3,23 @@
 import os
 from uuid import UUID
 
+from app.services.media_urls import PrivateMediaUrls
+
 DEFAULT_DEMO_USER_ID = "11111111-1111-4111-8111-111111111111"
+
+
+def get_media_public_base_url() -> str | None:
+    return os.getenv("MEDIA_PUBLIC_BASE_URL", "").strip() or None
+
+
+def get_private_media_urls() -> PrivateMediaUrls | None:
+    if os.getenv("MEDIA_STORAGE_PRIVATE", "false").strip().lower() != "true":
+        return None
+    return PrivateMediaUrls(
+        os.getenv("SUPABASE_URL", "").strip(),
+        os.getenv("MEDIA_STORAGE_BUCKET", "media-assets").strip(),
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+    )
 
 
 def get_demo_user_id() -> UUID:

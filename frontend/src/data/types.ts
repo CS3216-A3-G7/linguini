@@ -1,5 +1,3 @@
-import type { SceneArtId } from "../components/SceneArt";
-
 export type WordClass = "noun" | "verb" | "adjective" | "adverb" | "pronoun" | "preposition" | "conjunction" | "interjection" | "determiner" | "phrase" | "other";
 export type VocabStatus = "new" | "learning" | "familiar" | "mastered";
 export type Gender = "la" | "el" | null;
@@ -54,12 +52,12 @@ export type Phase2Prompt = {
 };
 
 export type Scene = {
+  imageUrl: string | null;
   mediaAssetId: string;
   languageCode: string;
   id: string;
   title: string;
   blurb: string;
-  art: SceneArtId;
   language: string;
   items: LanguageItem[];
   tasks: LearningTask[];
@@ -67,7 +65,7 @@ export type Scene = {
   prompts: Phase2Prompt[];
 };
 
-export type SceneSummary = Pick<Scene, "id" | "mediaAssetId" | "title" | "blurb" | "art" | "language" | "languageCode">;
+export type SceneSummary = Pick<Scene, "id" | "mediaAssetId" | "imageUrl" | "title" | "blurb" | "language" | "languageCode">;
 
 export type ScenarioProgress = {
   sceneId: string;
@@ -90,11 +88,12 @@ export type VocabRecord = {
 };
 
 export type JournalEntry = {
+  imageUrl: string | null;
   languageProfileId: string;
   id: string;
   date: string;
   title: string;
-  art: SceneArtId;
+  mediaAssetId: string | null;
   body: string;
   wordsUsed: string[];
 };

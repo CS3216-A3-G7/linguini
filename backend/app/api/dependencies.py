@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import Depends, Request
 
-from app.config import get_demo_user_id
+from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
 from app.repositories.learning import LearningRepository
@@ -77,7 +77,14 @@ def get_journal_service(
     users: Annotated[UserService, Depends(get_user_service)],
     profiles: Annotated[LanguageProfileService, Depends(get_language_profile_service)],
 ) -> JournalService:
-    return JournalService(repository, users, profiles, get_media_asset_repository(request))
+    return JournalService(
+        repository,
+        users,
+        profiles,
+        get_media_asset_repository(request),
+        get_media_public_base_url(),
+        get_private_media_urls(),
+    )
 
 
 def get_learning_repository(
@@ -108,7 +115,7 @@ def get_scene_service(
     repository: Annotated[SceneRepository, Depends(get_scene_repository)],
     media: Annotated[MediaAssetRepository, Depends(get_media_asset_repository)],
 ) -> SceneService:
-    return SceneService(repository, media)
+    return SceneService(repository, media, get_media_public_base_url(), get_private_media_urls())
 
 
 def get_practice_repository(
