@@ -1,102 +1,131 @@
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Mascot, Noodle } from "../components/ui";
-import { languages } from "../data/mock";
+import { Button, Card } from "../components/ui";
+import { ChevronRightIcon } from "../components/icons";
 import { useAppState } from "../state/useAppState";
+
+const avatars = [
+  { id: "farfalle", label: "Farfalle", src: "/pasta-assets/farfalle.png" },
+  { id: "penne", label: "Penne", src: "/pasta-assets/penne.png" },
+  { id: "fusilli", label: "Fusilli", src: "/pasta-assets/fusilli.png" },
+  { id: "macaroni", label: "Macaroni", src: "/pasta-assets/macaroni.png" },
+];
 
 export function Profile() {
   const navigate = useNavigate();
-  const { learner, setLanguage, updateLearner, xp, vocabulary, journal } = useAppState();
+  const { learner, vocabulary, journal, session } = useAppState();
+  const selectedAvatar = avatars.find((option) => option.id === learner.avatar) ?? avatars[0];
+
+  const weeklyProgress = [
+    { value: Math.min(vocabulary.length, 4), label: "Words" },
+    {
+      value: Math.min(vocabulary.filter((word) => word.status === "mastered").length, 1),
+      label: "Mastered",
+    },
+    { value: session.completedTaskIds.length, label: "Tasks" },
+    { value: Math.min(journal.length, 1), label: "Journals" },
+  ];
 
   return (
-    <div className="stack">
-      <h1>Profile</h1>
-
-      <Card lifted>
-        <div className="row">
-           <img
-              className="mascot"
-              src="pasta-assets/farfalle.png"
-              width={90}
-              height={90}
-              alt="Linguini mascot"
-            />
-            <div className="grow stack-2">
-              <h2>{learner.name}</h2>
-              <span className="small muted">
-                {learner.languageFlag} {learner.language} · 
-              </span>
-              <div className="row">
-                <span className="pill pill--xp">{xp} XP</span>
-              </div>
-          </div>
-        </div>
-      </Card>
-      <div className="stat-grid">
-        <div className="stat">
-          <div className="stat__value">{vocabulary.length}</div>
-          <span className="small muted">Words</span>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{journal.length}</div>
-          <span className="small muted">Entries</span>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{learner.dailyMinutes}</div>
-          <span className="small muted">Min / day</span>
-        </div>
+    <div className="stack profile-page">
+      <div className="profile-page__heading">
+        <h2>Profile</h2>
       </div>
-       <Noodle />
-      <div className="stack-2">
-        <h2>Target language</h2>
-        <div className="chip-row">
-          {languages.map((option) => (
-            <button
-              key={option.code}
-              type="button"
-              className={`chip${option.name === learner.language ? " chip--selected" : ""}`}
-              aria-pressed={option.name === learner.language}
-              onClick={() => setLanguage(option.name, option.flag)}
-            >
-              {option.flag} {option.name}
-            </button>
+
+      <button
+        type="button"
+        className="profile-identity-card"
+        aria-label="Edit profile"
+        onClick={() => navigate("/profile/edit")}
+      >
+        <span className="profile-avatar">
+          <img src={selectedAvatar.src} alt={`${selectedAvatar.label} pasta avatar`} />
+        </span>
+        <span className="profile-identity__details">
+          <h3>{learner.name}</h3>
+          <span>Joined September 2026</span>
+          <small>Edit profile</small>
+        </span>
+       
+      </button>
+
+      <div className="profile-streak-card">
+        <span>Max streak</span>
+        <strong>{learner.streak} days</strong>
+      </div>
+
+      <section className="profile-section">
+        <div className="profile-section__heading">
+          <h2>This week</h2>
+         
+        </div>
+        <div className="profile-progress-grid">
+          {weeklyProgress.map((metric) => (
+            <div key={metric.label} className="profile-progress-stat">
+              <strong>{metric.value}</strong>
+              <span>{metric.label}</span>
+            </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div className="stack-2">
-        <h2>Preferences</h2>
-        <Card plain>
-          <div className="stack-2">
-            <label className="spread">
-              <span>Microphone for speaking practice</span>
-              <input
-                type="checkbox"
-                aria-label="Microphone permission"
-                checked={learner.micOn}
-                onChange={(event) => updateLearner({ micOn: event.target.checked })}
-              />
-            </label>
-            <label className="spread">
-              <span>Camera for scene capture</span>
-              <input
-                type="checkbox"
-                aria-label="Camera permission"
-                checked={learner.cameraOn}
-                onChange={(event) => updateLearner({ cameraOn: event.target.checked })}
-              />
-            </label>
-            <label className="spread">
-              <span>Daily practice reminder</span>
-              <input type="checkbox" defaultChecked aria-label="Daily reminder" />
-            </label>
-            <label className="spread">
-              <span>Show English translations first</span>
-              <input type="checkbox" aria-label="Translations first" />
-            </label>
+      <section className="profile-section">
+        <h2>Learning setup</h2>
+        <Card plain className="profile-settings-card">
+          <div className="profile-setting">
+            <span>
+              <strong>Target language</strong>
+              <small>The language you are learning</small>
+            </span>
+            <b>{learner.languageFlag} {learner.language}</b>
+          </div>
+
+          <div className="profile-setting">
+            <span>
+              <strong>Daily goal</strong>
+              <small>Time set aside each day</small>
+            </span>
+            <b>{learner.dailyMinutes} min</b>
+          </div>
+
+          <div className="profile-setting">
+            <span>
+              <strong>Practice preference</strong>
+              <small>How you prefer to respond</small>
+            </span>
+            <b>{learner.practicePreference}</b>
           </div>
         </Card>
-      </div>
-      <Button variant="secondary" block onClick={() => navigate("/")}>
+      </section>
+
+      <section className="profile-section">
+        <h2>Permissions</h2>
+        <Card plain className="profile-settings-card">
+          <div className="profile-setting">
+            <span>
+              <strong>Microphone</strong>
+              <small>Used for pronunciation practice</small>
+            </span>
+            <b>{learner.micOn ? "On" : "Off"}</b>
+          </div>
+          <div className="profile-setting" >
+            <span>
+              <strong>Camera</strong>
+              <small>Used to capture scenes for learning</small>
+            </span>
+            <b>{learner.cameraOn ? "On" : "Off"}</b>
+          </div>
+        </Card>
+      </section>
+
+      <aside className="profile-ai-note">
+        <strong>How AI helps</strong>
+        <p>
+          Linguini suggests objects, vocabulary, and practice prompts from your scenes. You
+          always review the suggestions and decide what to keep, change, or remove.
+        </p>
+      </aside>
+
+      <Button block className="profile-logout" onClick={() => navigate("/")}>
         Log out
       </Button>
     </div>

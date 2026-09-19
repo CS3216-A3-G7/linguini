@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, IconButton } from "../components/ui";
+import { Button, Card, IconButton, Mascot } from "../components/ui";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { JournalPhotoVisual } from "../components/JournalPhotoVisual";
 import { useAppState } from "../state/useAppState";
@@ -67,13 +67,7 @@ export function Journal() {
       {visibleEntries.length === 0 ? (
         <Card>
           <div className="stack-2 center-text" style={{ alignItems: "center" }}>
-            <img
-              className="mascot"
-              src="/linguini-logo.png"
-              width={120}
-              height={120}
-              alt="Linguini mascot"
-            />
+           
             <strong>No entries this month</strong>
             <p className="small muted">A few sentences a day goes a long way.</p>
           </div>

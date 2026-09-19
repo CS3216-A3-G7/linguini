@@ -231,6 +231,10 @@ Vocabulary replaces Progress as a primary navigation destination. Open with a sc
 
 Make the completion state feel celebratory without becoming noisy. Center the noodle flourish beneath the congratulatory heading. Present the three session statistics with strong dark labels, large teal values, and a light sage-green surface so the results remain legible at a glance.
 
+### Profile
+
+Lead with a paper profile card containing a large pasta avatar inside a clean white circular frame, followed by the learner's name and joining month. A right chevron opens a dedicated Edit profile page; never expose editing controls or a separate Edit profile button on the main profile. The editing page owns the learner's name, pasta avatar, language, daily goal, practice preference, and permissions, and returns through the standard header back control. Show the maximum streak in its own compact cream card. Show only this week's quick progress beneath the identity area, then present the saved learning setup and permissions as readable values. End with a concise explanation that AI suggests scene vocabulary and prompts while the learner reviews and controls every decision, followed by a full-width tomato Log out action. Flags may identify languages, but do not use emoji as decoration elsewhere on this page.
+
 The journal list is a single-month view. Use a centered month-and-year label (for example, “September 2026”) with standard previous and next month chevrons on either side. Filter entries to the chosen month and keep the chevrons active when that month is empty. A journal entry can collect multiple ready-scene or uploaded photos; display them as a single-photo carousel with previous/next chevrons and a clear position label.
 
 ## Navigation and layout

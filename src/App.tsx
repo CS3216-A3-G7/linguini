@@ -17,6 +17,7 @@ import { Journal } from "./pages/Journal";
 import { JournalEntryPage } from "./pages/JournalEntryPage";
 import { JournalNew } from "./pages/JournalNew";
 import { Profile } from "./pages/Profile";
+import { ProfileEdit } from "./pages/ProfileEdit";
 
 export default function App() {
   return (
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/journal/new" element={<JournalNew />} />
         <Route path="/journal/:entryId" element={<JournalEntryPage />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/edit" element={<ProfileEdit />} />
       </Route>
       <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>

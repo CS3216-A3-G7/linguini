@@ -8,6 +8,7 @@ import type {
 
 export const learner = {
   name: "Roshni",
+  avatar: "farfalle",
   streak: 7,
   xp: 1280,
   level: "A1",
@@ -15,6 +16,7 @@ export const learner = {
   languageFlag: "🇪🇸",
   goal: "Chat with neighbours on my street",
   dailyMinutes: 10,
+  practicePreference: "Both",
   cameraOn: true,
   micOn: true,
 };

@@ -12,11 +12,14 @@ const items = [
 
 export function AppShell() {
   const { pathname } = useLocation();
-  const isJournalDetail = pathname === "/journal/new" || /^\/journal\/[^/]+$/.test(pathname);
+  const isDetailPage =
+    pathname === "/journal/new" ||
+    /^\/journal\/[^/]+$/.test(pathname) ||
+    pathname === "/profile/edit";
 
   return (
     <div className="shell">
-      <BrandBar back={isJournalDetail} />
+      <BrandBar back={isDetailPage} />
       <main className="shell__content">
         <Outlet />
       </main>
