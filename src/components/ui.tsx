@@ -83,7 +83,7 @@ export function Wordmark({ size = 26 }: { size?: number }) {
   );
 }
 
-/** Persistent yellow Linguini wordmark shown at the top of every screen. */
+/** Centered Linguini wordmark in the shared brand strip at the top of every screen. */
 export function BrandBar({ back = false }: { back?: boolean }) {
   const navigate = useNavigate();
   return (
@@ -173,14 +173,16 @@ export function Noodle({ className = "noodle-divider" }: { className?: string })
   );
 }
 
-export function Mascot({ size = 96 }: { size?: number }) {
+export function Mascot({ size = 96, expression = "happy" }: { size?: number; expression?: "happy" | "sad" }) {
+  const isSad = expression === "sad";
+
   return (
     <img
       className="mascot"
-      src="/linguini-logo.svg"
+      src={isSad ? "/linguini-logo-sad.svg" : "/linguini-logo.svg"}
       width={size}
       height={size}
-      alt="Linguini mascot"
+      alt={`Linguini mascot, ${expression}`}
     />
   );
 }

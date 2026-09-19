@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Feedback, TopBar } from "../components/ui";
+import { Button, Feedback } from "../components/ui";
 import { UploadIcon } from "../components/icons";
 import type { JournalPhoto } from "../data/types";
 import { JournalPhotoVisual } from "../components/JournalPhotoVisual";
@@ -59,10 +59,7 @@ export function JournalNew() {
 
   return (
     <div className="stack">
-      <TopBar
-        title={today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
-      />
-
+      <h3 className="center-text">{today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}</h3>
       <div className="field">
         <label className="field__label" htmlFor="entry-title">
           Title
@@ -102,7 +99,7 @@ export function JournalNew() {
             <p className="small muted">Add a few photos from your day</p>
           </div>
         )}
-        <div className="grid-3">
+        <div className="grid-2 journal-new__scene-grid">
           {scenes.map((scene) => {
             const scenePhoto = { id: `scene-${scene.art}`, kind: "scene" as const, art: scene.art };
             const isSelected = photos.some(
@@ -117,7 +114,7 @@ export function JournalNew() {
               onClick={() => toggleScenePhoto(scenePhoto)}
             >
               <SceneVisual scene={scene} />
-              <span className="small">{scene.title}</span>
+             
             </button>
             );
           })}
@@ -133,7 +130,7 @@ export function JournalNew() {
             event.target.value = "";
           }}
         />
-        <Button variant="secondary" block onClick={() => photoInput.current?.click()}>
+        <Button className="journal-new__upload" variant="secondary" block onClick={() => photoInput.current?.click()}>
           <UploadIcon size={18} /> Add photos from device
         </Button>
       </div>

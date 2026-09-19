@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Card, IconButton, TopBar } from "../components/ui";
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
+import { ChevronLeftIcon, ChevronRightIcon } from "../components/icons";
 import { JournalPhotoVisual } from "../components/JournalPhotoVisual";
 import { useAppState } from "../state/useAppState";
 
@@ -31,13 +31,11 @@ export function JournalEntryPage() {
 
   return (
     <div className="stack">
-      <TopBar
-        title={new Date(entry.date).toLocaleDateString("en-GB", {
+      <strong>{new Date(entry.date).toLocaleDateString("en-GB", {
           weekday: "long",
           day: "numeric",
           month: "short",
-        })}
-      />
+        })}</strong>
       <h1>{entry.title}</h1>
       <div className="journal-carousel">
         <div className="scene">
@@ -69,17 +67,6 @@ export function JournalEntryPage() {
         <p>{entry.body}</p>
       </Card>
 
-      <div className="stack-2">
-        <h2>Words used</h2>
-        <div className="chip-row">
-          {entry.wordsUsed.map((word) => (
-            <span key={word} className="chip chip--static">
-              {word}
-            </span>
-          ))}
-        </div>
-      </div>
-
       {linked.length ? (
         <div className="stack-2">
           <h2>From your vocabulary</h2>
@@ -98,9 +85,6 @@ export function JournalEntryPage() {
       ) : null}
 
       <div className="stack-2">
-        <Button block onClick={() => navigate("/journal/new")}>
-          <PlusIcon size={18} /> New entry
-        </Button>
         <Button variant="secondary" block onClick={() => navigate("/journal")}>
           Back to journal
         </Button>

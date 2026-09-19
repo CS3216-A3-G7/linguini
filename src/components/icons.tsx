@@ -106,6 +106,18 @@ export const PlusIcon = ({ size = 20, className }: IconProps) => (
   </svg>
 );
 
+export const FarfalleIcon = ({ size = 28, className }: IconProps) => (
+  <svg {...base(size)} className={className} viewBox="0 0 32 32">
+    <path
+      d="M4 6c4 0 7.1 2.7 9.4 6h5.2C20.9 8.7 24 6 28 6v20c-4 0-7.1-2.7-9.4-6h-5.2C11.1 23.3 8 26 4 26z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    />
+    <path d="M13.4 12h5.2v8h-5.2z" fill="#fffdf8" stroke="none" />
+  </svg>
+);
+
 export const UploadIcon = ({ size = 22, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M12 16V5M8 9l4-4 4 4" />

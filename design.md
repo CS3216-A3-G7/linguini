@@ -32,7 +32,7 @@ Keep the learning product legible and game-like, but avoid copying any competito
 - **Marker-and-menu outlines:** dark-teal hand-drawn-style contours with subtly imperfect geometry; never thick black cartoon outlines.
 - **Food-memory warmth:** buttery surfaces, tomato CTAs, herb-teal confirmation, and pasta-yellow moments of discovery.
 - **Real-world learning:** photographic scenes paired with illustrated overlays, vocabulary chips, and a journal-like record—not a fantasy-character world.
-- **The wordmark is the welcome:** use the supplied orange-yellow “Linguini” wordmark with its looping underline as the visual anchor at the top of the first screen view. Keep it centered, airy, and integrated into the butter page background without a divider; it scrolls away naturally with the page.
+- **The wordmark is the welcome:** use the supplied orange-yellow “Linguini” wordmark with its looping underline as the visual anchor at the top of the first screen view. Center it in a distinct pasta-cream brand strip so its alignment feels intentional beside left-aligned page content. It scrolls away naturally with the page.
 
 ## Design principles
 
@@ -192,7 +192,7 @@ Use a cream panel with a color-coded left detail and a concise human message: �
 
 ### Capture a scene
 
-The home screen answers one question only: “What should I do next?” Lead with a short greeting and one dominant card. For a new learner, use a large, calm camera visual with minimal copy and a single tomato “Start learning” action. If practice is underway, replace that card with the current scene, a compact task trail, and one tomato “Continue learning” action. Preset scenes stay within the practice flow. Keep the Vocabulary and Progress shortcuts as two compact secondary buttons at the bottom until the navigation is revisited. After a learner has completed learning tasks, show one calm, secondary journal prompt beneath the main card.
+The home screen starts with a compact weekly check-in, then answers one question only: “What should I do next?” Pair a small mascot welcome and streak count with a seven-day calendar rail. Use filled farfalle (bow-tie pasta) shapes—not generic circles—for checked-in days; leave missed or future days as muted pasta shapes. Below it, show one dominant featured card. For a new learner, use a single tomato “Begin a new practice” action. If practice is underway, replace that card with the current scene, a compact task trail, and one tomato “Continue learning” action; “Start a new practice” becomes a smaller supporting row. Keep the word bank below the plan and show the journal action only after a learner has completed learning tasks. Preset scenes stay within the practice flow.
 
 The scene-selection page is not a staged task and must not show a progress trail. Begin the trail only after the learner chooses or uploads an image, starting with image analysis and continuing through learning tasks.
 
@@ -215,17 +215,17 @@ The journal list is a single-month view. Use a centered month-and-year label (fo
 ### Mobile
 
 - Design for 360px wide screens first; allow content padding of 16px, expanding to 20–24px on larger phones.
-- Use a persistent four-item bottom bar: Home, Explore, Journal, Profile. Each item has an icon and label; active state is tomato.
-- Keep bottom navigation on a cream surface with a top divider and safe-area padding.
+- Use a persistent five-item bottom bar: Home, Practice, Journal, Progress, Profile. Each item has an icon and label; the active icon is filled tomato and its label is tomato.
+- Keep bottom navigation on the same butter surface as the page, separated only by a quiet line and safe-area padding. It should recede behind the learning content rather than create a new color band.
 - Primary actions belong above the navigation and must not be hidden behind it.
 - Use full-width action buttons, except compact paired controls that still preserve 44px hit targets.
 - Put the single back control beside the centered wordmark in the shared header. Do not add a second back arrow inside a screen title bar. Root destinations (Home, Practice, Journal, Progress, Profile, and Welcome) remain wordmark-only.
 
 ### Current implementation guidance
 
-- Use the supplied `public/linguini-logo.svg` for the mascot/icon mark; do not redraw it in individual pages.
+- Use the shared simplified mascot assets (`public/linguini-logo.svg` for happy and `public/linguini-logo-sad.svg` for sad) rather than redrawing the mark in individual pages. Use the `Mascot` component's `expression` prop when a screen needs to acknowledge a setback.
 - Keep `BrandBar`, `Button`, `Card`, `ScenePhoto`, `Tabs`, and `ProgressTrail` as the shared source of truth for page styling.
-- The page background is warm butter with a subtle pasta-yellow lift near the header. Elevated surfaces are paper/cream, never stark white or glassy.
+- The page background is warm butter with a subtle pasta-yellow lift near the header. The shared wordmark sits on a richer pasta-cream strip (`#F7E6B4`) without a divider; elevated surfaces are paper/cream, never stark white or glassy.
 - Tomato is reserved for the one dominant action and active navigation. Teal is the confidence/confirmation color. Pasta yellow is reserved for progress, rewards, and the wordmark.
 - Prefer one large scene or learning panel per screen. Journal and vocabulary rows should remain calm and connected by dividers.
 - On the mobile canvas, target 360px first: 16px side padding, 48px controls, 44px icon hit areas, and safe-area space below fixed navigation.

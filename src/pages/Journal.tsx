@@ -31,6 +31,11 @@ function isInMonth(date: string, month: Date) {
   return entryMonth.getFullYear() === month.getFullYear() && entryMonth.getMonth() === month.getMonth();
 }
 
+function wordCount(text: string) {
+  const count = text.trim().split(/\s+/).filter(Boolean).length;
+  return `${count} ${count === 1 ? "word" : "words"}`;
+}
+
 export function Journal() {
   const navigate = useNavigate();
   const { journal } = useAppState();
@@ -56,7 +61,7 @@ export function Journal() {
       </div>
 
       <Button block onClick={() => navigate("/journal/new")}>
-        <PlusIcon size={18} /> Write today&apos;s entry
+        <PlusIcon size={18} /> Add today&apos;s entry
       </Button>
 
       {visibleEntries.length === 0 ? (
@@ -75,15 +80,18 @@ export function Journal() {
             <button
               key={entry.id}
               type="button"
-              className="list__row"
+              className="list__row journal-list-entry"
               onClick={() => navigate(`/journal/${entry.id}`)}
             >
               <span className="thumb thumb--lg">
                 <JournalPhotoVisual photo={entry.photos[0]} />
               </span>
-              <span className="grow stack-2">
-                <strong>{entry.title}</strong>
-                <span className="small muted align-middle">{formatDate(entry.date)}</span>
+              <span className="grow journal-list-entry__details">
+                <strong className="journal-list-entry__title">{entry.title}</strong>
+                <span className="journal-list-entry__meta">
+                  <span className="journal-list-entry__date">{formatDate(entry.date)}</span>
+                </span>
+                 <span className="journal-list-entry__word-count">{wordCount(entry.body)}</span>
               </span>
             </button>
           ))}
