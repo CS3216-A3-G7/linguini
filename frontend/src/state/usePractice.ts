@@ -81,7 +81,6 @@ export function usePractice(userId: string, profileId: string, updateProgress: (
   }, [accept, enqueue]);
   const ensureSession = useCallback((sceneId: string) => load(sceneId), [load]);
   const startSession = useCallback((sceneId: string) => load(sceneId, true), [load]);
-  const awardAnalysis = useCallback(() => record({ kind: "analysis" }), [record]);
   const completeTask = useCallback((id: string) => record({ kind: "task", itemId: id }), [record]);
   const recordRound = useCallback((id: string, answer: string) => record({ kind: "round", itemId: id, answerId: answer }), [record]);
   const recordClue = useCallback((id: string, text: string) => record({ kind: "clue", itemId: id, text }), [record]);
@@ -94,5 +93,5 @@ export function usePractice(userId: string, profileId: string, updateProgress: (
   const setMicReady = useCallback((ready: boolean) => setSession((value) => ({ ...value, micReady: ready })), []);
   const retryPracticeSave = useCallback(() => retry.current?.() ?? Promise.resolve(false), []);
   return { session, sessionLoading, practiceSaving, practiceError, ensureSession, startSession,
-    awardAnalysis, completeTask, recordRound, recordClue, completeSession, setMicReady, retryPracticeSave };
+    completeTask, recordRound, recordClue, completeSession, setMicReady, retryPracticeSave };
 }

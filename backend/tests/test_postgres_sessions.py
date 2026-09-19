@@ -79,12 +79,12 @@ def test_sessions_persist_idempotently_and_xp_is_atomic(database):
         responses = list(workers.map(score, range(8)))
     assert all(row.status_code == 200 for row in responses)
     repository = PostgresPracticeRepository(engine, owner.id)
-    assert repository.read()[0].xp == 12
+    assert repository.read()[0].xp == 0
     with TestClient(create_app()) as restarted:
         assert (
-            restarted.get(f"/api/v1/sessions/{session_id}").json()["demoState"]["sessionXp"] == 12
+            restarted.get(f"/api/v1/sessions/{session_id}").json()["demoState"]["sessionXp"] == 0
         )
-        assert restarted.get("/api/v1/me/progress").json()["xp"] == 12
+        assert restarted.get("/api/v1/me/progress").json()["xp"] == 0
     replacement = create_run(client, profile, "session-key-2")
     assert replacement["session"]["id"] != session_id
     assert client.get(f"/api/v1/sessions/{session_id}").json()["session"]["status"] == "abandoned"

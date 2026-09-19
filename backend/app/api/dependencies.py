@@ -1,5 +1,6 @@
 """FastAPI wiring for PostgreSQL persistence and the read-only scene catalog."""
 
+import os
 from typing import Annotated
 from uuid import UUID
 
@@ -27,6 +28,7 @@ from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
 from app.repositories.practice import PracticeRepository
 from app.repositories.scenes import SceneRepository
 from app.repositories.users import UserRepository
+from app.services.image_storage import ImageStorage
 from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
@@ -108,7 +110,14 @@ def get_media_asset_service(
     repository: Annotated[MediaAssetRepository, Depends(get_media_asset_repository)],
     users: Annotated[UserService, Depends(get_user_service)],
 ) -> MediaAssetService:
-    return MediaAssetService(repository, users)
+    return MediaAssetService(
+        repository,
+        users,
+        ImageStorage(
+            os.getenv("SUPABASE_URL", "").strip(),
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+        ),
+    )
 
 
 def get_scene_service(
@@ -138,6 +147,7 @@ def get_practice_service(
         scenes,
         PostgresSceneObjectRepository(request.app.state.database_engine),
         PostgresTaskRepository(request.app.state.database_engine),
+        get_media_asset_repository(request),
     )
 
 

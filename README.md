@@ -148,7 +148,7 @@ of the same action in the same session award XP once. Reloads and backend restar
 preserve totals, completed tasks, answers, and clues. **Practise again** explicitly
 starts a new session. The browser stores only the session ID, not XP.
 
-Analysis earns 12 XP, tasks use the scene's configured XP, multiple-choice answers
+Analysis earns no XP. Tasks use the scene's configured XP, multiple-choice answers
 earn 5 XP when correct or 2 when incorrect, and a submitted clue earns 2 participation
 XP. Free-form clue feedback is still scripted; it is not AI evaluation. Failed saves
 show a retry action. The summary marks finished practice complete on the backend.

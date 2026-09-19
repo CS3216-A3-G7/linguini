@@ -52,6 +52,7 @@ export type Phase2Prompt = {
 };
 
 export type Scene = {
+  uploadedSessionId?: string;
   imageUrl: string | null;
   mediaAssetId: string;
   languageCode: string;

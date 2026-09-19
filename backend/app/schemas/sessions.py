@@ -51,6 +51,7 @@ class GenerateSessionPlanRequest(ApiModel):
 
 
 class SessionDetailResponse(ApiModel):
+    analysis_mode: Literal["placeholder"] | None = None
     demo_state: DemoPracticeState | None = None
     session: Session
     scene_objects: list[SceneObject] = Field(default_factory=list)

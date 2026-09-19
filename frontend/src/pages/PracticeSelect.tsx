@@ -1,25 +1,37 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, ProgressTrail, TopBar } from "../components/ui";
-import { ArrowRightIcon, CameraIcon, UploadIcon } from "../components/icons";
+import { ArrowRightIcon, CameraIcon } from "../components/icons";
+import { ImageUpload } from "../components/ImageUpload";
+import { createPractice } from "../lib/api";
+import type { UploadedImage } from "../lib/api";
 import { SceneImage } from "../components/SceneImage";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
 
 export function PracticeSelect() {
   const navigate = useNavigate();
-  const { startSession, scenes, learner } = useAppState();
+  const { startSession, scenes, learner, activeProfile } = useAppState();
   const [selected, setSelected] = useState<string | null>(null);
-  const [captured, setCaptured] = useState(false);
+  const [uploaded, setUploaded] = useState<UploadedImage | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  if (!scenes.length) return <div className="stack"><h1>Choose your environment</h1><SceneCatalogStatus /></div>;
-
-  const capture = () => {
-    setCaptured(true);
-    setSelected(scenes[0].id);
-  };
-
-  const cont = () => {
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const requestKey = useRef<{ asset: string; key: string } | null>(null);
+  const cont = async () => {
+    if (starting) return;
+    if (uploaded) {
+      if (!activeProfile) { setStartError("Choose a learning language first."); return; }
+      setStarting(true); setStartError(null);
+      if (requestKey.current?.asset !== uploaded.id) requestKey.current = { asset: uploaded.id, key: crypto.randomUUID() };
+      try {
+        const session = await createPractice(activeProfile.id, uploaded.id, requestKey.current.key);
+        navigate(`/practice/uploads/${session.session.id}/analysis`);
+      } catch (e) { setStartError(e instanceof Error ? e.message : "Unable to start analysis."); }
+      finally { setStarting(false); }
+      return;
+    }
     if (!selected) return;
     startSession(selected);
     navigate(`/practice/${selected}/analysis`);
@@ -38,12 +50,12 @@ export function PracticeSelect() {
       <p className="muted">Take a photo of the world around you, or start from a ready scene.</p>
 
       <div className="dashed-capture">
-        {captured ? (
+        {uploaded ? (
           <>
             <span className="thumb thumb--lg">
-              <SceneImage scene={scenes[0]} />
+              <SceneImage scene={{ imageUrl: uploaded.signedUrl, title: "Uploaded photo" }} />
             </span>
-            <p className="small muted">Photo captured — {scenes[0].title}</p>
+            <p className="small muted">Image uploaded. Continue to analyse your photo.</p>
           </>
         ) : (
           <>
@@ -53,26 +65,22 @@ export function PracticeSelect() {
             <p className="small muted center-text">Your photo goes here</p>
           </>
         )}
-        <div className="row">
-          <Button onClick={capture} disabled={!learner.cameraOn}>
-            <CameraIcon size={18} /> Open camera
-          </Button>
-          <Button variant="secondary" onClick={capture}>
-            <UploadIcon size={18} /> Upload
-          </Button>
-        </div>
+        <ImageUpload disabled={starting} cameraEnabled={learner.cameraOn} onBusyChange={setUploading}
+          onUploaded={(image) => { setUploaded(image); setSelected(null); }} />
       </div>
 
       <h2>Or practise with the below</h2>
+      <SceneCatalogStatus />
       <div className="grid-3">
         {scenes.map((scene) => (
           <button
             key={scene.id}
             type="button"
+            disabled={uploading || starting}
             className={`scene-pick${selected === scene.id ? " scene-pick--selected" : ""}`}
             aria-pressed={selected === scene.id}
             onClick={() => {
-              setCaptured(false);
+              setUploaded(null);
               setSelected(scene.id);
             }}
           >
@@ -84,10 +92,12 @@ export function PracticeSelect() {
         ))}
       </div>
 
-      <Button block disabled={!selected} onClick={cont}>
+      <Button block disabled={(!selected && !uploaded) || uploading || starting} onClick={cont}>
         Continue <ArrowRightIcon />
       </Button>
-      {!selected ? (
+      {startError ? <p role="alert">{startError}</p> : null}
+      {starting ? <p role="status">Starting analysis?</p> : null}
+      {!selected && !uploaded ? (
         <p className="small muted center-text">Pick a scene to continue.</p>
       ) : null}
     </div>

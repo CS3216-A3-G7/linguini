@@ -13,6 +13,9 @@ class SceneObjectReviewConflictError(Exception):
 
 
 class SceneObjectRepository(Protocol):
+    def save_analysis(
+        self, session_id: UUID, user_id: UUID, objects: list[SceneObject]
+    ) -> list[SceneObject]: ...
     def list_for_session(self, session_id: UUID, user_id: UUID) -> list[SceneObject]: ...
 
     def review(

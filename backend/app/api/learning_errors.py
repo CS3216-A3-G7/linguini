@@ -17,6 +17,7 @@ from app.repositories.scene_objects import (
 from app.repositories.scenes import SceneStorageError
 from app.repositories.tasks import TaskConflictError, TaskNotFoundError, TaskStorageError
 from app.repositories.users import UserRepositoryError
+from app.services.image_storage import InvalidImageUpload, UploadObjectMissing
 from app.services.journals import JournalConflictError, JournalNotFoundError
 from app.services.language_profiles import NoActiveLanguageError
 from app.services.learning import InvalidCursorError, ProgressNotFoundError
@@ -29,10 +30,20 @@ from app.services.users import UserNotFoundError
 
 def register_learning_errors(app: FastAPI) -> None:
     errors = {
+        InvalidImageUpload: (
+            422,
+            "invalid_image_upload",
+            "Use a valid JPEG, PNG or WebP image up to 10 MB with the issued upload key.",
+        ),
+        UploadObjectMissing: (
+            404,
+            "upload_not_found",
+            "Uploaded image not found. Upload the file before confirming.",
+        ),
         MediaUrlError: (
             503,
             "media_url_error",
-            "Unable to load scene images. Check backend Storage configuration and retry.",
+            "Unable to access media storage. Check backend Storage configuration and retry.",
         ),
         TaskNotFoundError: (404, "task_not_found", "Task or session not found."),
         TaskConflictError: (409, "task_conflict", "Task record conflicts with the current state."),

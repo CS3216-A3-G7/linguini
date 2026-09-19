@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Feedback, TopBar } from "../components/ui";
 import { UploadIcon } from "../components/icons";
+import { ImageUpload } from "../components/ImageUpload";
+import type { UploadedImage } from "../lib/api";
 import { JournalImage } from "../components/JournalImage";
 import { SceneImage } from "../components/SceneImage";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
@@ -27,6 +29,8 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
   const [title, setTitle] = useState(entry?.title ?? "");
   const [body, setBody] = useState(entry?.body ?? "");
   const [mediaAssetId, setMediaAssetId] = useState<string | null>(entry?.mediaAssetId ?? null);
+  const [uploaded, setUploaded] = useState<UploadedImage | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [selectedWords, setSelectedWords] = useState<string[]>(entry?.wordsUsed ?? []);
 
   const toggleWord = (word: string) =>
@@ -73,7 +77,7 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
         <span className="field__label">Scene image</span>
         {mediaAssetId ? (
           <div className="scene">
-            <JournalImage title={title || "Journal scene"} imageUrl={mediaAssetId === entry?.mediaAssetId ? entry.imageUrl : scenes.find((scene) => scene.mediaAssetId === mediaAssetId)?.imageUrl ?? null} className="scene__art" />
+            <JournalImage title={title || "Journal scene"} imageUrl={mediaAssetId === uploaded?.id ? uploaded.signedUrl : mediaAssetId === entry?.mediaAssetId ? entry.imageUrl : scenes.find((scene) => scene.mediaAssetId === mediaAssetId)?.imageUrl ?? null} className="scene__art" />
           </div>
         ) : (
           <div className="dashed-capture">
@@ -83,12 +87,15 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
             <p className="small muted">Choose a scene image below</p>
           </div>
         )}
+        <ImageUpload cameraEnabled={learner.cameraOn} disabled={journalSaving} onBusyChange={setUploading}
+          onUploaded={(image) => { setUploaded(image); setMediaAssetId(image.id); }} />
         <div className="grid-3">
           <SceneCatalogStatus />
           {scenes.map((scene) => (
             <button
               key={scene.id}
               type="button"
+              disabled={uploading || journalSaving}
               className={`scene-pick${mediaAssetId === scene.mediaAssetId ? " scene-pick--selected" : ""}`}
               onClick={() => setMediaAssetId(scene.mediaAssetId)}
             >
@@ -148,7 +155,7 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
 
       {journalSaveError ? <p role="alert">{journalSaveError}</p> : null}
       {journalSaving ? <p role="status">Saving journal…</p> : null}
-      <Button block disabled={journalSaving || !body.trim()} onClick={save}>
+      <Button block disabled={journalSaving || uploading || !body.trim()} onClick={save}>
         Save entry
       </Button>
     </div>

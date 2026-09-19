@@ -50,6 +50,56 @@ engine per process and disposes it at shutdown.
 
 ## Persistence and remaining static content
 
+### Image uploads
+
+Uploads currently use the existing `DEMO_USER_ID` identity, as explicitly chosen
+for this demo. This is not authentication; replace the current-user dependency
+with verified authentication before making user-owned uploads publicly available.
+The server requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; uploads use the
+private `media-assets` bucket. Install backend dependencies to include Pillow.
+
+1. `POST /api/v1/media/upload-url` with `fileName`, `fileSize`, `mimeType`, and
+   `source` (`camera` or `userUpload`). Sizes must be 1–10,485,760 bytes, and MIME
+   types must be JPEG, PNG or WebP. The response includes `assetId`, `storageKey`,
+   `uploadUrl`, and `expiresInSeconds`. No metadata row is inserted yet. Keys use
+   `users/{userId}/images/{assetId}.{extension}`, with the extension chosen by MIME.
+2. PUT the file bytes to `uploadUrl` with its `Content-Type`. Uploads do not permit
+   overwrites. The signed upload URL expires after 7,200 seconds.
+3. `POST /api/v1/media/confirm-upload` with `assetId`, `storageKey`, and `source`.
+   The server checks the key, downloads with a bounded byte limit, verifies and
+   decodes the image with Pillow, and saves the detected MIME and dimensions.
+   Invalid uploaded objects are deleted; transient Storage failures can be retried.
+   Repeated/concurrent confirmations return the existing owned asset.
+4. `GET /api/v1/media/{assetId}` returns metadata plus `signedUrl` and
+   `expiresInSeconds: 3600`. Missing and unauthorized assets both return 404.
+
+The frontend supports file selection and device camera capture, validation, upload
+status, error feedback, and a signed-image preview. Journal uploads can be selected
+and saved as attachments. Uploaded images can start a session and run the placeholder
+analysis workflow below. Desktop browsers may open a file picker for the camera control.
+
+### Uploaded-image analysis
+
+1. `POST /api/v1/sessions` accepts a confirmed image owned by the current user, its
+   `mediaAssetId`, the active `languageProfileId`, and an optional `idempotencyKey`.
+2. `GET /api/v1/media/{assetId}` supplies the signed image preview URL.
+3. `POST /api/v1/sessions/{sessionId}/analyze` returns `SessionDetailResponse` with
+   `analysisMode: "placeholder"` and three `sceneObjects`: chair, table, and plant.
+   `PlaceholderImageExtractor.extract` in `app/services/image_analysis.py` is the
+   replacement point for a real detector. It does not inspect image pixels. Labels
+   and normalized bounding boxes are fixed sample output, explicitly labeled in the UI.
+4. Results are persisted together in `scene_objects`; repeated/concurrent calls
+   return existing objects and preserve reviewed selections. Foreign sessions and
+   non-active sessions cannot be analyzed. Existing preloaded practice is unchanged.
+5. `PATCH /api/v1/sessions/{sessionId}/scene-objects` remains available to save
+   accepted/rejected objects. Reloading restores saved results through the session GET.
+   Uploaded photos use the same analysis and mic-test pages as preloaded scenes;
+   Start practice is disabled for uploads until learning-plan generation is available.
+
+Neither uploaded nor preloaded image analysis awards XP, including legacy analysis
+event requests. No simulated delay is used for uploaded analysis. Generating a learning plan
+from the selected objects remains a separate unimplemented step.
+
 ### Preloaded scene images
 
 For a private bucket, set these backend-only variables in `backend/.env.local`:

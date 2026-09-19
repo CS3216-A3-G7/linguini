@@ -50,6 +50,11 @@ def record_demo_event(
     return service.record(session_id, request)
 
 
+@router.post("/{session_id}/analyze", response_model=SessionDetailResponse)
+def analyze_session(session_id: UUID, service: PracticeServiceDep) -> SessionDetailResponse:
+    return service.analyze(session_id)
+
+
 @router.patch("/{session_id}/scene-objects", response_model=SessionDetailResponse)
 def review_scene_objects(
     session_id: UUID, request: ReviewSceneObjectsRequest, service: PracticeServiceDep

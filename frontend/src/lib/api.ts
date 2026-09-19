@@ -4,6 +4,37 @@ import type { JournalEntry } from "../data/types";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
 
+export interface UploadedImage {
+  id: string;
+  signedUrl: string;
+  mimeType: string;
+  width: number;
+  height: number;
+}
+
+export async function uploadImage(file: File, source: "camera" | "userUpload", onPhase: (phase: string) => void): Promise<UploadedImage> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Choose a JPEG, PNG or WebP image.");
+  if (!file.size || file.size > 10 * 1024 * 1024) throw new Error("Choose an image between 1 byte and 10 MB.");
+  onPhase("Preparing upload…");
+  const upload = await write<{ assetId: string; storageKey: string; uploadUrl: string }>("/api/v1/media/upload-url", "POST", {
+    fileName: file.name, fileSize: file.size, mimeType: file.type, source,
+  });
+  onPhase("Uploading image…");
+  const response = await fetch(upload.uploadUrl, {
+    method: "PUT", headers: { "Content-Type": file.type, "x-upsert": "false" }, body: file,
+  });
+  if (!response.ok) throw new Error("Image upload failed. Please try again.");
+  onPhase("Checking image…");
+  // Confirmation is idempotent; retry once if the server committed but its response was lost.
+  const confirm = () => write<UploadedImage>("/api/v1/media/confirm-upload", "POST", {
+    assetId: upload.assetId, storageKey: upload.storageKey, source,
+  });
+  try { return await confirm(); } catch (error) {
+    if (error instanceof Error && /HTTP 4\d\d/.test(error.message)) throw error;
+    return confirm();
+  }
+}
+
 // Matches the camelCase User response from GET /api/v1/me.
 export interface User {
   learningGoal: string;
@@ -176,13 +207,26 @@ export async function saveJournal(draft: JournalDraft, profileId: string, id?: s
 }
 
 export interface PracticeDetail {
-  session: { id: string; status: string };
+  session: { id: string; status: string; sceneMediaAssetId: string };
+  analysisMode: "placeholder" | null;
+  sceneObjects: SceneObject[];
   demoState: {
     answers: Record<string, string>; clues: Record<string, string>;
     sceneId: string; completedTaskIds: string[]; scoredRoundIds: string[];
     analysisScored: boolean; roundsPlayed: number; correctRounds: number; sessionXp: number; micReady: boolean;
   };
 }
+export interface SceneObject {
+  id: string;
+  detectedLabel: string;
+  confirmedLabel: string | null;
+  selectionStatus: "suggested" | "accepted" | "rejected" | "corrected";
+  boundingBox: { x: number | string; y: number | string; width: number | string; height: number | string };
+}
+export const getMedia = (id: string) => request<UploadedImage>(`/api/v1/media/${id}`);
+export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
+export const reviewPracticeObjects = (id: string, objects: { sceneObjectId: string; selectionStatus: SceneObject["selectionStatus"]; confirmedLabel: string | null }[]) =>
+  write<PracticeDetail>(`/api/v1/sessions/${id}/scene-objects`, "PATCH", { objects });
 export interface PracticeEvent { kind: "analysis" | "task" | "round" | "clue"; itemId?: string; answerId?: string; text?: string }
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);
 export const getActivePractice = () => request<PracticeDetail | null>("/api/v1/sessions/active");

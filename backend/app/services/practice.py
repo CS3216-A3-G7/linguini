@@ -1,10 +1,11 @@
 from uuid import UUID
 
+from app.repositories.media_assets import MediaAssetRepository
 from app.repositories.practice import PracticeRepository
 from app.repositories.scene_objects import SceneObjectRepository
 from app.repositories.tasks import TaskRepository
 from app.schemas.base import utc_now
-from app.schemas.enums import SessionStatus
+from app.schemas.enums import MediaSource, MediaType, SessionStatus
 from app.schemas.media import ReviewSceneObjectsRequest
 from app.schemas.progress import ScenarioProgress, StoredProgress
 from app.schemas.sessions import (
@@ -16,6 +17,7 @@ from app.schemas.sessions import (
     StoredDemoSession,
 )
 from app.schemas.tasks import SessionProgress, SessionTaskPublic
+from app.services.image_analysis import PlaceholderImageExtractor
 from app.services.language_profiles import LanguageProfileService
 from app.services.scenes import SceneService
 from app.services.users import UserService
@@ -38,6 +40,8 @@ class PracticeService:
         scenes: SceneService,
         scene_objects: SceneObjectRepository | None = None,
         tasks: TaskRepository | None = None,
+        media: MediaAssetRepository | None = None,
+        extractor: PlaceholderImageExtractor | None = None,
     ) -> None:
         self.repository = repository
         self.users = users
@@ -45,6 +49,8 @@ class PracticeService:
         self.scenes = scenes
         self.scene_objects = scene_objects
         self.tasks = tasks
+        self.media = media
+        self.extractor = extractor or PlaceholderImageExtractor()
 
     def _profile(self):
         self.profiles.active_language()
@@ -52,7 +58,11 @@ class PracticeService:
 
     @staticmethod
     def _detail(run: StoredDemoSession) -> SessionDetailResponse:
-        return SessionDetailResponse(session=run.session, demo_state=run.state)
+        return SessionDetailResponse(
+            session=run.session,
+            demo_state=run.state,
+            analysis_mode="placeholder" if run.state.scene_id.startswith("upload:") else None,
+        )
 
     def _attach_objects(self, detail: SessionDetailResponse) -> SessionDetailResponse:
         if self.scene_objects is not None:
@@ -107,15 +117,30 @@ class PracticeService:
         profile = self._profile()
         if request.language_profile_id != profile.id:
             raise PracticeConflictError("Select the active language profile.")
-        scene = next(
-            (
-                row
-                for row in self.scenes.list_scenes(profile.target_language_code)
-                if row.media_asset.id == request.media_asset_id
-            ),
-            None,
+        asset = (
+            self.media.get_by_ids([request.media_asset_id]).get(request.media_asset_id)
+            if self.media
+            else None
         )
-        if scene is None:
+        uploaded = (
+            asset is not None
+            and asset.owner_user_id == profile.user_id
+            and asset.media_type == MediaType.IMAGE
+            and asset.source in (MediaSource.CAMERA, MediaSource.USER_UPLOAD)
+        )
+        scene = (
+            None
+            if uploaded
+            else next(
+                (
+                    row
+                    for row in self.scenes.list_scenes(profile.target_language_code)
+                    if row.media_asset.id == request.media_asset_id
+                ),
+                None,
+            )
+        )
+        if scene is None and not uploaded:
             raise PracticeNotFoundError("Scene not found for the active language.")
 
         def change(rows: list[StoredProgress]) -> SessionDetailResponse:
@@ -163,7 +188,9 @@ class PracticeService:
                     status=SessionStatus.IN_PROGRESS,
                     started_at=utc_now(),
                 ),
-                state=DemoPracticeState(scene_id=scene.scene_id),
+                state=DemoPracticeState(
+                    scene_id=f"upload:{asset.id}" if uploaded else scene.scene_id
+                ),
                 idempotency_key=request.idempotency_key,
             )
             progress.practice_sessions.append(run)
@@ -171,10 +198,40 @@ class PracticeService:
 
         return self._attach_objects(self.repository.change(change))
 
+    def analyze(self, session_id: UUID) -> SessionDetailResponse:
+        detail = self.get(session_id)
+        if detail.session.status != SessionStatus.IN_PROGRESS:
+            raise PracticeConflictError("Session is no longer active.")
+        if (
+            detail.analysis_mode != "placeholder"
+            or self.media is None
+            or self.scene_objects is None
+        ):
+            raise PracticeConflictError("Analysis requires an uploaded image session.")
+        asset = self.media.get_by_ids([detail.session.scene_media_asset_id]).get(
+            detail.session.scene_media_asset_id
+        )
+        if (
+            asset is None
+            or asset.owner_user_id != detail.session.user_id
+            or asset.media_type != MediaType.IMAGE
+        ):
+            raise PracticeNotFoundError("Image not found.")
+        if not detail.scene_objects:
+            objects = self.extractor.extract(asset, session_id)
+            detail.scene_objects = self.scene_objects.save_analysis(
+                session_id, detail.session.user_id, objects
+            )
+        return detail
+
     def record(self, session_id: UUID, event: DemoPracticeEventRequest) -> SessionDetailResponse:
         profile = self._profile()
         progress, initial = self._find(self.repository.read(), session_id, profile)
-        scene = self.scenes.get_scene(initial.state.scene_id, progress.language_code)
+        scene = (
+            None
+            if event.kind == "analysis"
+            else self.scenes.get_scene(initial.state.scene_id, progress.language_code)
+        )
 
         def change(rows: list[StoredProgress]) -> SessionDetailResponse:
             progress, run = self._find(rows, session_id, profile)
@@ -193,7 +250,7 @@ class PracticeService:
                 raise PracticeConflictError("This session is no longer active.")
             if event.kind == "analysis":
                 state.analysis_scored = True
-                xp = 12
+                xp = 0  # Analysis is preparation, never an XP-earning activity.
             elif event.kind == "task":
                 task = next((row for row in scene.tasks if row.id == event.item_id), None)
                 if task is None:

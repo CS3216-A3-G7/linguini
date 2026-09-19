@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Feedback, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, MicIcon } from "../components/icons";
@@ -10,24 +10,20 @@ type MicState = "idle" | "listening" | "working" | "unavailable";
 export function MicTest() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { ensureSession, setMicReady, learner } = useAppState();
+  const { setMicReady, learner } = useAppState();
   const [state, setState] = useState<MicState>(learner.micOn ? "idle" : "unavailable");
-
-  useEffect(() => {
-    ensureSession(scene.id);
-  }, [scene.id, ensureSession]);
 
   const listen = () => {
     setState("listening");
     window.setTimeout(() => {
       setState("working");
-      setMicReady(true);
+      if (!scene.uploadedSessionId) setMicReady(true);
     }, 1200);
   };
 
   const skip = () => {
     setState("unavailable");
-    setMicReady(false);
+    if (!scene.uploadedSessionId) setMicReady(false);
   };
 
   return (
@@ -44,8 +40,8 @@ export function MicTest() {
       <Card>
         <div className="stack-2 center-text">
           <span className="label muted">Test prompt</span>
-          <h2>{scene.items[0].example}</h2>
-          <span className="small muted">{scene.items[0].exampleTranslation}</span>
+          <h2>{scene.items[0]?.example || "Testing my microphone."}</h2>
+          <span className="small muted">{scene.items[0]?.exampleTranslation}</span>
         </div>
       </Card>
 
@@ -86,11 +82,12 @@ export function MicTest() {
 
       <Button
         block
-        disabled={state === "idle" || state === "listening"}
-        onClick={() => navigate(`/practice/${scene.id}/learn`)}
+        disabled={Boolean(scene.uploadedSessionId) || state === "idle" || state === "listening"}
+        onClick={() => { if (!scene.uploadedSessionId) navigate(`/practice/${scene.id}/learn`); }}
       >
         Start practice <ArrowRightIcon />
       </Button>
+      {scene.uploadedSessionId ? <p className="small muted">Practice for uploaded images is not available yet.</p> : null}
     </div>
   );
 }

@@ -1,32 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Feedback, ProgressTrail, TopBar, XpPill } from "../components/ui";
+import { Button, Card, Feedback, ProgressTrail, TopBar } from "../components/ui";
 import { ArrowRightIcon, CheckIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 
-const ANALYSIS_XP = 12;
-
 export function PracticeAnalysis() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { learner, ensureSession, awardAnalysis } = useAppState();
-  const [done, setDone] = useState(false);
+  const { learner } = useAppState();
+  const [done, setDone] = useState(Boolean(scene.uploadedSessionId));
   const [activeItem, setActiveItem] = useState<string | null>(null);
 
   useEffect(() => {
-    ensureSession(scene.id);
-  }, [scene.id, ensureSession]);
-
-  useEffect(() => {
+    if (scene.uploadedSessionId) return;
     const timer = window.setTimeout(() => setDone(true), 1400);
     return () => window.clearTimeout(timer);
-  }, [scene.id]);
-
-  useEffect(() => {
-    if (done) void awardAnalysis();
-  }, [done, awardAnalysis]);
+  }, [scene.id, scene.uploadedSessionId]);
 
   const nouns = scene.items.filter((item) => item.wordClass === "noun").length;
   const others = scene.items.length - nouns;
@@ -35,7 +26,7 @@ export function PracticeAnalysis() {
     <div className="stack">
       <TopBar
         title="Step 2: Analyse"
-        help="Linguini only teaches what it can actually see in your photo."
+        help="Review the objects in your scene before continuing."
       />
       <ProgressTrail value={2} total={3} label="Step 2 of 3" />
 
@@ -45,6 +36,8 @@ export function PracticeAnalysis() {
           {learner.languageFlag} {learner.language}
         </span>
       </div>
+
+      {scene.uploadedSessionId ? <p className="small muted">Preview mode: these are sample objects and positions, not detections from your photo.</p> : null}
 
       <ScenePhoto
         scene={scene}
@@ -80,7 +73,6 @@ export function PracticeAnalysis() {
             <span className="small muted">
               {nouns} nouns, {others} describing and position words.
             </span>
-            <XpPill xp={ANALYSIS_XP} />
           </div>
         </Feedback>
       ) : (
@@ -92,7 +84,7 @@ export function PracticeAnalysis() {
         </Card>
       )}
 
-      <Button block disabled={!done} onClick={() => navigate(`/practice/${scene.id}/mic-test`)}>
+      <Button block disabled={!done} onClick={() => navigate(scene.uploadedSessionId ? `/practice/uploads/${scene.uploadedSessionId}/mic-test` : `/practice/${scene.id}/mic-test`)}>
         Continue to mic test <ArrowRightIcon />
       </Button>
     </div>

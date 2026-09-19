@@ -18,6 +18,7 @@ import { JournalEntryPage } from "./pages/JournalEntryPage";
 import { JournalNew } from "./pages/JournalNew";
 import { Profile } from "./pages/Profile";
 import { SceneRoute } from "./components/SceneRoute";
+import { UploadedSceneRoute } from "./components/UploadedSceneRoute";
 
 export default function App() {
   return (
@@ -26,6 +27,10 @@ export default function App() {
         <Route path="/" element={<Welcome />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/practice/uploads/:sessionId" element={<UploadedSceneRoute />}>
+          <Route path="analysis" element={<PracticeAnalysis />} />
+          <Route path="mic-test" element={<MicTest />} />
+        </Route>
         <Route path="/practice/:sceneId" element={<SceneRoute />}>
           <Route path="analysis" element={<PracticeAnalysis />} />
           <Route path="mic-test" element={<MicTest />} />
