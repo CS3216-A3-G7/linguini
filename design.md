@@ -14,9 +14,10 @@ should make that loop feel like one friendly trail rather than four unrelated fe
 4. **Play I-Spy:** Linguini gives clues first; then the learner describes an object back.
 5. **Reflect:** write a journal entry using the words discovered that day.
 
-The primary route through the product is always visible as a small progress trail. Review,
-vocabulary, progress, and profile are supporting routes and should never compete with the
-next step in the loop.
+The primary route through the product becomes visible once active learning begins. Scene
+selection and AI scene analysis stay unnumbered so the learner can focus on choosing and
+correcting the source material before committing to the lesson. Review, vocabulary,
+progress, and profile are supporting routes and should never compete with the next step.
 
 ## Product character
 
@@ -194,11 +195,25 @@ Use a cream panel with a color-coded left detail and a concise human message: �
 
 The home screen starts with a compact weekly check-in, then answers one question only: “What should I do next?” Pair a small mascot welcome and streak count with a seven-day calendar rail. Use filled farfalle (bow-tie pasta) shapes—not generic circles—for checked-in days; leave missed or future days as muted pasta shapes. Below it, show one dominant featured card. For a new learner, use a single tomato “Begin a new practice” action. If practice is underway, replace that card with the current scene, a compact task trail, and one tomato “Continue learning” action; “Start a new practice” becomes a smaller supporting row. Keep the word bank below the plan and show the journal action only after a learner has completed learning tasks. Preset scenes stay within the practice flow.
 
-The scene-selection page is not a staged task and must not show a progress trail. Begin the trail only after the learner chooses or uploads an image, starting with image analysis and continuing through learning tasks.
+The scene-selection page is not a staged task and must not show a progress trail. Choosing, capturing, or uploading an image opens analysis immediately. Scene analysis is also unnumbered: use the title “Scene Analysis,” never “Step 2” or a progress bar. Begin staged progress only when the learner moves from their confirmed word list into active learning tasks.
+
+### Scene analysis
+
+Treat AI detection as a suggestion the learner reviews, not a completed decision. Start with a brief image-scanning state that says “Finding objects in your image…” without a card or progress bar. Then show the real photo with numbered markers, followed by a plain-text result count such as “2 words found.” Place the detected English words in one calm card below the count. Every suggestion must have a visible remove action, and the same card must let the learner add a word the analysis missed. Adding a word is a two-part action: the learner names it, then taps its location in the photo before it joins the list. User-added words receive their own orange numbered marker so the photo and list stay directly mapped. Continuing is disabled when no words remain or a new word is still awaiting placement.
 
 ### Choose vocabulary
 
 Place the captured photo at the center of the screen. Numbered markers map directly to selectable vocabulary chips underneath. Use tomato for the current selection and pasta / teal for supporting markers, maintaining high-contrast text. The primary action reads “Start I Spy” and remains fixed above the bottom navigation when the chip list scrolls.
+
+### Test your mic
+
+Keep microphone setup short and visually quiet. Use the unnumbered title “Test your mic” with no progress trail. Group the phrase, translation, microphone, and test status in one calm paper panel. “Use typing instead” is an outlined supporting action rather than a competing filled button. Only the forward-moving Continue action uses the filled tomato treatment.
+
+### Learning tasks
+
+The learning-task list is a launch page, not part of the task sequence itself. Do not show a phase label or progress trail there. Show the scene, a calm list of available tasks, and one filled action to begin the first task or continue the next incomplete one. Every task row may also open its task directly.
+
+Each learning task has its own full page rather than opening in a bottom sheet. Put task progress at the top as “Task n of total,” followed by the task title, guidance, and one focused word card at a time. Give the card a warm pasta-yellow surface, set the target vocabulary in dark teal, and place the audio action in a generous white circular control so pronunciation remains easy to find. Use a small text counter for progress within the task so two progress bars never compete. Place an underlined “Back to tasks” link beneath the filled orange action so leaving the activity remains available without competing with the primary button. Completing a task advances to the next task; the final task returns to the completed list, where I-Spy becomes the primary action.
 
 ### Play I Spy
 
@@ -207,6 +222,10 @@ Make the challenge feel focused: progress at top, scene photo next, a compact hi
 ### Word journal
 
 Treat the journal as proof of progress, not a dense database. Put a soft pasta-yellow encouragement panel above or below the list. Segment Review, Learned, and Mastered with text-first tabs. The active tab uses tomato fill; inactive tabs live on a pale cream rail. Each row should feel easy to revisit in under a second.
+
+### Session summary
+
+Make the completion state feel celebratory without becoming noisy. Center the noodle flourish beneath the congratulatory heading. Present the three session statistics with strong dark labels, large teal values, and a light sage-green surface so the results remain legible at a glance.
 
 The journal list is a single-month view. Use a centered month-and-year label (for example, “September 2026”) with standard previous and next month chevrons on either side. Filter entries to the chosen month and keep the chevrons active when that month is empty. A journal entry can collect multiple ready-scene or uploaded photos; display them as a single-photo carousel with previous/next chevrons and a clear position label.
 

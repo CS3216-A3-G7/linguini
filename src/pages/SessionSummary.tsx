@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Mascot, Noodle, StatusPill, TopBar, XpPill } from "../components/ui";
+import { Button, Card, Noodle, StatusPill, XpPill } from "../components/ui";
 import { getScene } from "../data/mock";
 import { useAppState } from "../state/useAppState";
 
@@ -7,34 +7,39 @@ export function SessionSummary() {
   const navigate = useNavigate();
   const { sceneId } = useParams();
   const scene = getScene(sceneId);
-  const { session, replayGame } = useAppState();
+  const { session } = useAppState();
 
   const revisit = scene.items.slice(0, 3);
 
   return (
     <div className="stack">
-      <TopBar title="Session complete" />
       <div className="center-text stack-2" style={{ alignItems: "center" }}>
-        <Mascot size={120} />
+        <img
+          className="mascot"
+          src="/linguini-logo.png"
+          width={120}
+          height={120}
+          alt="Linguini mascot"
+        />
         <h1>Good job!</h1>
-        <Noodle />
-        <p className="muted">You practised {scene.title.toLowerCase()} out loud today.</p>
+        <Noodle className="noodle-divider summary__noodle" />
+        <p className="muted">You practised {scene.title.toLowerCase()} out today!</p>
       </div>
 
       <div className="stat-grid">
         <div className="stat">
           <div className="stat__value">{session.sessionXp}</div>
-          <span className="small muted">XP earned</span>
+          <span className="stat__label">XP</span>
         </div>
         <div className="stat">
           <div className="stat__value">
             {session.correctRounds}/{session.roundsPlayed}
           </div>
-          <span className="small muted">I-Spy correct</span>
+          <span className="stat__label">Correct</span>
         </div>
         <div className="stat">
           <div className="stat__value">{scene.items.length}</div>
-          <span className="small muted">Items found</span>
+          <span className="stat__label">Words</span>
         </div>
       </div>
 
@@ -62,16 +67,6 @@ export function SessionSummary() {
         </Button>
         <Button variant="secondary" block onClick={() => navigate("/vocabulary")}>
           Review difficult words
-        </Button>
-        <Button
-          variant="secondary"
-          block
-          onClick={() => {
-            replayGame();
-            navigate(`/practice/${scene.id}/ispy-1`);
-          }}
-        >
-          Replay I-Spy
         </Button>
         <Button variant="quiet" block onClick={() => navigate("/home")}>
           Back home

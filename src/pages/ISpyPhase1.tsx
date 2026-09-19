@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { Button, Feedback, IconButton, ProgressTrail, TopBar } from "../components/ui";
+import { Button, Feedback, IconButton, ProgressTrail } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, SpeakerIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
 import { getScene } from "../data/mock";
@@ -50,7 +50,8 @@ export function ISpyPhase1() {
 
   return (
     <div className="stack">
-      <TopBar title="I-Spy · Linguini clues" help="Listen or read the clue, then choose what you spy." />
+      <h2 className="text-center">I-Spy · Linguini's clues</h2>
+      <p>Use the clues to find the word</p>
       <ProgressTrail
         value={roundIndex + (answered ? 1 : 0)}
         total={scene.rounds.length}
@@ -111,7 +112,7 @@ export function ISpyPhase1() {
       ) : null}
 
       <Button block disabled={!answered} onClick={next}>
-        {roundIndex === scene.rounds.length - 1 ? "Your turn to give clues" : "Next clue"}{" "}
+        {roundIndex === scene.rounds.length - 1 ? "Your turn to give clues" : "Next"}{" "}
         <ArrowRightIcon />
       </Button>
     </div>

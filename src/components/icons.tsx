@@ -93,6 +93,12 @@ export const CheckIcon = ({ size = 20, className }: IconProps) => (
   </svg>
 );
 
+export const CloseIcon = ({ size = 20, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m7 7 10 10M17 7 7 17" />
+  </svg>
+);
+
 export const HelpIcon = ({ size = 22, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <circle cx="12" cy="12" r="8.5" />

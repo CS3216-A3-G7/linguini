@@ -156,7 +156,7 @@ export function Tabs<T extends string>({
 
 export function Noodle({ className = "noodle-divider" }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 240 20" fill="none" role="presentation">
+    <svg className={className} viewBox="-25 0 240 20" fill="none" role="presentation">
       <path
         d="M4 14c18-14 34 8 52 0s26-14 44-6 28 14 46 6 24-10 40-2"
         stroke="#E85D32"
@@ -194,29 +194,5 @@ export function Feedback({
   tone?: "good" | "warn";
   children: ReactNode;
 }) {
-  return <div className={`feedback${tone === "warn" ? " feedback--warn" : ""}`}>{children}</div>;
-}
-
-export function Sheet({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="sheet">
-        <div className="spread" style={{ marginBottom: "var(--space-4)" }}>
-          <h2>{title}</h2>
-          <Button variant="quiet" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
+  return <div className={`feedback feedback--${tone}`}>{children}</div>;
 }
