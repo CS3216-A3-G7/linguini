@@ -139,7 +139,6 @@ class PreloadedScene(ApiModel):
     image_url: str | None = None
     language_code: NonEmptyText = "es"
     scene_id: NonEmptyText
-    art: Literal["street", "cafe", "market", "bedroom", "kitchen", "park"]
     language: NonEmptyText
     media_asset: MediaAsset
     title: NonEmptyText

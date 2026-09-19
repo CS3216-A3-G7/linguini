@@ -34,7 +34,6 @@ preloaded_scenes = Table(
     Column("media_asset_id", Uuid, nullable=False),
     Column("title", Text, nullable=False),
     Column("description", Text),
-    Column("art", String(7), nullable=False),
     Column("difficulty", String(12), nullable=False),
     Column("content", JSONB, nullable=False),
     Column("sort_order", Integer, nullable=False),
@@ -82,7 +81,6 @@ class PostgresSceneRepository:
                                         "language",
                                         "title",
                                         "description",
-                                        "art",
                                         "difficulty",
                                     )
                                 },

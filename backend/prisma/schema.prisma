@@ -56,7 +56,6 @@ model PreloadedScene {
   mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   title        String @db.Text
   description  String? @db.Text
-  art          String @db.VarChar(7)
   difficulty   String @default("beginner") @db.VarChar(12)
   content      Json @db.JsonB
   sortOrder    Int @default(0) @map("sort_order")

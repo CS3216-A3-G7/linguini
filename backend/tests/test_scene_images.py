@@ -40,7 +40,6 @@ def test_list_and_detail_use_current_media_key(private):
     )
     scene = PreloadedSceneDetail(
         scene_id="cafe",
-        art="cafe",
         language="Spanish",
         title="Cafe",
         media_asset=asset,

@@ -65,7 +65,8 @@ def test_api_and_visibility(scene_record):
     response = client.get(f"/api/v1/preloaded-scenes/{slug}")
     assert response.status_code == 200
     expected = PreloadedSceneDetail.model_validate(row).model_dump(mode="json", by_alias=True)
-    for key in ("sceneId", "items", "tasks", "rounds", "prompts", "art", "title"):
+    assert "art" not in response.json()
+    for key in ("sceneId", "items", "tasks", "rounds", "prompts", "title"):
         assert response.json()[key] == expected[key]
     with engine.begin() as connection:
         connection.execute(
