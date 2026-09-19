@@ -714,9 +714,123 @@
 }
 
 .bottom-nav__item.is-active svg {
-  fill: currentColor;
+  fill: none;
   stroke: currentColor;
   stroke-width: 2.25;
+}
+
+@media (min-width: 900px) {
+  .shell--app {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .shell--app > .brandbar {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .shell--app > .shell__content {
+    grid-column: 2;
+    grid-row: 2;
+    max-width: 760px;
+    padding: var(--space-10) var(--space-10) var(--space-12);
+  }
+
+  .shell--app > .shell__content--desktop-wide {
+    max-width: 1120px;
+  }
+
+  .shell--focus > .shell__content {
+    max-width: 680px;
+    padding-inline: var(--space-8);
+  }
+
+  .shell--app > .bottom-nav {
+    position: sticky;
+    grid-column: 1;
+    grid-row: 2;
+    top: 0;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 190px;
+    height: calc(100vh - 70px);
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-8) var(--space-4);
+    border-top: 0;
+    border-right: 1px solid rgba(222, 215, 200, 0.7);
+    background: transparent;
+  }
+
+  .shell--app .bottom-nav__item {
+    flex: none;
+    width: 100%;
+    max-width: none;
+    min-height: 52px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    padding-inline: var(--space-4);
+    font-size: var(--text-small);
+  }
+
+  .shell--app .bottom-nav__item:hover {
+    background: var(--cream);
+  }
+
+  .home {
+    grid-template-columns: minmax(280px, 0.85fr) minmax(380px, 1.15fr);
+    align-items: start;
+    column-gap: var(--space-8);
+  }
+
+  .home-welcome {
+    grid-column: 1 / -1;
+  }
+
+  .home-streak {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .home-plan {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+  }
+
+  .home-action-row--journal {
+    grid-column: 1;
+  }
+
+  .home-action-row--new-practice {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .practice-select .grid-2 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .practice-select .dashed-capture {
+    min-height: 220px;
+  }
+
+  .vocabulary-scenes,
+  .vocabulary-list,
+  .journal-page > .list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--space-4);
+  }
+
+  .journal-list-entry + .journal-list-entry {
+    margin-top: 0;
+  }
 }
 
 /* Feedback */
@@ -1661,6 +1775,27 @@
 /* Home: a weekly check-in, one featured lesson, then quiet supporting actions. */
 .home {
   gap: var(--space-6);
+}
+
+.home-dashboard,
+.home-dashboard__left {
+  display: contents;
+}
+
+.home-streak {
+  order: 1;
+}
+
+.home-plan {
+  order: 2;
+}
+
+.home-action-row--new-practice {
+  order: 3;
+}
+
+.home-action-row--journal {
+  order: 4;
 }
 
 .home h1 {
@@ -2685,5 +2820,87 @@
 
   .progress-overview__metric strong {
     font-size: 34px;
+  }
+}
+
+/* Wide-screen collection layouts come last so mobile-first component rules cannot override them. */
+@media (min-width: 900px) {
+  .vocabulary-page__view-toggle {
+    width: min(100%, 340px);
+    align-self: flex-end;
+  }
+
+  .journal-page__add {
+    width: min(100%, 340px);
+    align-self: flex-end;
+  }
+
+  .home.stack {
+    display: flex;
+  }
+
+  .home-dashboard {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.85fr) minmax(380px, 1.15fr);
+    align-items: start;
+    gap: var(--space-8);
+  }
+
+  .home-dashboard__left {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .home-dashboard > .home-plan {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .home-welcome {
+    grid-column: 1 / -1;
+  }
+
+  .home-streak {
+    grid-column: 1;
+  }
+
+  .home-plan {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+  }
+
+  .home-action-row--journal {
+    grid-column: 1;
+  }
+
+  .practice-select .grid-2 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .vocabulary-scenes,
+  .vocabulary-list,
+  .journal-page > .list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--space-4);
+  }
+
+  .journal-list-entry + .journal-list-entry {
+    margin-top: 0;
+  }
+
+  .journal-list-entry {
+    min-height: 136px;
+    align-items: center;
+    gap: var(--space-5);
+    padding: var(--space-5);
+  }
+
+  .journal-list-entry .thumb--lg {
+    width: 112px;
+    height: 88px;
   }
 }

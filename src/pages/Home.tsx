@@ -36,6 +36,8 @@ export function Home() {
         </div>
       </section>
 
+      <div className="home-dashboard">
+        <div className="home-dashboard__left">
       <section className="home-streak" aria-label={`${learner.streak}-day learning streak`}>
         <div className="home-streak__heading">
           <strong>This week</strong>
@@ -61,6 +63,35 @@ export function Home() {
           })}
         </ol>
       </section>
+
+      {hasSessionToContinue ? (
+        <Button
+          variant="quiet"
+          className="home-action-row home-action-row--new-practice"
+          onClick={() => navigate("/practice")}
+        >
+          <span className="home-action-row__icon home-action-row__icon--pasta">
+            <PlusIcon size={20} />
+          </span>
+          <span className="home-action-row__copy">
+            <strong>Find more words</strong>
+            <small>Use a new photo or ready scene</small>
+          </span>
+          <ChevronRightIcon />
+        </Button>
+      ) : null}
+
+      <Button variant="quiet" className="home-action-row home-action-row--journal" onClick={() => navigate("/journal/new")}>
+        <span className="home-action-row__icon home-action-row__icon--teal">
+          <BookIcon size={20} />
+        </span>
+        <span className="home-action-row__copy">
+          <strong>Write a journal entry</strong>
+          <small>Use your recent words in a short reflection</small>
+        </span>
+        <ChevronRightIcon />
+      </Button>
+        </div>
 
       <section className="home-plan" aria-labelledby="home-plan-title">
         <h2 id="home-plan-title">Today&apos;s plan</h2>
@@ -96,30 +127,8 @@ export function Home() {
           </Card>
         )}
 
-        {hasSessionToContinue ? (
-          <Button variant="quiet" className="home-action-row" onClick={() => navigate("/practice")}>
-            <span className="home-action-row__icon home-action-row__icon--pasta">
-              <PlusIcon size={20} />
-            </span>
-            <span className="home-action-row__copy">
-              <strong>Find more words</strong>
-              <small>Use a new photo or ready scene</small>
-            </span>
-            <ChevronRightIcon />
-          </Button>
-        ) : null}
       </section>
-
-      <Button variant="quiet" className="home-action-row home-action-row--journal" onClick={() => navigate("/journal/new")}> 
-        <span className="home-action-row__icon home-action-row__icon--teal">
-          <BookIcon size={20} />
-        </span>
-        <span className="home-action-row__copy">
-          <strong>Write a journal entry</strong>
-          <small>Use your recent words in a short reflection</small>
-        </span>
-        <ChevronRightIcon />
-      </Button>
+      </div>
 
     </div>
   );

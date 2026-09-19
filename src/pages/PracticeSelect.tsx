@@ -15,7 +15,7 @@ export function PracticeSelect() {
   };
 
   return (
-    <div className="stack">
+    <div className="stack practice-select">
       <h1>Capture a Scene</h1>
       <p className="muted">Take a photo of the world around you, or start from a ready scene.</p>
 

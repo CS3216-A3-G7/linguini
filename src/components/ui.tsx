@@ -56,12 +56,12 @@ export function TopBar({
 }) {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const titleId = useId();
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!isHelpOpen) return;
 
-    closeButtonRef.current?.focus();
+    modalRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsHelpOpen(false);
     };
@@ -89,6 +89,7 @@ export function TopBar({
       {help && isHelpOpen ? (
         <div className="help-modal__backdrop" onMouseDown={() => setIsHelpOpen(false)}>
           <section
+            ref={modalRef}
             className="help-modal"
             role="dialog"
             aria-modal="true"
@@ -98,7 +99,6 @@ export function TopBar({
             <div className="help-modal__header">
               <h2 id={titleId}>About this step</h2>
               <IconButton
-                ref={closeButtonRef}
                 label="Close information"
                 onClick={() => setIsHelpOpen(false)}
               >

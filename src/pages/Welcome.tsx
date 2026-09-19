@@ -36,7 +36,7 @@ export function Welcome() {
           height={120}
           alt="Linguini mascot"
       />
-      <section className="welcome-story" aria-live="polite" aria-label={`${current.label}: ${current.title}`}>
+      <section className="welcome-story" aria-live="polite">
         <div className="welcome-story__copy">
          
           <h2>{current.title}</h2>
@@ -98,7 +98,6 @@ export function Welcome() {
                 key={item.id}
                 type="button"
                 className={index === step ? "is-active" : ""}
-                aria-label={`Show ${item.label}`}
                 aria-current={index === step ? "step" : undefined}
                 onClick={() => setStep(index)}
               />

@@ -49,7 +49,7 @@ export function Journal() {
   };
 
   return (
-    <div className="stack">
+    <div className="stack journal-page">
       <div className="month-switcher">
         <IconButton label="Previous month" onClick={() => changeMonth(-1)}>
           <ChevronLeftIcon />
@@ -60,7 +60,7 @@ export function Journal() {
         </IconButton>
       </div>
 
-      <Button block onClick={() => navigate("/journal/new")}>
+      <Button block className="journal-page__add" onClick={() => navigate("/journal/new")}>
         <PlusIcon size={18} /> Add today&apos;s entry
       </Button>
 

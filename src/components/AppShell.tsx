@@ -16,11 +16,12 @@ export function AppShell() {
     pathname === "/journal/new" ||
     /^\/journal\/[^/]+$/.test(pathname) ||
     pathname === "/profile/edit";
+  const usesWideCanvas = ["/home", "/practice", "/vocabulary", "/journal"].includes(pathname);
 
   return (
-    <div className="shell">
+    <div className="shell shell--app">
       <BrandBar back={isDetailPage} />
-      <main className="shell__content">
+      <main className={`shell__content${usesWideCanvas ? " shell__content--desktop-wide" : ""}`}>
         <Outlet />
       </main>
       <nav className="bottom-nav" aria-label="Main">
@@ -44,7 +45,7 @@ export function FocusShell() {
   const { pathname } = useLocation();
 
   return (
-    <div className="shell">
+    <div className="shell shell--focus">
       <BrandBar back={pathname !== "/"} />
       <main className="shell__content" style={{ paddingBottom: "var(--space-8)" }}>
         <Outlet />
