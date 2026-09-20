@@ -55,6 +55,7 @@ export type VocabRecord = {
 };
 
 export type JournalEntry = {
+  photos: { mediaAssetId: string; displayOrder: number; imageUrl: string | null }[];
   imageUrl: string | null;
   languageProfileId: string;
   id: string;

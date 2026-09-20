@@ -1,122 +1,123 @@
-import { LoadingScreen } from "../components/LoadingScreen";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Mascot, Noodle } from "../components/ui";
-import { PlusIcon } from "../components/icons";
-import { languages } from "../config/languages";
+import { Button, Card } from "../components/ui";
 import { useAppState } from "../state/useAppState";
-import type { LanguageProfile } from "../lib/api";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { learner, languageProfiles, activateLanguageProfile, saveUser, saveLanguageProfile, profileSaving, profileError, xp, vocabulary, journal, activeProfile } = useAppState();
-  const [name, setName] = useState(learner.name);
-  const [goal, setGoal] = useState(learner.goal);
-  const [saved, setSaved] = useState(false);
-  const targetProfiles = languageProfiles.filter((profile, index, profiles) =>
-    profiles.findIndex((row) => row.targetLanguageCode.toLowerCase() === profile.targetLanguageCode.toLowerCase()) === index
-  );
+  const { learner, vocabulary, journal, user, activeProfile, progress, progressLoading, progressError,
+    vocabularyLoading, vocabularyError, journalLoading, journalError } = useAppState();
+  const metrics = [
+    { value: vocabularyLoading || vocabularyError ? "--" : vocabulary.length, label: "Words" },
+    { value: vocabularyLoading || vocabularyError ? "--" : vocabulary.filter(word => word.status === "mastered").length, label: "Mastered" },
+    { value: progressLoading || progressError ? "--" : progress?.scenarios.reduce((sum, scene) => sum + scene.completedTaskCount, 0) ?? 0, label: "Tasks" },
+    { value: journalLoading || journalError ? "--" : journal.length, label: "Journals" },
+  ];
+  const preference = activeProfile ? { speech: "Speaking", text: "Typing", both: "Both" }[activeProfile.preferredInputMode] : "Not set";
+
   return (
-    <div className="stack">
-      <h1>Profile</h1>
-      <Card lifted>
-        <div className="row">
-          <Mascot size={72} />
-          <div className="grow stack-2">
-            <h2>{learner.name}</h2>
-            <span className="small muted">
-              {learner.languageFlag} {learner.language} · level {learner.level}
+    <div className="stack profile-page">
+      <div className="profile-page__heading">
+        <h2>Profile</h2>
+      </div>
+
+      <button
+        type="button"
+        className="profile-identity-card"
+        aria-label="Edit profile"
+        onClick={() => navigate("/profile/edit")}
+      >
+        <span className="profile-avatar">
+          <img src="/pasta-assets/farfalle.png" alt="Farfalle pasta" />
+        </span>
+        <span className="profile-identity__details">
+          <h3>{learner.name}</h3>
+          <span>{user ? `Joined ${new Date(user.createdAt).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}` : ""}</span>
+          <small>Edit profile</small>
+        </span>
+
+      </button>
+
+      <div className="profile-streak-card">
+        <span>Learning XP</span>
+        <strong>{progressLoading || progressError ? "--" : progress?.xp ?? 0} XP</strong>
+      </div>
+
+      {progressLoading || vocabularyLoading || journalLoading ? <p role="status">Loading your progress...</p> : null}
+      {[progressError, vocabularyError, journalError].filter(Boolean).map((error, index) => <p key={index} role="alert">{error} Reload to retry.</p>)}
+      <section className="profile-section">
+        <div className="profile-section__heading">
+          <h2>Your progress</h2>
+
+        </div>
+        <div className="profile-progress-grid">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="profile-progress-stat">
+              <strong>{metric.value}</strong>
+              <span>{metric.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="profile-section">
+        <h2>Learning setup</h2>
+        <Card plain className="profile-settings-card">
+          <div className="profile-setting">
+            <span>
+              <strong>Target language</strong>
+              <small>The language you are learning</small>
             </span>
-            <span className="pill pill--xp">{xp} XP</span>
+            <b>{learner.languageFlag} {learner.language}</b>
           </div>
-        </div>
-      </Card>
 
-      <div className="stat-grid">
-        <div className="stat">
-          <div className="stat__value">{vocabulary.length}</div>
-          <span className="small muted">Words</span>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{journal.length}</div>
-          <span className="small muted">Entries</span>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{learner.dailyMinutes ?? "—"}</div>
-          <span className="small muted">Min / day</span>
-        </div>
-      </div>
+          <div className="profile-setting">
+            <span>
+              <strong>Daily goal</strong>
+              <small>Time set aside each day</small>
+            </span>
+            <b>{learner.dailyMinutes ? `${learner.dailyMinutes} min` : "Not set"}</b>
+          </div>
 
-      {profileSaving ? <LoadingScreen label="Saving profile…" /> : null}
-      {profileError ? <p role="alert">{profileError}</p> : null}
-
-      <div className="stack-2">
-        <h2>Target language</h2>
-        <div className="chip-row">
-          {targetProfiles.map((profile) => {
-            const code = profile.targetLanguageCode.toLowerCase();
-            const option = languages.find((language) => language.code === code);
-            const selected = code === learner.languageCode.toLowerCase();
-            return <button key={code} type="button" disabled={profileSaving}
-              className={`chip${selected ? " chip--selected" : ""}`}
-              aria-pressed={selected}
-              onClick={() => { if (!selected) { setSaved(false); void activateLanguageProfile(profile.id); } }}>
-              {option?.flag} {option?.name ?? profile.targetLanguageCode}
-            </button>;
-          })}
-          <button type="button" className="chip chip--static" disabled aria-label="Add target language" title="Add target language (coming soon)">
-            <PlusIcon />
-          </button>
-        </div>
-        <p className="small muted">Your selection is saved. Scenes, vocabulary, and progress follow this language. Demo content is currently available in Spanish only.</p>
-      </div>
-
-      <Card>
-        <form className="stack" onSubmit={async (event) => {
-          event.preventDefault();
-          setSaved(await saveUser({ displayName: name.trim(), learningGoal: goal.trim() }));
-        }}>
-          <label className="field">Your name<input className="input" required maxLength={100} value={name} onChange={(event) => { setName(event.target.value); setSaved(false); }} /></label>
-          <label className="field">Your goal<input className="input" maxLength={300} value={goal} onChange={(event) => { setGoal(event.target.value); setSaved(false); }} /></label>
-          <Button disabled={profileSaving || !name.trim()} type="submit">Save profile</Button>
-          {saved && !profileError ? <p role="status">Profile saved.</p> : null}
-        </form>
-      </Card>
-
-      <div className="stack-2">
-        <h2>Learning preferences</h2>
-        <Card>
-          <div className="stack">
-            <label className="spread">
-              Level
-              <select disabled={profileSaving || !activeProfile} value={learner.level} onChange={(event) => void saveLanguageProfile({ proficiencyLevel: event.target.value as LanguageProfile["proficiencyLevel"] })}>
-                {["A1", "A2", "B1", "B2", "C1", "C2"].map((level) => <option key={level}>{level}</option>)}
-              </select>
-            </label>
-            <label className="spread">
-              Daily goal
-              <select disabled={profileSaving || !activeProfile} value={learner.dailyMinutes ?? ""} onChange={(event) => void saveLanguageProfile({ dailyGoalMinutes: event.target.value ? Number(event.target.value) : null })}>
-                <option value="">Not set</option>
-                {[...new Set([5, 10, 20, ...(learner.dailyMinutes ? [learner.dailyMinutes] : [])])].sort((a, b) => a - b).map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}
-              </select>
-            </label>
-            <label className="spread">
-              Microphone for speaking practice
-              <input type="checkbox" disabled={profileSaving} checked={learner.micOn} onChange={(event) => void saveUser({ microphoneEnabled: event.target.checked })} />
-            </label>
-            <label className="spread">
-              Camera for scene capture
-              <input type="checkbox" disabled={profileSaving} checked={learner.cameraOn} onChange={(event) => void saveUser({ cameraEnabled: event.target.checked })} />
-            </label>
-            <p className="small muted">Device preferences are saved; browser permission is requested separately when needed.</p>
+          <div className="profile-setting">
+            <span>
+              <strong>Practice preference</strong>
+              <small>How you prefer to respond</small>
+            </span>
+            <b>{preference}</b>
           </div>
         </Card>
-      </div>
+      </section>
 
-      <Noodle />
+      <section className="profile-section">
+        <h2>Permissions</h2>
+        <Card plain className="profile-settings-card">
+          <div className="profile-setting">
+            <span>
+              <strong>Microphone</strong>
+              <small>Used for pronunciation practice</small>
+            </span>
+            <b>{learner.micOn ? "On" : "Off"}</b>
+          </div>
+          <div className="profile-setting" >
+            <span>
+              <strong>Camera</strong>
+              <small>Used to capture scenes for learning</small>
+            </span>
+            <b>{learner.cameraOn ? "On" : "Off"}</b>
+          </div>
+        </Card>
+      </section>
 
-      <Button variant="secondary" block onClick={() => navigate("/")}>
-        Log out
+      <aside className="profile-ai-note">
+        <strong>How AI helps</strong>
+        <p>
+          Linguini suggests objects, vocabulary, and practice prompts from your scenes. You
+          always review the suggestions and decide what to keep, change, or remove.
+        </p>
+      </aside>
+
+      <Button block className="profile-logout" onClick={() => navigate("/")}>
+        Back to welcome
       </Button>
     </div>
   );

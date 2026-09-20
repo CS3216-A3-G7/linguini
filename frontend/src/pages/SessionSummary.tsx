@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Mascot, Noodle, StatusPill, TopBar, XpPill } from "../components/ui";
+import { Button, Card, Noodle, StatusPill, XpPill } from "../components/ui";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { createPractice, getPracticeSummary } from "../lib/api";
@@ -19,30 +19,31 @@ export function SessionSummary() {
   const revisit = scene.items.filter(item => data?.learnedVocabularyIds.includes(
     session?.sceneObjects.find(object => object.id === item.id)?.vocabularyItemId ?? ""
   )).slice(0, 3);
+  const busy = useRef(false);
   const practiseAgain = async () => {
-    if (starting || !activeProfile) return;
+    if (starting || busy.current || !activeProfile) return;
+    busy.current = true;
     setStarting(true); setStartError(null);
     try {
       const next = await createPractice(activeProfile.id, scene.mediaAssetId, requestKey.current);
       navigate("/practice/sessions/" + next.session.id + "/analysis");
     } catch (error) { setStartError(error instanceof Error ? error.message : "Unable to start practice."); }
-    finally { setStarting(false); }
+    finally { busy.current = false; setStarting(false); }
   };
   return <div className="stack">
-    <TopBar title="Session summary" onBack={() => navigate("/home")} />
     <p className="small muted">{completed ? "Session and XP saved." : "XP is saved after each action."}</p>
     {session?.session.status === "inProgress" ? <Button onClick={() => navigate("/practice/sessions/" + scene.sessionId + "/learn")}>Continue unfinished practice</Button> : null}
     <div className="center-text stack-2" style={{ alignItems: "center" }}>
-      <Mascot size={120} /><h1>{completed ? "Good job!" : "Your session"}</h1><Noodle />
-      <p className="muted">You practised {scene.title.toLowerCase()} today.</p>
+      <img className="mascot" src="/linguini-logo.png" width={120} height={120} alt="Linguini mascot" /><h1>{completed ? "Good job!" : "Your session"}</h1><Noodle className="noodle-divider summary__noodle" />
+      <p className="muted">You practised {scene.title.toLowerCase()}.</p>
     </div>
     {loading ? <p role="status">Loading your results...</p> : null}
     {error || startError ? <p role="alert">{error || startError}</p> : null}
     {data ? <>
       <div className="stat-grid">
-        <div className="stat"><div className="stat__value">{data.xpEarned}</div><span className="small muted">XP earned</span></div>
-        <div className="stat"><div className="stat__value">{data.ispyCorrectCount}/{data.ispyAttemptCount}</div><span className="small muted">I-Spy correct</span></div>
-        <div className="stat"><div className="stat__value">{scene.items.length}</div><span className="small muted">Items found</span></div>
+        <div className="stat"><div className="stat__value">{data.xpEarned}</div><span className="stat__label">XP earned</span></div>
+        <div className="stat"><div className="stat__value">{data.ispyCorrectCount}/{data.ispyAttemptCount}</div><span className="stat__label">I-Spy correct</span></div>
+        <div className="stat"><div className="stat__value">{data.learnedVocabularyIds.length}</div><span className="stat__label">Words learned</span></div>
       </div>
       <Card><div className="stack-2">
         <div className="spread"><h2>Words to revisit</h2><XpPill xp={data.xpEarned} /></div>

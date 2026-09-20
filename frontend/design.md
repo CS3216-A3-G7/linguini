@@ -2,6 +2,23 @@
 
 > **A curious language-learning companion, served in small real-world moments.**
 
+## Product loop
+
+Linguini is organized around one repeatable promise: **notice a real place, learn the
+words inside it, play with those words, then use them in a journal.** The visual design
+should make that loop feel like one friendly trail rather than four unrelated features.
+
+1. **Capture:** upload a personal photo or choose a ready-made scene.
+2. **Choose:** review useful objects and select what matters.
+3. **Learn:** build confidence with pronunciation, meaning, examples, and phrases.
+4. **Play I-Spy:** Linguini gives clues first; then the learner describes an object back.
+5. **Reflect:** write a journal entry using the words discovered that day.
+
+The primary route through the product becomes visible once active learning begins. Scene
+selection and AI scene analysis stay unnumbered so the learner can focus on choosing and
+correcting the source material before committing to the lesson. Review, vocabulary,
+progress, and profile are supporting routes and should never compete with the next step.
+
 ## Product character
 
 Linguini helps learners notice language in the world around them: capture a scene, choose what matters, play a quick visual game, and collect discoveries in a personal word journal. The experience should feel sunny, tactile, and reassuring—like a small illustrated field notebook with a mischievous noodle guide.
@@ -16,6 +33,7 @@ Keep the learning product legible and game-like, but avoid copying any competito
 - **Marker-and-menu outlines:** dark-teal hand-drawn-style contours with subtly imperfect geometry; never thick black cartoon outlines.
 - **Food-memory warmth:** buttery surfaces, tomato CTAs, herb-teal confirmation, and pasta-yellow moments of discovery.
 - **Real-world learning:** photographic scenes paired with illustrated overlays, vocabulary chips, and a journal-like record—not a fantasy-character world.
+- **The wordmark is the welcome:** use the supplied orange-yellow “Linguini” wordmark with its looping underline as the visual anchor at the top of the first screen view. Center it in a distinct pasta-cream brand strip so its alignment feels intentional beside left-aligned page content. It scrolls away naturally with the page.
 
 ## Design principles
 
@@ -59,11 +77,11 @@ Choose licensed fonts with rounded, human shapes rather than a branded competito
 
 | Role | Recommended family | Weight | Desktop / mobile | Notes |
 |---|---|---:|---:|---|
-| Display | **Fredoka** | 600–700 | 52–64 / 32–40 | Friendly, compact headings with a soft bounce |
+| Headings | **Baloo 2** | 700–800 | 52–64 / 32–40 | Warm, rounded headings that support the custom wordmark without copying it |
 | UI & body | **Nunito Sans** | 400–800 | 16 / 16 | Clear at small sizes; use 700–800 for controls |
 | Numbers / metadata | **Nunito Sans** | 700–800 | 12–16 / 12–16 | Use tabular numerals where progress is compared |
 
-Use sentence case throughout. Headings can be expressive, but keep body text calm and conversational. Avoid all-caps except tiny status labels if needed.
+Use sentence case throughout. The supplied wordmark is the only expressive display lettering; use Baloo 2 at 700–800 for headings and keep Nunito Sans body text calm and conversational. Avoid all-caps except tiny status labels if needed.
 
 ### Type scale
 
@@ -134,11 +152,18 @@ Tomato fill with cream or white label, 18px radius, 48px minimum height, and a 4
 
 ### Secondary button
 
-Cream or transparent fill, 2px teal outline, teal-dark label, 48px minimum height. Use when an action is meaningful but not the screen’s main route. Avoid placing more than one secondary button beside a primary action on small screens.
+Teal fill with a cream or white label, 18px radius, 48px minimum height, and a 4px dark-teal bottom edge. Use when an action is meaningful but not the screen’s main route. Avoid placing more than one secondary button beside a primary action on small screens.
 
 ### Quiet button / icon button
 
 No filled container by default; use teal-dark text or icon with a minimum 44 × 44px hit area. Add a cream hover/pressed surface, not a new border.
+
+### Button consistency rules
+
+- Use **primary** for the one forward-moving action: tomato fill, tomato border, white label, and the same 4px tomato press edge everywhere.
+- Use **secondary** for a meaningful alternative: teal fill, white label, teal border, and the same 4px press edge as primary buttons.
+- Use **quiet** only for supporting actions such as “Show English”, “Back home”, and close controls. It has no outline or shadow.
+- Do not create a new button treatment inside a page. Answer choices, vocabulary chips, scene tiles, and task rows are selectable learning controls, not action buttons, so their selected/correct/incorrect states are the only deliberate exceptions.
 
 ### Vocabulary chip
 
@@ -166,13 +191,33 @@ Use a cream panel with a color-coded left detail and a concise human message: �
 
 ## Key screens
 
+### Welcome
+
+Introduce Linguini through one spacious three-step carousel rather than a dense feature list. The steps are Find, Learn, and Use: Find shows a real scene photo with numbered AI-suggested objects and learner-approved word chips; Learn shows a compact I-Spy clue and choices; Use shows two real photos arranged as a journal memory beside a short entry. Keep the current step's title and explanation above one large demonstration card, with previous/next chevrons and three progress dots below. The full Linguini wordmark remains in the shared brand strip. Keep one persistent tomato Get started action beneath the carousel and a quiet existing-account route below it. The page must communicate the complete image-to-practice-to-journal loop without requiring a scroll through separate marketing sections.
+
 ### Capture a scene
 
-The home screen invites the learner to begin with their surroundings. Lead with a clear title and a short, practical explanation. The empty photo area is a soft illustrated landscape with a dashed contour and a large camera symbol. The tomato “Open camera” button sits directly beneath it. A small noodle curl and two short spark marks frame the moment; do not surround the entire screen with decoration.
+The home screen answers one question only: “What should I do next?” Begin with a compact mascot welcome using the learner's name and one short encouraging sentence, followed by a quiet seven-day check-in panel. Use the supplied transparent farfalle image—not generic circles or a redrawn bow—for checked-in days; leave missed or future days muted. Below it, show one dominant featured card. For a new learner, use a single tomato “Begin a new practice” action. If practice is underway, let its real scene image lead the card, followed by a compact task trail and one tomato “Continue learning” action; “Start a new practice” becomes a smaller supporting row. Show only three recent words beneath the plan on soft pasta-cream chips, with a quiet route to the full vocabulary library. Keep one gentle journal-entry action directly beneath the words so reflection is always findable without competing with practice. Do not add profile details, full statistics, scene collections, or multiple equally prominent actions to Home.
+
+The scene-selection page is not a staged task and must not show a progress trail. Choosing, capturing, or uploading an image opens analysis immediately. Scene analysis is also unnumbered: use the title “Scene Analysis,” never “Step 2” or a progress bar. Begin staged progress only when the learner moves from their confirmed word list into active learning tasks.
+
+### Scene analysis
+
+Treat AI detection as a suggestion the learner reviews, not a completed decision. Start with a brief image-scanning state that says “Finding objects in your image…” without a card or progress bar. Then show the real photo with numbered markers, followed by a plain-text result count such as “2 words found.” Place the detected English words in one calm card below the count. Every suggestion must have a visible remove action, and the same card must let the learner add a word the analysis missed. Adding a word is a two-part action: the learner names it, then taps its location in the photo before it joins the list. User-added words receive their own orange numbered marker so the photo and list stay directly mapped. Continuing is disabled when no words remain or a new word is still awaiting placement.
 
 ### Choose vocabulary
 
 Place the captured photo at the center of the screen. Numbered markers map directly to selectable vocabulary chips underneath. Use tomato for the current selection and pasta / teal for supporting markers, maintaining high-contrast text. The primary action reads “Start I Spy” and remains fixed above the bottom navigation when the chip list scrolls.
+
+### Test your mic
+
+Keep microphone setup short and visually quiet. Use the unnumbered title “Test your mic” with no progress trail. Group the phrase, translation, microphone, and test status in one calm paper panel. “Use typing instead” is an outlined supporting action rather than a competing filled button. Only the forward-moving Continue action uses the filled tomato treatment.
+
+### Learning tasks
+
+The learning-task list is a launch page, not part of the task sequence itself. Do not show a phase label or progress trail there. Show the scene, a calm list of available tasks, and one filled action to begin the first task or continue the next incomplete one. Every task row may also open its task directly.
+
+Each learning task has its own full page rather than opening in a bottom sheet. Put task progress at the top as “Task n of total,” followed by a title row with a compact “× Exit” control that returns home. Repeat this title-row exit on the task-list page so the learner can leave active practice at any time. Follow the title with guidance and one focused word card at a time. Give the card a warm pasta-yellow surface, set the target vocabulary in dark teal, and place the audio action in a generous white circular control so pronunciation remains easy to find. Use a small text counter for progress within the task so two progress bars never compete. Keep the underlined “Back to tasks” link beneath the filled orange action on individual tasks. Completing a task advances to the next task; the final task returns to the completed list, where I-Spy becomes the primary action.
 
 ### Play I Spy
 
@@ -182,15 +227,39 @@ Make the challenge feel focused: progress at top, scene photo next, a compact hi
 
 Treat the journal as proof of progress, not a dense database. Put a soft pasta-yellow encouragement panel above or below the list. Segment Review, Learned, and Mastered with text-first tabs. The active tab uses tomato fill; inactive tabs live on a pale cream rail. Each row should feel easy to revisit in under a second.
 
+### Vocabulary library
+
+Vocabulary replaces Progress as a primary navigation destination. Open with a scene-first library: each real scene image introduces the words collected from that place, with target words, translations, and pronunciation controls grouped directly beneath it. A prominent teal book action at the top switches to the complete vocabulary list. Present that full list as calm paper cards, matching the journal’s card language rather than a divided utility list. Give the target-language word clear teal emphasis on the left, align its translation to the right, and keep the example, word type, and topic together below. Use soft teal-green pills for word type and topic so they remain distinct from pasta-yellow actions and surfaces. Anchor pronunciation in a circular control at the card’s bottom-right corner. Open vocabulary filters in a bottom sheet rather than expanding the page; changes stay temporary until the learner selects the filled “Apply filters” action, while close, backdrop, or Escape dismisses the sheet without applying them.
+
+### Session summary
+
+Make the completion state feel celebratory without becoming noisy. Center the noodle flourish beneath the congratulatory heading. Present the three session statistics with strong dark labels, large teal values, and a light sage-green surface so the results remain legible at a glance.
+
+### Profile
+
+Lead with a paper profile card containing a large pasta avatar inside a clean white circular frame, followed by the learner's name and joining month. A right chevron opens a dedicated Edit profile page; never expose editing controls or a separate Edit profile button on the main profile. The editing page owns the learner's name, pasta avatar, language, daily goal, practice preference, and permissions, and returns through the standard header back control. Show the maximum streak in its own compact cream card. Show only this week's quick progress beneath the identity area, then present the saved learning setup and permissions as readable values. End with a concise explanation that AI suggests scene vocabulary and prompts while the learner reviews and controls every decision, followed by a full-width tomato Log out action. Flags may identify languages, but do not use emoji as decoration elsewhere on this page.
+
+The journal list is a single-month view. Use a centered month-and-year label (for example, “September 2026”) with standard previous and next month chevrons on either side. Filter entries to the chosen month and keep the chevrons active when that month is empty. A journal entry can collect multiple ready-scene or uploaded photos; display them as a single-photo carousel with previous/next chevrons and a clear position label.
+
 ## Navigation and layout
 
 ### Mobile
 
 - Design for 360px wide screens first; allow content padding of 16px, expanding to 20–24px on larger phones.
-- Use a persistent four-item bottom bar: Home, Explore, Journal, Profile. Each item has an icon and label; active state is tomato.
-- Keep bottom navigation on a cream surface with a top divider and safe-area padding.
+- Use a persistent five-item bottom bar: Home, Practice, Vocabulary, Journal, Profile. Vocabulary uses an open-book icon and occupies the center position; Journal uses a distinct notebook-and-pencil icon. Each item has an icon and label; the active icon is filled tomato and its label is tomato.
+- Keep bottom navigation on the same butter surface as the page, separated only by a quiet line and safe-area padding. It should recede behind the learning content rather than create a new color band.
 - Primary actions belong above the navigation and must not be hidden behind it.
 - Use full-width action buttons, except compact paired controls that still preserve 44px hit targets.
+- Put the single back control beside the centered wordmark in the shared header. Do not add a second back arrow inside a screen title bar. Root destinations (Home, Practice, Journal, Vocabulary, Profile, and Welcome) remain wordmark-only.
+
+### Current implementation guidance
+
+- Use the shared simplified mascot assets (`public/linguini-logo.svg` for happy and `public/linguini-logo-sad.svg` for sad) rather than redrawing the mark in individual pages. Use the `Mascot` component's `expression` prop when a screen needs to acknowledge a setback.
+- Keep `BrandBar`, `Button`, `Card`, `ScenePhoto`, `Tabs`, and `ProgressTrail` as the shared source of truth for page styling.
+- The page background is warm butter with a subtle pasta-yellow lift near the header. The shared wordmark sits on a richer pasta-cream strip (`#F7E6B4`) without a divider; elevated surfaces are paper/cream, never stark white or glassy.
+- Tomato is reserved for the one dominant action and active navigation. Teal is the confidence/confirmation color. Pasta yellow is reserved for progress, rewards, and the wordmark.
+- Prefer one large scene or learning panel per screen. Journal and vocabulary collections use calm paper cards with consistent spacing and restrained elevation.
+- On the mobile canvas, target 360px first: 16px side padding, 48px controls, 44px icon hit areas, and safe-area space below fixed navigation.
 
 ### Tablet and web
 
@@ -247,7 +316,7 @@ Warm, direct, and observant. Use short sentences, active verbs, and concrete cue
   --line: #D9D2C3;
   --focus: #166C84;
 
-  --font-display: "Fredoka", "Arial Rounded MT Bold", ui-rounded, sans-serif;
+  --font-display: "Baloo 2", ui-rounded, sans-serif;
   --font-ui: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
 
   --radius-sm: 12px;

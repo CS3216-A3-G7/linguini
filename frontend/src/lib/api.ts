@@ -67,6 +67,7 @@ async function request<T>(path: string, signal?: AbortSignal, options?: RequestI
     const message = typeof body?.detail?.message === "string" ? body.detail.message : "Request failed.";
     throw new Error(`${message} (HTTP ${response.status})`);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -184,7 +185,9 @@ interface JournalDetail {
 }
 function journalEntry(detail: JournalDetail): JournalEntry {
   const row = detail.journal;
+  const media = [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder);
   return { id: row.id, languageProfileId: row.languageProfileId, date: row.localDate,
+    photos: media.map((photo, index) => ({ ...photo, imageUrl: index === 0 ? detail.imageUrl ?? null : null })),
     title: row.title, mediaAssetId: [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.mediaAssetId ?? null, imageUrl: detail.imageUrl ?? null, wordsUsed: row.selectedWords,
     body: detail.revisions.find((revision) => revision.id === row.currentRevisionId)?.content ?? "" };
 }
@@ -198,11 +201,27 @@ export async function getTodayJournal(signal?: AbortSignal) {
   const context = await request<{ localDate: string; journal: JournalRecord | null }>("/api/v1/journal/today/context", signal);
   return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null };
 }
-export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed">;
+export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed"> & { photoAssetIds?: string[] };
 export async function saveJournal(draft: JournalDraft, profileId: string, id?: string) {
-  const body = { title: draft.title, mediaAssetId: draft.mediaAssetId, content: draft.body, selectedWords: draft.wordsUsed };
+  const body = { title: draft.title, ...(draft.photoAssetIds === undefined ? { mediaAssetId: draft.mediaAssetId } : {}), content: draft.body, selectedWords: draft.wordsUsed };
   const row = id ? await write<JournalRecord>(`/api/v1/journals/${id}`, "PATCH", body)
     : await write<JournalRecord>("/api/v1/journal/today", "PUT", { ...body, languageProfileId: profileId });
+  if (draft.photoAssetIds !== undefined) {
+    const desired = [...new Set(draft.photoAssetIds)];
+    const current = await getJournal(row.id);
+    // Remove changed positions first; the API requires unique positions and asset IDs.
+    // Reading persisted attachments on every retry also recovers from a partial save.
+    for (const photo of current.photos) {
+      if (desired[photo.displayOrder] !== photo.mediaAssetId) {
+        await request<void>(`/api/v1/journals/${row.id}/media/${photo.mediaAssetId}`, undefined, { method: "DELETE" });
+      }
+    }
+    for (const [displayOrder, mediaAssetId] of desired.entries()) {
+      if (!current.photos.some(photo => photo.mediaAssetId === mediaAssetId && photo.displayOrder === displayOrder)) {
+        await write(`/api/v1/journals/${row.id}/media`, "POST", { mediaAssetId, displayOrder });
+      }
+    }
+  }
   return getJournal(row.id);
 }
 

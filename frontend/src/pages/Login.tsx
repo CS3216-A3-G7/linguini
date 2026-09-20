@@ -1,77 +1,24 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Mascot, TopBar } from "../components/ui";
-import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
+import { Button } from "../components/ui";
 import { useAppState } from "../state/useAppState";
 
 export function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("alex@linguini.app");
-  const [password, setPassword] = useState("noodles");
-  const { progress, scenes } = useAppState();
-  const active = progress?.scenarios.find((row) => row.status === "in-progress");
-  const resumable = scenes.find((scene) => scene.id === active?.sceneId);
-
-  return (
-    <div className="stack">
-      <TopBar title="Log in" onBack={() => navigate("/")} />
-      <div className="center-text stack-2" style={{ alignItems: "center" }}>
-        <Mascot size={96} />
-        <h1>Welcome back</h1>
-        <p className="muted">Your café session is waiting where you left it.</p>
-      </div>
-      <form
-        className="stack"
-        onSubmit={(event) => {
-          event.preventDefault();
-          navigate("/home");
-        }}
-      >
-        <div className="field">
-          <label className="field__label" htmlFor="login-email">
-            Email
-          </label>
-          <input
-            id="login-email"
-            className="input"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label className="field__label" htmlFor="login-password">
-            Password
-          </label>
-          <input
-            id="login-password"
-            className="input"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </div>
-        <Button block type="submit">
-          Log in
-        </Button>
-      </form>
-      <SceneCatalogStatus />
-      {resumable ? <Card>
-        <div className="stack-2">
-          <span className="label muted">Interrupted session</span>
-          <strong>{resumable.title}</strong>
-          <p className="small muted">{resumable.blurb}</p>
-          <Button variant="secondary" onClick={() => navigate(`/practice/${resumable.id}/learn`)}>
-            Resume after login
-          </Button>
-        </div>
-      </Card> : null}
-      <p className="small muted center-text">
-        New here?{" "}
-        <button type="button" className="btn btn--quiet" onClick={() => navigate("/onboarding")}>
-          Create an account
-        </button>
-      </p>
+  const { learner, progress, progressLoading, progressError } = useAppState();
+  const active = progress?.scenarios.find(row => row.status === "in-progress");
+  return <div className="stack">
+    <div className="center-text stack-2" style={{ alignItems: "center" }}>
+      <img className="mascot" src="/linguini-logo.png" width={120} height={120} alt="Linguini mascot" />
+      <h1>Welcome back</h1>
+      <p className="muted">Continue learning with {learner.name}.</p>
+      <p className="small muted">This version uses a demo account. Email and password sign-in is not available yet.</p>
     </div>
-  );
+    <Button block onClick={() => navigate("/home")}>Continue to home</Button>
+    {progressLoading ? <p role="status">Loading your practice...</p> : null}
+    {progressError ? <p role="alert">{progressError} Reload to retry.</p> : null}
+    {active ? <Button variant="secondary" block onClick={() => navigate(`/practice/sessions/${active.sessionId}/learn`)}>Resume {active.title}</Button> : null}
+    <p className="small muted center-text">
+      <button type="button" className="btn btn--quiet" onClick={() => navigate("/onboarding")}>Set up your learning preferences</button>
+    </p>
+  </div>;
 }

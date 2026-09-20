@@ -1,77 +1,109 @@
-import { LoadingScreen } from "../components/LoadingScreen";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Mascot } from "../components/ui";
-import { PlusIcon } from "../components/icons";
+import { Button, Card, IconButton } from "../components/ui";
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { JournalImage } from "../components/JournalImage";
+import { LoadingScreen } from "../components/LoadingScreen";
 import { useAppState } from "../state/useAppState";
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-GB", {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",
   });
 }
 
-function monthOf(date: string) {
-  return new Date(date).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+function monthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function dateFromEntry(date: string) {
+  const [year, month] = date.split("-").map(Number);
+  return new Date(year, month - 1, 1);
+}
+
+function monthLabel(date: Date) {
+  return date.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+}
+
+function isInMonth(date: string, month: Date) {
+  const entryMonth = dateFromEntry(date);
+  return entryMonth.getFullYear() === month.getFullYear() && entryMonth.getMonth() === month.getMonth();
+}
+
+function wordCount(text: string) {
+  const count = text.trim().split(/\s+/).filter(Boolean).length;
+  return `${count} ${count === 1 ? "word" : "words"}`;
 }
 
 export function Journal() {
-  const navigate = useNavigate();
   const { journal, journalLoading, journalError } = useAppState();
-  if (journalLoading) return <LoadingScreen label="Loading journal history…" />;
+  if (journalLoading) return <LoadingScreen label="Loading journal history..." />;
   if (journalError) return <p role="alert">{journalError} Reload to retry.</p>;
+  return <JournalMonths journal={journal} />;
+}
 
-  const months = journal.reduce<Record<string, typeof journal>>((groups, entry) => {
-    const key = monthOf(entry.date);
-    groups[key] = [...(groups[key] ?? []), entry];
-    return groups;
-  }, {});
+function JournalMonths({ journal }: { journal: ReturnType<typeof useAppState>["journal"] }) {
+  const navigate = useNavigate();
+  const [visibleMonth, setVisibleMonth] = useState(() =>
+    monthStart(journal.length ? dateFromEntry(journal[0].date) : new Date()),
+  );
+  const visibleEntries = journal.filter((entry) => isInMonth(entry.date, visibleMonth));
+
+  const changeMonth = (offset: number) => {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  };
 
   return (
-    <div className="stack">
-      <h1>My journal</h1>
-      <p className="muted">Practice writing about your day</p>
+    <div className="stack journal-page">
+      <div className="month-switcher">
+        <IconButton label="Previous month" onClick={() => changeMonth(-1)}>
+          <ChevronLeftIcon />
+        </IconButton>
+        <h1>{monthLabel(visibleMonth)}</h1>
+        <IconButton label="Next month" onClick={() => changeMonth(1)}>
+          <ChevronRightIcon />
+        </IconButton>
+      </div>
 
-      <Button block onClick={() => navigate("/journal/new")}>
-        <PlusIcon size={18} /> Write today&apos;s entry
+      <Button block className="journal-page__add" onClick={() => navigate("/journal/new")}>
+        <PlusIcon size={18} /> Add today&apos;s entry
       </Button>
 
-      {journal.length === 0 ? (
+      {visibleEntries.length === 0 ? (
         <Card>
           <div className="stack-2 center-text" style={{ alignItems: "center" }}>
-            <Mascot size={96} />
-            <strong>No entries yet</strong>
+
+            <strong>No entries this month</strong>
             <p className="small muted">A few sentences a day goes a long way.</p>
           </div>
         </Card>
       ) : null}
 
-      {Object.entries(months).map(([month, entries]) => (
-        <div key={month} className="stack-2">
-          <h2>{month}</h2>
-          <div className="list">
-            {entries.map((entry) => (
-              <button
-                key={entry.id}
-                type="button"
-                className="list__row"
-                onClick={() => navigate(`/journal/${entry.id}`)}
-              >
-                <span className="thumb thumb--lg">
-                  <JournalImage title={entry.title} imageUrl={entry.imageUrl} />
+      {visibleEntries.length ? (
+        <div className="list">
+          {visibleEntries.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className="list__row journal-list-entry"
+              onClick={() => navigate(`/journal/${entry.id}`)}
+            >
+              <span className="thumb thumb--lg">
+                <JournalImage title={entry.title} imageUrl={entry.imageUrl} />
+              </span>
+              <span className="grow journal-list-entry__details">
+                <strong className="journal-list-entry__title">{entry.title}</strong>
+                <span className="journal-list-entry__meta">
+                  <span className="journal-list-entry__date">{formatDate(entry.date)}</span>
                 </span>
-                <span className="grow stack-2">
-                  <strong>{entry.title}</strong>
-                  <span className="small muted align-middle">{formatDate(entry.date)}</span>
-                  <span className="small muted">{entry.wordsUsed.length} words used</span>
-                </span>
-              </button>
-            ))}
-          </div>
+                 <span className="journal-list-entry__word-count">{wordCount(entry.body)}</span>
+              </span>
+            </button>
+          ))}
         </div>
-      ))}
+      ) : null}
     </div>
   );
 }

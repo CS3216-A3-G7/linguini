@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Button, Feedback, IconButton, ProgressTrail, TopBar } from "../components/ui";
+import { Button, Feedback, IconButton, ProgressTrail } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, SpeakerIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
 import { useScene } from "../state/useScene";
@@ -20,6 +20,7 @@ export function ISpyPhase1() {
   if (!session) return null;
   const { learning, clues } = practiceStages(session.tasks);
   const base = `/practice/sessions/${scene.sessionId}`;
+  if (session.session.status === "completed") return <Navigate to={`${base}/summary`} replace />;
   if (!learning.every(taskDone) || ["abandoned", "failed"].includes(session.session.status)) return <Navigate to={`${base}/learn`} replace />;
   const task = clues[index];
   if (!task) return <Navigate to={`${base}/ispy-2`} replace />;
@@ -33,18 +34,27 @@ function ClueRound({ task, index, total, onNext }: { task: SessionTask; index: n
   const [picked, setPicked] = useState<string | null>(null);
   const [result, setResult] = useState<TaskActionResult | null>(null);
   const [showTranslation, setShowTranslation] = useState(false);
-  const key = useRef(crypto.randomUUID());
+  const request = useRef<{ answer: string; key: string } | null>(null);
+  const submitting = useRef(false);
   const content = task.publicContent;
   if (content.kind !== "ispyRound") return null;
   const answered = taskDone(task);
   const choose = async (optionId: string) => {
-    if (answered || practiceSaving) return;
+    if (answered || practiceSaving || submitting.current) return;
+    submitting.current = true;
+    if (request.current?.answer !== optionId) request.current = { answer: optionId, key: crypto.randomUUID() };
     setPicked(optionId);
-    setResult(await actOnTask(task.id, "attempts", { inputMode: "multipleChoice", optionId }, key.current));
+    setResult(null);
+    try {
+      const saved = await actOnTask(task.id, "attempts", { inputMode: "multipleChoice", optionId }, request.current.key);
+      setResult(saved);
+      if (saved) request.current = null;
+    } finally { submitting.current = false; }
   };
   const selected = content.options.find(option => option.optionId === picked);
   return <div className="stack">
-    <TopBar title="I-Spy · Linguini clues" help="Listen or read the clue, then choose what you spy." />
+    <h2 className="text-center">I-Spy · Linguini's clues</h2>
+    <p>Use the clues to find the word</p>
     <ProgressTrail value={index + (answered ? 1 : 0)} total={total} label={`${index + 1} / ${total}`} />
     <ScenePhoto scene={scene} activeItemId={result?.attempt?.isCorrect ? selected?.sceneObjectId : null} />
     <div className="card card--lifted stack-2">
@@ -53,12 +63,12 @@ function ClueRound({ task, index, total, onNext }: { task: SessionTask; index: n
       {content.clueTranslation ? showTranslation ? <p className="small muted">{content.clueTranslation}</p> : <Button variant="quiet" onClick={() => setShowTranslation(true)}>Show translation</Button> : null}
     </div>
     <div className="choice-grid">{content.options.map(option => {
-      const state = result?.attempt && picked === option.optionId ? (result.attempt.isCorrect ? " choice--correct" : " choice--incorrect") : "";
+      const state = result?.attempt?.isCorrect != null && picked === option.optionId ? (result.attempt.isCorrect ? " choice--correct" : " choice--incorrect") : "";
       return <button key={option.optionId} type="button" className={`choice${state}`} disabled={answered || practiceSaving} onClick={() => void choose(option.optionId)}>
         {result?.attempt?.isCorrect && picked === option.optionId ? <CheckIcon size={16} /> : null}{option.label}
       </button>;
     })}</div>
-    {answered ? <Feedback tone={result?.attempt?.isCorrect === false ? "warn" : "good"}><div className="stack-2"><strong>{task.status === "skipped" ? "Skipped — no XP earned." : result?.attempt?.feedback?.message ?? "Answer saved."}</strong>{content.encouragement ? <span className="small muted">{content.encouragement}</span> : null}</div></Feedback> : null}
+    {answered || result ? <Feedback tone={result?.attempt?.isCorrect === false ? "warn" : "good"}><div className="stack-2" role="status"><strong>{task.status === "skipped" ? "Skipped — no XP earned." : result?.attempt?.feedback?.message ?? "Answer saved."}</strong>{content.encouragement ? <span className="small muted">{content.encouragement}</span> : null}</div></Feedback> : null}
     {practiceError ? <p role="alert">{practiceError}</p> : null}
     <Button block disabled={!answered || practiceSaving} onClick={() => index === total - 1 ? navigate(`/practice/sessions/${scene.sessionId}/ispy-2`) : onNext()}>{index === total - 1 ? "Your turn" : "Next clue"} <ArrowRightIcon /></Button>
     {!answered ? <Button variant="quiet" block disabled={practiceSaving} onClick={() => void actOnTask(task.id, "skip")}>Skip task</Button> : null}

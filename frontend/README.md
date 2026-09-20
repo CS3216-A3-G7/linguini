@@ -219,3 +219,13 @@ Use [design.md](design.md) and `frontend/src/styles/tokens.css` for visual conve
 Frontend types and backend schemas are currently maintained separately. When
 connecting additional screens, align the UI with the backend OpenAPI contracts
 and use the centralized request helper in `frontend/src/lib/api.ts`.
+
+- `src/styles/tokens.css` — design tokens from [`design.md`](./design.md)
+- `src/components/` — UI primitives, bottom-nav shell, scene illustrations and markers
+- `src/data/` — types plus the dummy scenes, vocabulary, journal and progress data
+- `src/state/` — in-memory app state (XP, task completion, vocabulary status, journal entries)
+- `src/pages/` — one file per screen
+
+The ready scenes use real photos where available, while `src/components/SceneArt.tsx` remains the
+fallback illustration system for journal entries and incomplete image states.
+
