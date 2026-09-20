@@ -1,10 +1,13 @@
 import { useCallback, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
+import { queryKeys } from "../lib/queryKeys";
 
 export function usePractice(_userId: string, profileId: string, onLearningChanged: () => void) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<PracticeDetail | null>(null);
   const [practiceSaving, setSaving] = useState(false);
   const [practiceError, setError] = useState<string | null>(null);
@@ -57,10 +60,11 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       const completed = await getPractice(session.session.id);
       setSession(value => value?.session.id === completed.session.id ? completed : value);
       onLearningChanged();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(session.session.id) });
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to complete session."); return false; }
     finally { busy.current = false; setSaving(false); }
-  }, [session, onLearningChanged]);
+  }, [session, onLearningChanged, queryClient]);
   const saveReview = useCallback(async (review: PracticeReview) => {
     if (!session || busy.current) return false;
     busy.current = true; setSaving(true); setError(null);

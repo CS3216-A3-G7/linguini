@@ -1,16 +1,19 @@
-import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "../components/ui";
 import { getActivePractice } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
-import { useApiData } from "../lib/useApiData";
+import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 
 export function Login() {
   const navigate = useNavigate();
-  const { learner } = useAppState();
-  const loadActive = useCallback(() => getActivePractice(), []);
-  const { data: active, error: activeError, loading: activeLoading } = useApiData(loadActive);
+  const { learner, activeProfile } = useAppState();
+  const { data: active, error: activeQueryError, isPending: activeLoading } = useQuery({
+    queryKey: queryKeys.activeSession(activeProfile?.id ?? ""),
+    queryFn: () => getActivePractice(),
+  });
+  const activeError = queryError(activeQueryError);
   return <div className="stack">
     <div className="center-text stack-2" style={{ alignItems: "center" }}>
       <img className="mascot" src="/linguini-logo.png" width={120} height={120} alt="Linguini mascot" />
