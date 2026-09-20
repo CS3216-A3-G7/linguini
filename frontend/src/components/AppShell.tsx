@@ -17,7 +17,10 @@ export function AppShell() {
     pathname === "/journal/new" ||
     /^\/journal\/[^/]+$/.test(pathname) ||
     pathname === "/profile/edit";
-  const usesWideCanvas = ["/home", "/practice", "/vocabulary", "/journal"].includes(pathname);
+  const usesWideCanvas =
+    ["/home", "/practice", "/vocabulary", "/journal"].includes(pathname) ||
+    pathname === "/journal/new" ||
+    /^\/journal\/[^/]+$/.test(pathname);
 
   return (
     <div className="shell shell--app">

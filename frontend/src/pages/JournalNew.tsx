@@ -2,7 +2,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Feedback } from "../components/ui";
-import { UploadIcon } from "../components/icons";
+import { ChevronRightIcon, UploadIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
 import { MediaImage } from "../components/MediaImage";
 import { useAppState } from "../state/useAppState";
@@ -36,6 +36,7 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
   const [photos, setPhotos] = useState(entry?.photos ?? []);
   const [uploading, setUploading] = useState(false);
   const [selectedWords, setSelectedWords] = useState<string[]>(entry?.wordsUsed ?? []);
+  const [photoPickerOpen, setPhotoPickerOpen] = useState(photos.length === 0 && photoOptions.length > 0);
 
   const toggleWord = (word: string) =>
     setSelectedWords((current) =>
@@ -58,118 +59,132 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
   };
 
   return (
-    <div className="stack">
-      <h3 className="center-text">{shownDate.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}</h3>
-      <h1>{entry ? "Edit journal entry" : isToday ? "Today's journal" : "Journal entry"}</h1>
+    <div className="journal-editor">
+      <header className="journal-editor__header">
+        <span className="journal-editor__date">{shownDate.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}</span>
+        <h1>{entry ? "Edit entry" : isToday ? "Today's entry" : "Journal entry"}</h1>
+      </header>
 
-      <div className="field">
-        <label className="field__label" htmlFor="entry-title">
-          Title
-        </label>
-        <input
-          id="entry-title"
-          disabled={journalSaving}
-          maxLength={200}
-          className="input"
-          placeholder="A walk downtown"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-      </div>
-
-      <div className="stack-2">
-        <span className="field__label">Photos</span>
-        {photos.length ? (
-          <div className="photo-strip" aria-label={`${photos.length} photos added`}>
-            {photos.map((photo, index) => <div key={photo.mediaAssetId} className="photo-thumb">
-              <MediaImage assetId={photo.mediaAssetId} imageUrl={photo.imageUrl} title={`Journal photo ${index + 1}`} />
-              <button type="button" className="photo-thumb__remove" aria-label={`Remove photo ${index + 1}`}
-                disabled={journalSaving || uploading}
-                onClick={() => setPhotos(current => current.filter(item => item.mediaAssetId !== photo.mediaAssetId))}>
-                &times;
-              </button>
-            </div>)}
+      <div className="journal-editor__layout">
+        <section className="journal-editor__write">
+          <label className="visually-hidden" htmlFor="entry-title">Title</label>
+          <input
+            id="entry-title"
+            disabled={journalSaving}
+            maxLength={200}
+            className="journal-editor__title-input"
+            placeholder="Give today a title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+          <label className="visually-hidden" htmlFor="entry-body">Your entry</label>
+          <textarea
+            id="entry-body"
+            disabled={journalSaving}
+            maxLength={20000}
+            className="journal-editor__body-input"
+            placeholder="Start writing…"
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+          />
+          <div className="journal-editor__write-foot">
+            <span className="small muted">{body.trim() ? body.trim().split(/\s+/).length : 0} words</span>
           </div>
-        ) : <div className="dashed-capture">
-          <span style={{ color: "var(--teal-dark)" }}><UploadIcon size={40} /></span>
-          <p className="small muted">Add a few photos from your day</p>
-        </div>}
-        {photoOptions.length ? (
-          <div className="grid-2 journal-new__scene-grid">
-            {photoOptions.map((option) => {
-              const selected = photos.some(photo => photo.mediaAssetId === option.mediaAssetId);
-              return <button key={option.mediaAssetId} type="button" disabled={uploading || journalSaving}
-                className={`scene-pick${selected ? " scene-pick--selected" : ""}`} aria-pressed={selected}
-                onClick={() => setPhotos(current => selected
-                  ? current.filter(photo => photo.mediaAssetId !== option.mediaAssetId)
-                  : [...current, { mediaAssetId: option.mediaAssetId, imageUrl: option.imageUrl, displayOrder: current.length }])}>
-                <MediaImage assetId={option.mediaAssetId} imageUrl={option.imageUrl} title="Photo from your practice session" />
-              </button>;
-            })}
-          </div>
-        ) : <p className="small muted">No photos from completed sessions on this day — add one from your camera or gallery below.</p>}
-        <div className="journal-new__upload">
-          <ImageUpload cameraEnabled={learner.cameraOn} disabled={journalSaving} onBusyChange={setUploading}
-            onUploaded={(image) => setPhotos(current => current.some(photo => photo.mediaAssetId === image.id) ? current
-              : [...current, { mediaAssetId: image.id, imageUrl: image.signedUrl, displayOrder: current.length }])} />
-        </div>
+          {selectedWords.length ? (
+            <Feedback>
+              <div className="stack-2">
+                <strong>Nice picks</strong>
+                <span className="small muted">
+                  Try using {selectedWords.slice(0, 2).join(" and ")} in one sentence.
+                </span>
+              </div>
+            </Feedback>
+          ) : null}
+        </section>
+
+        <aside className="journal-editor__aside">
+          <section className="journal-editor__panel">
+            <h2 className="journal-editor__panel-title">Photos</h2>
+            {photos.length ? (
+              <div className="photo-strip" aria-label={`${photos.length} photos added`}>
+                {photos.map((photo, index) => <div key={photo.mediaAssetId} className="photo-thumb">
+                  <MediaImage assetId={photo.mediaAssetId} imageUrl={photo.imageUrl} title={`Journal photo ${index + 1}`} />
+                  <button type="button" className="photo-thumb__remove" aria-label={`Remove photo ${index + 1}`}
+                    disabled={journalSaving || uploading}
+                    onClick={() => setPhotos(current => current.filter(item => item.mediaAssetId !== photo.mediaAssetId))}>
+                    &times;
+                  </button>
+                </div>)}
+              </div>
+            ) : <div className="dashed-capture">
+              <span style={{ color: "var(--teal-dark)" }}><UploadIcon size={40} /></span>
+              <p className="small muted">Add a few photos from your day</p>
+            </div>}
+            <div className="journal-editor__upload">
+              <ImageUpload cameraEnabled={learner.cameraOn} disabled={journalSaving} onBusyChange={setUploading}
+                onUploaded={(image) => setPhotos(current => current.some(photo => photo.mediaAssetId === image.id) ? current
+                  : [...current, { mediaAssetId: image.id, imageUrl: image.signedUrl, displayOrder: current.length }])} />
+            </div>
+            {photoOptions.length ? (
+              <>
+                <button
+                  type="button"
+                  className="journal-editor__disclosure"
+                  aria-expanded={photoPickerOpen}
+                  onClick={() => setPhotoPickerOpen(v => !v)}
+                >
+                  Choose from this day's practice photos <ChevronRightIcon size={18} />
+                </button>
+                {photoPickerOpen ? (
+                  <div className="journal-editor__scene-grid">
+                    {photoOptions.map((option) => {
+                      const selected = photos.some(photo => photo.mediaAssetId === option.mediaAssetId);
+                      return <button key={option.mediaAssetId} type="button" disabled={uploading || journalSaving}
+                        className={`scene-pick${selected ? " scene-pick--selected" : ""}`} aria-pressed={selected}
+                        onClick={() => setPhotos(current => selected
+                          ? current.filter(photo => photo.mediaAssetId !== option.mediaAssetId)
+                          : [...current, { mediaAssetId: option.mediaAssetId, imageUrl: option.imageUrl, displayOrder: current.length }])}>
+                        <MediaImage assetId={option.mediaAssetId} imageUrl={option.imageUrl} title="Photo from your practice session" />
+                      </button>;
+                    })}
+                  </div>
+                ) : null}
+              </>
+            ) : <p className="small muted">No photos from completed sessions on this day — add one from your camera or gallery above.</p>}
+          </section>
+
+          <section className="journal-editor__panel">
+            <h2 className="journal-editor__panel-title">Words to use</h2>
+            {!sameLanguage ? <p className="small muted">Select this entry's language in Profile to see matching word suggestions.</p> : null}
+            <div className="chip-row">
+              {vocabularyLoading ? <p role="status">Loading words…</p> : null}
+              {vocabularyError ? <p role="alert">{vocabularyError}</p> : null}
+              {!vocabularyLoading && !vocabularyError && !journalWordSuggestions.length ? <p className="small muted">No saved words for {learner.language} yet.</p> : null}
+              {journalWordSuggestions.map((word) => (
+                <button
+                  key={word}
+                  type="button"
+                  className={`chip${selectedWords.includes(word) ? " chip--selected" : ""}`}
+                  aria-pressed={selectedWords.includes(word)}
+                  disabled={journalSaving}
+                  onClick={() => toggleWord(word)}
+                >
+                  {word}
+                </button>
+              ))}
+            </div>
+          </section>
+        </aside>
       </div>
 
-      <div className="stack-2">
-        <span className="field__label">Word suggestions</span>
-        {!sameLanguage ? <p className="small muted">Select this entry's language in Profile to see matching word suggestions.</p> : null}
-        <div className="chip-row">
-          {vocabularyLoading ? <p role="status">Loading words…</p> : null}
-          {vocabularyError ? <p role="alert">{vocabularyError}</p> : null}
-          {!vocabularyLoading && !vocabularyError && !journalWordSuggestions.length ? <p className="small muted">No saved words for {learner.language} yet.</p> : null}
-          {journalWordSuggestions.map((word) => (
-            <button
-              key={word}
-              type="button"
-              className={`chip${selectedWords.includes(word) ? " chip--selected" : ""}`}
-              aria-pressed={selectedWords.includes(word)}
-              disabled={journalSaving}
-              onClick={() => toggleWord(word)}
-            >
-              {word}
-            </button>
-          ))}
-        </div>
+      <div className="journal-editor__actions">
+        {journalSaveError ? <p role="alert">{journalSaveError}</p> : null}
+        {journalSaving ? <p role="status">Saving journal…</p> : null}
+        {!entry && !activeProfile ? <p role="alert">Choose a language in Profile before saving.</p> : null}
+        <Button block className="journal-editor__save" disabled={journalSaving || uploading || !body.trim() || (!entry && !activeProfile)} onClick={save}>
+          Save entry
+        </Button>
       </div>
-
-      <div className="field">
-        <label className="field__label" htmlFor="entry-body">
-          Your entry
-        </label>
-        <textarea
-          id="entry-body"
-          disabled={journalSaving}
-          maxLength={20000}
-          className="textarea"
-          placeholder="Hoy caminé por la calle y vi un árbol grande…"
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-        />
-        <span className="small muted">{body.trim() ? body.trim().split(/\s+/).length : 0} words</span>
-      </div>
-
-      {selectedWords.length ? (
-        <Feedback>
-          <div className="stack-2">
-            <strong>Nice picks</strong>
-            <span className="small muted">
-              Try using {selectedWords.slice(0, 2).join(" and ")} in one sentence.
-            </span>
-          </div>
-        </Feedback>
-      ) : null}
-
-      {journalSaveError ? <p role="alert">{journalSaveError}</p> : null}
-      {journalSaving ? <p role="status">Saving journal…</p> : null}
-      {!entry && !activeProfile ? <p role="alert">Choose a language in Profile before saving.</p> : null}
-      <Button block disabled={journalSaving || uploading || !body.trim() || (!entry && !activeProfile)} onClick={save}>
-        Save entry
-      </Button>
     </div>
   );
 }
