@@ -436,27 +436,6 @@
   padding-top: var(--space-2);
 }
 
-.leave-session__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: none;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: var(--text-small);
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.leave-session__trigger:hover {
-  background: var(--cream);
-  color: var(--ink);
-}
-
 .leave-session__dialog h2 {
   margin-bottom: var(--space-2);
   color: var(--ink);
@@ -650,7 +629,7 @@
 }
 
 .analysis-add-word__controls .btn {
-  min-width: 76px;
+  min-width: 64px;
 }
 
 .analysis-add-word__error {

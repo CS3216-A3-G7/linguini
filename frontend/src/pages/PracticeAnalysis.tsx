@@ -103,7 +103,7 @@ export function PracticeAnalysis() {
               <label className="field__label" htmlFor="analysis-new-word">Add another object you see</label>
               <div className="analysis-add-word__controls">
                 <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={checking || practiceSaving || !!pending} onChange={event => setLabel(event.target.value)} />
-                <Button variant="secondary" type="submit" disabled={checking || !label.trim() || !!pending || practiceSaving || added.length >= 20}>{checking ? "Checking word..." : "Choose location"}</Button>
+                <Button variant="secondary" type="submit" disabled={checking || !label.trim() || !!pending || practiceSaving || added.length >= 20}>{checking ? "Checking..." : "Add"}</Button>
               </div>
             </form> : null}
           </Card>

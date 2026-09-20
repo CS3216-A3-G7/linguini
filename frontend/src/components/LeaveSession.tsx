@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui";
-import { CloseIcon } from "./icons";
+import { useBackAction } from "./BackAction";
 import { abandonPractice } from "../lib/api";
 
 export function LeaveSession({ sessionId, warning }: { sessionId: string; warning: string }) {
@@ -22,6 +22,11 @@ export function LeaveSession({ sessionId, warning }: { sessionId: string; warnin
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [asking, leaving]);
 
+  // The brand-bar chevron is the leave trigger; ignore repeats while open or in flight.
+  useBackAction(() => {
+    if (!leaving) setAsking(true);
+  }, "Leave this session");
+
   // Stays disabled after a successful abandon so a queued click cannot reach the picker.
   const leave = async () => {
     if (leaving) return;
@@ -38,16 +43,6 @@ export function LeaveSession({ sessionId, warning }: { sessionId: string; warnin
 
   return (
     <>
-      <button
-        type="button"
-        className="leave-session__trigger"
-        aria-haspopup="dialog"
-        aria-expanded={asking}
-        onClick={() => setAsking(true)}
-      >
-        <CloseIcon size={16} />
-        <span>Leave</span>
-      </button>
       {asking ? (
         <div
           className="help-modal__backdrop"

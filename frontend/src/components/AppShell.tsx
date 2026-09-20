@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { BookIcon, CameraIcon, HomeIcon, JournalIcon, PersonIcon } from "./icons";
 import { BrandBar } from "./ui";
+import { BackActionProvider, useRegisteredBackAction } from "./BackAction";
 
 const items = [
   { to: "/home", label: "Home", Icon: HomeIcon },
@@ -42,12 +43,21 @@ export function AppShell() {
 
 /** Full-bleed shell for focused flows (onboarding, practice steps, I-Spy). */
 export function FocusShell() {
+  return (
+    <BackActionProvider>
+      <FocusShellView />
+    </BackActionProvider>
+  );
+}
+
+function FocusShellView() {
   const { pathname } = useLocation();
+  const backAction = useRegisteredBackAction();
   const usesWideCanvas = pathname.endsWith("/analysis");
 
   return (
     <div className="shell shell--focus">
-      <BrandBar back={pathname !== "/"} />
+      <BrandBar back={pathname !== "/"} onBack={backAction.onBack} backLabel={backAction.backLabel} />
       <main
         className={`shell__content${usesWideCanvas ? " shell__content--desktop-wide" : ""}`}
         style={{ paddingBottom: "var(--space-8)" }}
