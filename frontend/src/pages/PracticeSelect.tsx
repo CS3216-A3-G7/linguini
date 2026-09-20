@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { CameraIcon } from "../components/icons";
@@ -8,6 +8,8 @@ import type { PracticeDetail } from "../lib/api";
 import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { sessionDestination } from "../lib/sessionRoute";
+import { queryKeys } from "../lib/queryKeys";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAppState } from "../state/useAppState";
 
 export function PracticeSelect() {
@@ -24,6 +26,12 @@ export function PracticeSelect() {
   const [activeCheckError, setActiveCheckError] = useState<string | null>(null);
   const busy = useRef(false);
   const request = useRef<{ asset: string; key: string } | null>(null);
+  const queryClient = useQueryClient();
+  const activeFetch = useCallback(() => queryClient.fetchQuery({
+    queryKey: queryKeys.activeSession(activeProfileId ?? ""),
+    queryFn: () => getActivePractice(),
+    staleTime: 0,
+  }), [queryClient, activeProfileId]);
   useEffect(() => {
     let cancelled = false;
     if (!activeProfileId) {
@@ -34,14 +42,14 @@ export function PracticeSelect() {
     setActiveSession(null);
     setActiveCheckLoading(true);
     setActiveCheckError(null);
-    getActivePractice()
+    activeFetch()
       .then(session => { if (!cancelled) setActiveSession(session); })
       .catch(reason => {
         if (!cancelled) setActiveCheckError(reason instanceof Error ? reason.message : "Unable to check active practice.");
       })
       .finally(() => { if (!cancelled) setActiveCheckLoading(false); });
     return () => { cancelled = true; };
-  }, [activeProfileId]);
+  }, [activeProfileId, activeFetch]);
   const interactionDisabled = selected || starting || activeCheckLoading || !!activeSession || !!activeCheckError || !activeProfile;
   const start = async (asset: string) => {
     if (busy.current || !activeProfile || activeCheckLoading || activeSession || activeCheckError) return;
@@ -53,7 +61,7 @@ export function PracticeSelect() {
     } catch (reason) {
       if (reason instanceof ApiError && reason.code === "active_session_exists" && reason.activeSessionId) {
         setSelected(false);
-        const existing = await getActivePractice().catch(() => null);
+        const existing = await activeFetch().catch(() => null);
         if (existing) setActiveSession(existing);
         navigate(existing ? sessionDestination(existing).path : `/practice/sessions/${reason.activeSessionId}/analysis`);
         return;
@@ -64,7 +72,7 @@ export function PracticeSelect() {
   };
   const continueActive = async () => {
     try {
-      const fresh = await getActivePractice();
+      const fresh = await activeFetch();
       if (!fresh) { setActiveSession(null); return; }
       setActiveSession(fresh);
       navigate(sessionDestination(fresh).path);

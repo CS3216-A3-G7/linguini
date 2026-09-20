@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import timedelta
 from uuid import uuid5
 
-from sqlalchemy import DateTime, case, delete, func, insert, select, update
+from sqlalchemy import DateTime, and_, case, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as upsert
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -13,7 +13,6 @@ from app.repositories.postgres.media_assets import media_assets
 from app.repositories.postgres.practice import sessions
 from app.repositories.postgres.scene_objects import (
     object_values,
-    parse_object,
     scene_object_relations,
     scene_objects,
 )
@@ -103,6 +102,15 @@ class PostgresWorkflowRepository:
         except SQLAlchemyError as exc:
             raise PracticeStorageError("Unable to save the session workflow.") from exc
 
+    @contextmanager
+    def read_connection(self):
+        """Reads need a consistent snapshot, not the per-user write lock."""
+        try:
+            with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
+                yield c
+        except SQLAlchemyError as exc:
+            raise PracticeStorageError("Unable to read the session workflow.") from exc
+
     def _session(self, c, session_id, profile_id=None):
         query = select(sessions).where(
             sessions.c.id == session_id, sessions.c.user_id == self.user_id
@@ -177,54 +185,86 @@ class PostgresWorkflowRepository:
             if asset.source == "preloaded"
             else None
         )
-        objects = [
-            parse_object(r)
-            for r in c.execute(
-                select(scene_objects)
-                .where(scene_objects.c.session_id == session.id)
-                .order_by(scene_objects.c.id)
-            ).mappings()
-        ]
-        draft = c.execute(
-            select(sessions.c.analysis_draft).where(sessions.c.id == session.id)
-        ).scalar_one_or_none()
-        relations = [
-            SceneObjectRelation.model_validate(dict(row))
-            for row in c.execute(
-                select(scene_object_relations)
-                .join(
-                    scene_objects,
-                    scene_objects.c.id == scene_object_relations.c.subject_scene_object_id,
-                )
-                .where(scene_objects.c.session_id == session.id)
-            ).mappings()
-        ]
-        if draft and session.status in {"created", "analyzingScene", "awaitingObjectReview"}:
+        draft = session.analysis_draft
+        use_draft = bool(draft) and session.status in {
+            "created",
+            "analyzingScene",
+            "awaitingObjectReview",
+        }
+        if use_draft:
             objects = [SceneObject.model_validate(obj) for obj in draft.get("objects", [])]
             relations = [
                 SceneObjectRelation.model_validate(row) for row in draft.get("relations", [])
             ]
-        ids = [o.vocabulary_item_id for o in objects if o.vocabulary_item_id]
-        words = [
-            VocabularyItem.model_validate(dict(r))
-            for r in c.execute(
-                select(vocabulary_items).where(vocabulary_items.c.id.in_(ids))
-            ).mappings()
-        ]
-        source = c.execute(
-            select(language_profiles.c.source_language_code).where(
-                language_profiles.c.id == session.language_profile_id
-            )
-        ).scalar_one()
-        translations = [
-            VocabularyTranslation.model_validate(dict(r))
-            for r in c.execute(
-                select(vocabulary_translations).where(
-                    vocabulary_translations.c.vocabulary_item_id.in_(ids),
-                    func.lower(vocabulary_translations.c.source_language_code) == source.lower(),
+        else:
+            objects = []
+            relations = []
+            seen_objects = set()
+            for row in c.execute(
+                select(
+                    scene_objects,
+                    *[column.label(f"r_{column.name}") for column in scene_object_relations.c],
                 )
-            ).mappings()
-        ]
+                .select_from(
+                    scene_objects.outerjoin(
+                        scene_object_relations,
+                        scene_object_relations.c.subject_scene_object_id == scene_objects.c.id,
+                    )
+                )
+                .where(scene_objects.c.session_id == session.id)
+                .order_by(scene_objects.c.id)
+            ).mappings():
+                if row["id"] not in seen_objects:
+                    seen_objects.add(row["id"])
+                    objects.append(
+                        SceneObject.model_validate({k: row[k] for k in SceneObject.model_fields})
+                    )
+                if row["r_id"] is not None:
+                    relations.append(
+                        SceneObjectRelation.model_validate(
+                            {k: row[f"r_{k}"] for k in SceneObjectRelation.model_fields}
+                        )
+                    )
+        ids = [o.vocabulary_item_id for o in objects if o.vocabulary_item_id]
+        words = []
+        translations = []
+        if ids:
+            source = (
+                select(language_profiles.c.source_language_code)
+                .where(language_profiles.c.id == session.language_profile_id)
+                .scalar_subquery()
+            )
+            seen = set()
+            for row in c.execute(
+                select(
+                    vocabulary_items,
+                    *[column.label(f"t_{column.name}") for column in vocabulary_translations.c],
+                )
+                .select_from(
+                    vocabulary_items.outerjoin(
+                        vocabulary_translations,
+                        and_(
+                            vocabulary_translations.c.vocabulary_item_id == vocabulary_items.c.id,
+                            func.lower(vocabulary_translations.c.source_language_code)
+                            == func.lower(source),
+                        ),
+                    )
+                )
+                .where(vocabulary_items.c.id.in_(ids))
+            ).mappings():
+                if row["id"] not in seen:
+                    seen.add(row["id"])
+                    words.append(
+                        VocabularyItem.model_validate(
+                            {k: row[k] for k in VocabularyItem.model_fields}
+                        )
+                    )
+                if row["t_id"] is not None:
+                    translations.append(
+                        VocabularyTranslation.model_validate(
+                            {k: row[f"t_{k}"] for k in VocabularyTranslation.model_fields}
+                        )
+                    )
         tasks = self._tasks(c, session.id)
         return SessionDetailResponse(
             session=session,
@@ -243,27 +283,53 @@ class PostgresWorkflowRepository:
             ),
         )
 
+    def _active_row(self, c, profile_id):
+        return (
+            c.execute(
+                select(
+                    sessions,
+                    and_(
+                        sessions.c.status.in_(("analyzingScene", "generatingTasks")),
+                        sessions.c.analysis_draft["processingStartedAt"].astext.cast(
+                            DateTime(timezone=True)
+                        )
+                        < utc_now() - ANALYSIS_TIMEOUT,
+                    ).label("is_stale"),
+                )
+                .where(
+                    sessions.c.user_id == self.user_id,
+                    sessions.c.language_profile_id == profile_id,
+                    sessions.c.status.not_in(TERMINAL),
+                )
+                .order_by(sessions.c.started_at.desc().nulls_last(), sessions.c.id)
+            )
+            .mappings()
+            .first()
+        )
+
     def get(self, session_id, profile_id=None):
-        with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
+        with self.read_connection() as c:
             return self._detail(c, self._session(c, session_id, profile_id))
 
     def active(self, profile_id):
         try:
+            with self.read_connection() as c:
+                if (
+                    c.execute(
+                        select(users.c.id).where(users.c.id == self.user_id)
+                    ).scalar_one_or_none()
+                    is None
+                ):
+                    return None
+                row = self._active_row(c, profile_id)
+                if row is None:
+                    return None
+                if not row["is_stale"]:
+                    return self._detail(c, parse_session(row))
+            # Only an expired processing session needs the write path.
             with self.transaction() as c:
                 self._reap(c, profile_id)
-                row = (
-                    c.execute(
-                        select(sessions)
-                        .where(
-                            sessions.c.user_id == self.user_id,
-                            sessions.c.language_profile_id == profile_id,
-                            sessions.c.status.not_in(TERMINAL),
-                        )
-                        .order_by(sessions.c.started_at.desc().nulls_last(), sessions.c.id)
-                    )
-                    .mappings()
-                    .first()
-                )
+                row = self._active_row(c, profile_id)
                 return self._detail(c, parse_session(row)) if row else None
         except PracticeNotFoundError:
             return None
@@ -646,7 +712,7 @@ class PostgresWorkflowRepository:
             return self._transition(c, session, target)
 
     def summary(self, session_id, profile_id):
-        with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
+        with self.read_connection() as c:
             session = self._session(c, session_id, profile_id)
             learned = (
                 c.execute(

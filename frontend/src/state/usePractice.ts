@@ -1,10 +1,13 @@
 import { useCallback, useRef, useState } from "react";
-import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getProgress, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
-import type { PracticeDetail, ProgressResponse, TaskAnswer, TaskActionResult } from "../lib/api";
+import type { PracticeDetail, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
+import { queryKeys } from "../lib/queryKeys";
 
-export function usePractice(_userId: string, profileId: string, updateProgress: (data: ProgressResponse) => void) {
+export function usePractice(_userId: string, profileId: string, onLearningChanged: () => void) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<PracticeDetail | null>(null);
   const [practiceSaving, setSaving] = useState(false);
   const [practiceError, setError] = useState<string | null>(null);
@@ -44,12 +47,11 @@ export function usePractice(_userId: string, profileId: string, updateProgress: 
     try {
       const result = await taskAction(taskId, action, answer ? { ...answer, idempotencyKey: key } : {});
       setSession(value => applyTaskResult(value, session.session.id, result));
-      try { updateProgress(await getProgress()); }
-      catch { setError("Your task was saved. Reload to refresh the progress totals."); }
+      onLearningChanged();
       return result;
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save task. Retry your action."); return null; }
     finally { busy.current = false; setSaving(false); }
-  }, [session, updateProgress]);
+  }, [session, onLearningChanged]);
   const completeSession = useCallback(async () => {
     if (!session || busy.current) return false;
     busy.current = true; setSaving(true); setError(null);
@@ -57,11 +59,12 @@ export function usePractice(_userId: string, profileId: string, updateProgress: 
       await completePractice(session.session.id);
       const completed = await getPractice(session.session.id);
       setSession(value => value?.session.id === completed.session.id ? completed : value);
-      updateProgress(await getProgress());
+      onLearningChanged();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(session.session.id) });
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to complete session."); return false; }
     finally { busy.current = false; setSaving(false); }
-  }, [session, updateProgress]);
+  }, [session, onLearningChanged, queryClient]);
   const saveReview = useCallback(async (review: PracticeReview) => {
     if (!session || busy.current) return false;
     busy.current = true; setSaving(true); setError(null);
