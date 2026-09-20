@@ -1,9 +1,9 @@
 """Shared API and domain enum values."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ProficiencyLevel(str, Enum):
+class ProficiencyLevel(StrEnum):
     A1 = "A1"
     A2 = "A2"
     B1 = "B1"
@@ -12,32 +12,32 @@ class ProficiencyLevel(str, Enum):
     C2 = "C2"
 
 
-class PreferredInputMode(str, Enum):
+class PreferredInputMode(StrEnum):
     SPEECH = "speech"
     TEXT = "text"
     BOTH = "both"
 
 
-class MediaType(str, Enum):
+class MediaType(StrEnum):
     IMAGE = "image"
     AUDIO = "audio"
 
 
-class MediaSource(str, Enum):
+class MediaSource(StrEnum):
     USER_UPLOAD = "userUpload"
     CAMERA = "camera"
     PRELOADED = "preloaded"
     GENERATED = "generated"
 
 
-class SceneObjectSelectionStatus(str, Enum):
+class SceneObjectSelectionStatus(StrEnum):
     SUGGESTED = "suggested"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     CORRECTED = "corrected"
 
 
-class PartOfSpeech(str, Enum):
+class PartOfSpeech(StrEnum):
     NOUN = "noun"
     VERB = "verb"
     ADJECTIVE = "adjective"
@@ -51,27 +51,27 @@ class PartOfSpeech(str, Enum):
     OTHER = "other"
 
 
-class VocabularyLearningStatus(str, Enum):
+class VocabularyLearningStatus(StrEnum):
     NEW = "new"
     LEARNING = "learning"
     FAMILIAR = "familiar"
     MASTERED = "mastered"
 
 
-class VocabularyEncounterType(str, Enum):
+class VocabularyEncounterType(StrEnum):
     INTRODUCED = "introduced"
     PRACTISED = "practised"
     RECALLED = "recalled"
     MASTERED = "mastered"
 
 
-class VocabularyEncounterOutcome(str, Enum):
+class VocabularyEncounterOutcome(StrEnum):
     CORRECT = "correct"
     INCORRECT = "incorrect"
     COMPLETED = "completed"
 
 
-class SessionStatus(str, Enum):
+class SessionStatus(StrEnum):
     CREATED = "created"
     ANALYZING_SCENE = "analyzingScene"
     AWAITING_OBJECT_REVIEW = "awaitingObjectReview"
@@ -82,12 +82,12 @@ class SessionStatus(str, Enum):
     FAILED = "failed"
 
 
-class TaskPhase(str, Enum):
+class TaskPhase(StrEnum):
     LEARNING = "learning"
     ISPY = "ispy"
 
 
-class TaskKind(str, Enum):
+class TaskKind(StrEnum):
     VOCABULARY_INTRODUCTION = "vocabularyIntroduction"
     PRONUNCIATION_PRACTICE = "pronunciationPractice"
     GRAMMAR_EXPLANATION = "grammarExplanation"
@@ -98,38 +98,38 @@ class TaskKind(str, Enum):
     REFLECTION = "reflection"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     PENDING = "pending"
     IN_PROGRESS = "inProgress"
     COMPLETED = "completed"
     SKIPPED = "skipped"
 
 
-class AttemptInputMode(str, Enum):
+class AttemptInputMode(StrEnum):
     SPEECH = "speech"
     TEXT = "text"
     OBJECT_SELECTION = "objectSelection"
     MULTIPLE_CHOICE = "multipleChoice"
 
 
-class ISpyInteractionMode(str, Enum):
+class ISpyInteractionMode(StrEnum):
     SELECT_OBJECT = "selectObject"
     SPEAK_ANSWER = "speakAnswer"
     TYPE_ANSWER = "typeAnswer"
 
 
-class JournalStatus(str, Enum):
+class JournalStatus(StrEnum):
     DRAFT = "draft"
     COMPLETED = "completed"
 
 
-class JournalRevisionCreator(str, Enum):
+class JournalRevisionCreator(StrEnum):
     USER = "user"
     AI = "ai"
     MERGED = "merged"
 
 
-class JournalSuggestionType(str, Enum):
+class JournalSuggestionType(StrEnum):
     GRAMMAR = "grammar"
     SPELLING = "spelling"
     SYNTAX = "syntax"
@@ -137,20 +137,20 @@ class JournalSuggestionType(str, Enum):
     CLARITY = "clarity"
 
 
-class JournalSuggestionStatus(str, Enum):
+class JournalSuggestionStatus(StrEnum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
 
 
-class WordMatchMethod(str, Enum):
+class WordMatchMethod(StrEnum):
     EXACT = "exact"
     INFLECTED = "inflected"
     SEMANTIC = "semantic"
     USER_CONFIRMED = "userConfirmed"
 
 
-class AiFeature(str, Enum):
+class AiFeature(StrEnum):
     SCENE_ANALYSIS = "sceneAnalysis"
     VOCABULARY_GENERATION = "vocabularyGeneration"
     SESSION_PLAN_GENERATION = "sessionPlanGeneration"
@@ -162,7 +162,7 @@ class AiFeature(str, Enum):
     JOURNAL_WORD_MATCHING = "journalWordMatching"
 
 
-class AiRunStatus(str, Enum):
+class AiRunStatus(StrEnum):
     PENDING = "pending"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
