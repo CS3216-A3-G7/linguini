@@ -74,6 +74,22 @@ The frontend template contains:
 | --- | --- |
 | `VITE_API_BASE_URL` | Backend origin, for example `http://127.0.0.1:8000`, without `/api/v1`. |
 
+## Documentation site
+
+This site needs no database and no Supabase credentials. From the repository
+root:
+
+```sh
+python3 -m venv .venv-docs
+.venv-docs/bin/python -m pip install -r docs/requirements.txt
+.venv-docs/bin/mkdocs serve
+```
+
+The site is served at `http://127.0.0.1:8000/linguini/`, with live reload on
+every saved Markdown change. Pass `-a 127.0.0.1:8001` if the backend already
+occupies port 8000. `mkdocs build --strict` produces the static site in `site/`
+and is what CI runs.
+
 ## Without Supabase: throwaway local PostgreSQL
 
 For local migration and backend-test work, a disposable PostgreSQL container is

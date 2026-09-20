@@ -33,8 +33,9 @@ coverage/
 # Local database backups; never commit user data
 .local-backups/
 
-# Generated MkDocs site
+# Generated MkDocs site and its local virtual environment
 site/
+.venv-docs/
 
 # Editor directories and files
 .vscode/*
