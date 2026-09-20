@@ -32,6 +32,7 @@ from app.services.language_profiles import NoActiveLanguageError
 from app.services.learning import InvalidCursorError, ProgressNotFoundError
 from app.services.media_assets import MediaAssetNotFoundError
 from app.services.media_urls import MediaUrlError
+from app.services.scene_analysis import SceneAnalysisError
 from app.services.scenes import SceneNotFoundError
 from app.services.users import UserNotFoundError
 
@@ -86,6 +87,11 @@ def register_learning_errors(app: FastAPI) -> None:
             404,
             "practice_not_found",
             "Session or scene not found for the active language.",
+        ),
+        SceneAnalysisError: (
+            502,
+            "scene_analysis_failed",
+            "Scene analysis failed. Start a new practice session.",
         ),
         PracticeConflictError: (
             409,

@@ -1,16 +1,39 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, ProgressTrail } from "../components/ui";
 import { BookIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { MediaImage } from "../components/MediaImage";
+import { getActivePractice } from "../lib/api";
+import { sessionDestination } from "../lib/sessionRoute";
+import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 
 export function Home() {
   const navigate = useNavigate();
-  const { learner, progress, progressLoading, progressError, scenes,
+  const { learner, activeProfile, progress, progressLoading, progressError,
     vocabulary, vocabularyLoading, vocabularyError } = useAppState();
-  const resume = progress?.scenarios.find((item) => item.status === "in-progress");
-  const resumeScene = scenes.find((scene) => scene.id === resume?.sceneId);
+  const queryClient = useQueryClient();
+  const profileId = activeProfile?.id ?? "";
+  const { data: resume, error: resumeQueryError, isPending: resumeLoading } = useQuery({
+    queryKey: queryKeys.activeSession(profileId),
+    queryFn: () => getActivePractice(),
+  });
+  const resumeError = queryError(resumeQueryError);
+  const [continueError, setContinueError] = useState<string | null>(null);
   const hasSessionToContinue = Boolean(resume);
+  const continuePractice = async () => {
+    setContinueError(null);
+    try {
+      const fresh = await queryClient.fetchQuery({
+        queryKey: queryKeys.activeSession(profileId),
+        queryFn: () => getActivePractice(),
+        staleTime: 0,
+      });
+      if (!fresh) { queryClient.setQueryData(queryKeys.activeSession(profileId), null); return; }
+      navigate(sessionDestination(fresh).path);
+    } catch (reason) { setContinueError(reason instanceof Error ? reason.message : "Unable to load your practice."); }
+  };
 
   return (
     <div className="home stack">
@@ -70,22 +93,23 @@ export function Home() {
 
       <section className="home-plan" aria-labelledby="home-plan-title">
         <h2 id="home-plan-title">Today&apos;s plan</h2>
-        {progressLoading ? <p role="status">Loading your practice...</p> : progressError ? (
-          <p role="alert">{progressError} Reload to retry.</p>
+        {progressLoading || resumeLoading ? <p role="status">Loading your practice...</p> : progressError || resumeError ? (
+          <p role="alert">{progressError ?? resumeError} Reload to retry.</p>
         ) : resume ? (
           <Card className="home-featured">
-            <div className="home-featured__image"><MediaImage assetId={resume.mediaAssetId} title={resume.title} imageUrl={resumeScene?.imageUrl} /></div>
+            <div className="home-featured__image"><MediaImage assetId={resume.session.sceneMediaAssetId} title={resume.title} /></div>
             <div className="home-featured__body">
               <div className="stack-2">
                 <h3>Continue learning</h3>
                 <p>{resume.title}</p>
               </div>
-              <ProgressTrail
-                value={resume.completedTaskCount}
-                total={resume.totalTaskCount}
-                label={`${resume.completedTaskCount} of ${resume.totalTaskCount} tasks complete`}
-              />
-              <Button block onClick={() => navigate(`/practice/sessions/${resume.sessionId}/learn`)}>
+              {resume.progress.totalTaskCount > 0 ? <ProgressTrail
+                value={resume.progress.completedTaskCount}
+                total={resume.progress.totalTaskCount}
+                label={`${resume.progress.completedTaskCount} of ${resume.progress.totalTaskCount} tasks complete`}
+              /> : null}
+              {continueError ? <p role="alert">{continueError}</p> : null}
+              <Button block onClick={() => void continuePractice()}>
                 Continue learning <ChevronRightIcon size={20} />
               </Button>
             </div>

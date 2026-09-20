@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { languages } from "../config/languages";
 import { createLanguageProfile, getCurrentUser, getLanguageProfiles, updateLanguageProfile, updateUser } from "../lib/api";
 import type { LanguageProfilePatch, UserPatch } from "../lib/api";
-import { useApiData } from "../lib/useApiData";
+import { queryError, queryKeys } from "../lib/queryKeys";
 
 async function loadAccount(signal?: AbortSignal) {
   const [user, profiles] = await Promise.all([getCurrentUser(signal), getLanguageProfiles(signal)]);
@@ -10,7 +11,9 @@ async function loadAccount(signal?: AbortSignal) {
 }
 
 export function useAccount() {
-  const { data, setData, loading, error } = useApiData(loadAccount);
+  const queryClient = useQueryClient();
+  const { data, isPending: loading, error: queryErrorValue } = useQuery({ queryKey: queryKeys.account, queryFn: ({ signal }) => loadAccount(signal) });
+  const error = queryError(queryErrorValue);
   const [profileSaving, setSaving] = useState(false);
   const [profileError, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -24,7 +27,7 @@ export function useAccount() {
     setError(null);
     try {
       await action();
-      setData(await loadAccount());
+      await queryClient.invalidateQueries({ queryKey: queryKeys.account });
       return true;
     } catch (reason) {
       setError(`${reason instanceof Error ? reason.message : "Unable to save profile."} Please retry or reload.`);
@@ -33,7 +36,7 @@ export function useAccount() {
       busy.current = false;
       setSaving(false);
     }
-  }, [setData]);
+  }, [queryClient]);
 
   const setLanguage = useCallback((code: string, minutes?: number) => run(async () => {
     const profile = data?.profiles.find((row) => row.targetLanguageCode.toLowerCase() === code && row.sourceLanguageCode === "en");

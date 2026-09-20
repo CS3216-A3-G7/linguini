@@ -127,7 +127,13 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(lambda _: analyze(client, sid, confirm=False), range(4)))
     assert all(not result["tasks"] for result in results)
-    assert all(result["sceneObjects"] == results[0]["sceneObjects"] for result in results)
+    assert all(
+        result["session"]["status"] in {"analyzingScene", "awaitingObjectReview"}
+        for result in results
+    )
+    settled = client.get(f"/api/v1/sessions/{sid}").json()
+    assert settled["session"]["status"] == "awaitingObjectReview"
+    assert settled["sceneObjects"]
     detail = analyze(client, sid)
     assert len(detail["tasks"]) == len(TaskKind)
     assert {t["kind"] for t in detail["tasks"]} == {k.value for k in TaskKind}

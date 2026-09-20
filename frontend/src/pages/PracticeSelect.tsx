@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { CameraIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
@@ -7,10 +7,14 @@ import { ApiError, createPractice, getActivePractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
 import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
+import { sessionDestination } from "../lib/sessionRoute";
+import { queryKeys } from "../lib/queryKeys";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAppState } from "../state/useAppState";
 
 export function PracticeSelect() {
   const navigate = useNavigate();
+  const notice = (useLocation().state as { practiceNotice?: string } | null)?.practiceNotice;
   const { scenes, learner, activeProfile } = useAppState();
   const activeProfileId = activeProfile?.id;
   const [uploading, setUploading] = useState(false);
@@ -22,6 +26,12 @@ export function PracticeSelect() {
   const [activeCheckError, setActiveCheckError] = useState<string | null>(null);
   const busy = useRef(false);
   const request = useRef<{ asset: string; key: string } | null>(null);
+  const queryClient = useQueryClient();
+  const activeFetch = useCallback(() => queryClient.fetchQuery({
+    queryKey: queryKeys.activeSession(activeProfileId ?? ""),
+    queryFn: () => getActivePractice(),
+    staleTime: 0,
+  }), [queryClient, activeProfileId]);
   useEffect(() => {
     let cancelled = false;
     if (!activeProfileId) {
@@ -32,14 +42,14 @@ export function PracticeSelect() {
     setActiveSession(null);
     setActiveCheckLoading(true);
     setActiveCheckError(null);
-    getActivePractice()
+    activeFetch()
       .then(session => { if (!cancelled) setActiveSession(session); })
       .catch(reason => {
         if (!cancelled) setActiveCheckError(reason instanceof Error ? reason.message : "Unable to check active practice.");
       })
       .finally(() => { if (!cancelled) setActiveCheckLoading(false); });
     return () => { cancelled = true; };
-  }, [activeProfileId]);
+  }, [activeProfileId, activeFetch]);
   const interactionDisabled = selected || starting || activeCheckLoading || !!activeSession || !!activeCheckError || !activeProfile;
   const start = async (asset: string) => {
     if (busy.current || !activeProfile || activeCheckLoading || activeSession || activeCheckError) return;
@@ -47,19 +57,30 @@ export function PracticeSelect() {
     if (request.current?.asset !== asset) request.current = { asset, key: crypto.randomUUID() };
     try {
       const detail = await createPractice(activeProfile.id, asset, request.current.key);
-      navigate(`/practice/sessions/${detail.session.id}/analysis`);
+      navigate(sessionDestination(detail).path);
     } catch (reason) {
       if (reason instanceof ApiError && reason.code === "active_session_exists" && reason.activeSessionId) {
         setSelected(false);
-        navigate(`/practice/sessions/${reason.activeSessionId}/analysis`);
+        const existing = await activeFetch().catch(() => null);
+        if (existing) setActiveSession(existing);
+        navigate(existing ? sessionDestination(existing).path : `/practice/sessions/${reason.activeSessionId}/analysis`);
         return;
       }
       setError(reason instanceof Error ? reason.message : "Unable to start practice.");
     }
     finally { busy.current = false; setStarting(false); }
   };
+  const continueActive = async () => {
+    try {
+      const fresh = await activeFetch();
+      if (!fresh) { setActiveSession(null); return; }
+      setActiveSession(fresh);
+      navigate(sessionDestination(fresh).path);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load your practice."); }
+  };
   return <div className="stack practice-select">
     <h1>Capture a scene</h1>
+    {notice ? <p role="alert">{notice}</p> : null}
     <p className="muted">Take a photo of the world around you, or start from a ready scene.</p>
     {activeCheckLoading ? <p role="status">Checking your current practice...</p> : null}
     {activeCheckError ? <p role="alert">{activeCheckError} Reload to check before starting a new practice.</p> : null}
@@ -68,7 +89,7 @@ export function PracticeSelect() {
         <strong>You already have an active practice</strong>
         <p className="small muted">Continue it before starting another session.</p>
       </div>
-      <Button variant="secondary" onClick={() => navigate(`/practice/sessions/${activeSession.session.id}/${["created", "analyzingScene", "awaitingObjectReview"].includes(activeSession.session.status) ? "analysis" : "learn"}`)}>
+      <Button variant="secondary" onClick={() => void continueActive()}>
         Continue practice
       </Button>
     </div> : null}
