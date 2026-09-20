@@ -4,8 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, func, insert, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, func, insert, select
 
 from app.database import create_database_engine
 from app.main import create_app
@@ -18,6 +17,7 @@ from app.repositories.postgres.tasks import session_tasks, task_attempts
 from app.repositories.postgres.users import users
 from app.repositories.postgres.vocabulary import user_vocabulary_progress, vocabulary_encounters
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
+from app.repositories.practice import PracticeConflictError
 from app.schemas.enums import TaskKind
 from app.schemas.media import MediaAsset
 from app.schemas.users import LanguageProfile, User
@@ -249,19 +249,75 @@ def test_task_updates_roll_back_with_encounter_failure(database, monkeypatch):
     assert client.get(f"/api/v1/sessions/{sid}").json()["tasks"][1]["status"] == "pending"
 
 
-def test_active_session_replacement_and_owner_scope(database, monkeypatch):
+def test_active_session_lifecycle_and_owner_scope(database, monkeypatch):
     engine, owner, profile, client = database
-    first = create_run(client, profile)["session"]["id"]
-    replacement = create_run(client, profile, "replacement-key")["session"]["id"]
-    assert client.get(f"/api/v1/sessions/{first}").json()["session"]["status"] == "abandoned"
-    assert client.post(f"/api/v1/sessions/{first}/analyze").status_code == 409
-    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == replacement
-    with pytest.raises(IntegrityError), engine.begin() as c:
-        c.execute(
-            update(sessions).where(sessions.c.id == UUID(replacement)).values(status="completed")
+    scenes = client.get("/api/v1/preloaded-scenes").json()
+    first_asset = scenes[0]["mediaAsset"]["id"]
+    other_asset = scenes[1]["mediaAsset"]["id"]
+
+    def create(asset, key):
+        return client.post(
+            "/api/v1/sessions",
+            json={
+                "languageProfileId": str(profile.id),
+                "mediaAssetId": asset,
+                "idempotencyKey": key,
+            },
         )
+
+    created = create(first_asset, "first-session-key")
+    assert created.status_code == 202, created.text
+    sid = created.json()["session"]["id"]
+    assert created.json()["session"]["status"] == "created"
+    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == sid
+
+    # Creating again for the same image continues the session without touching it.
+    continued = create(first_asset, "continue-session-key")
+    assert continued.status_code == 202, continued.text
+    assert continued.json()["session"]["id"] == sid
+    assert continued.json()["session"]["status"] == "created"
+
+    # A different image conflicts and reports the active session id.
+    conflict = create(other_asset, "conflicting-session-key")
+    assert conflict.status_code == 409, conflict.text
+    detail = conflict.json()["detail"]
+    assert detail["code"] == "active_session_exists"
+    assert detail["activeSessionId"] == sid
+
+    # The state machine rejects edges outside ALLOWED_TRANSITIONS.
+    repository = PostgresWorkflowRepository(engine, owner.id)
+    with repository.transaction() as connection:
+        session = repository._session(connection, UUID(sid))
+        with pytest.raises(PracticeConflictError):
+            repository._transition(connection, session, "completed")
+
+    # created -> analyzingScene -> awaitingObjectReview -> generatingTasks -> inProgress.
+    assert client.post(f"/api/v1/sessions/{sid}/analyze").status_code == 200
+    status = client.get(f"/api/v1/sessions/{sid}").json()["session"]["status"]
+    assert status == "awaitingObjectReview"
+    detail = client.get(f"/api/v1/sessions/{sid}").json()
+    reviewed = client.put(
+        f"/api/v1/sessions/{sid}/review",
+        json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["session"]["status"] == "inProgress"
+    for task in reviewed.json()["tasks"]:
+        assert client.post(f"/api/v1/tasks/{task['id']}/skip", json={}).status_code == 200
+    assert client.post(f"/api/v1/sessions/{sid}/complete").status_code == 200
+    assert client.get(f"/api/v1/sessions/{sid}").json()["session"]["status"] == "completed"
+
+    # A new session is allowed once the previous one is terminal; discard ends it.
+    second = create(other_asset, "second-session-key")
+    assert second.status_code == 202, second.text
+    second_id = second.json()["session"]["id"]
+    assert second_id != sid
+    assert client.post(f"/api/v1/sessions/{second_id}/abandon").status_code == 200
+    assert client.get(f"/api/v1/sessions/{second_id}").json()["session"]["status"] == "abandoned"
+    assert create(first_asset, "third-session-key").status_code == 202
+
     monkeypatch.setenv("DEMO_USER_ID", str(uuid4()))
-    assert client.get(f"/api/v1/sessions/{replacement}").status_code == 404
+    assert client.get(f"/api/v1/sessions/{sid}").status_code == 404
 
 
 def test_all_task_kinds_complete_with_server_evaluation(database):
