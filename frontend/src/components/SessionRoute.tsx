@@ -29,7 +29,7 @@ function SessionLoader({ id }: { id: string }) {
     const initial = await getPractice(id);
     const media = await getMedia(initial.mediaAsset.id);
     if (!signal?.aborted) setPreview(practiceScene(initial, media, learner.language));
-    const loaded = await loadSession(id);
+    const loaded = await loadSession(id, initial);
     setDetail(loaded);
     return practiceScene(loaded, media, learner.language);
   }, [id, loadSession, learner.language]);

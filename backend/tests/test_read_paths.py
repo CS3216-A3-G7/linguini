@@ -81,3 +81,50 @@ def test_session_detail_query_count(database):
     assert loaded.session.status in {"analyzingScene", "awaitingObjectReview"}
     assert loaded.scene_objects and loaded.scene_object_relations
     assert len(statements) <= 5, len(statements)
+
+
+def test_progress_batches_task_counts_and_keeps_latest_scene(database):
+    from sqlalchemy import update
+
+    from app.repositories.postgres.practice import SessionBackedLearningRepository, sessions
+    from app.repositories.postgres.tasks import session_tasks
+    from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
+
+    engine, owner, profile, client = database
+    latest = None
+    for index in range(3):
+        latest = UUID(create_run(client, profile, f"progress-{index}")["session"]["id"])
+        detail = analyze(client, str(latest))
+        task_ids = [UUID(task["id"]) for task in detail["tasks"]]
+        with engine.begin() as connection:
+            connection.execute(
+                update(session_tasks)
+                .where(session_tasks.c.session_id == latest)
+                .values(status="skipped", skipped_at=utc_now())
+            )
+            if index:
+                connection.execute(
+                    update(session_tasks)
+                    .where(session_tasks.c.id.in_(task_ids[:index]))
+                    .values(status="completed", completed_at=utc_now(), skipped_at=None)
+                )
+            connection.execute(
+                update(sessions).where(sessions.c.id == latest).values(
+                    status="completed", started_at=utc_now(), completed_at=utc_now()
+                )
+            )
+
+    repository = SessionBackedLearningRepository(
+        engine, owner.id, PostgresVocabularyRepository(engine)
+    )
+    progress, statements = count_statements(
+        engine, lambda: repository.get_progress(owner.id, "es")
+    )
+    assert len(statements) == 2
+    assert len(progress.scenarios) == 1
+    scene = progress.scenarios[0]
+    assert scene.session_id == latest
+    assert scene.completed_task_count == 2
+    assert scene.total_task_count == len(task_ids)
+    assert scene.status == "completed"
+    assert repository.get_progress(owner.id, "fr").scenarios == []

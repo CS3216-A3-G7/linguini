@@ -18,10 +18,10 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
   const loadVersion = useRef(0);
   const creation = useRef<{ asset: string; key: string } | null>(null);
   const [micReady, setMicReady] = useState(false);
-  const loadSession = useCallback(async (id: string) => {
+  const loadSession = useCallback(async (id: string, initial?: PracticeDetail) => {
     const version = ++loadVersion.current;
     setStalled(false);
-    let data = await getPractice(id);
+    let data = initial?.session.id === id ? initial : await getPractice(id);
     if (data.session.status === "created") {
       try { data = await analyzePractice(id); }
       catch (error) {

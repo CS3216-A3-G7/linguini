@@ -60,9 +60,12 @@ const apiFixtures: Record<string, unknown> = {
   "/api/v1/journals": [],
 };
 
+const requests: string[] = [];
+
 globals.fetch = async (input: unknown) => {
   const url = typeof input === "string" ? input : (input as Request).url;
   const path = url.replace(/^https?:\/\/[^/]+/, "");
+  requests.push(path);
   if (path === `/api/v1/sessions/${SESSION_ID}`) return Response.json(fixture);
   if (path === "/api/v1/media/asset") {
     return Response.json({ id: "asset", signedUrl: "http://test.local/img.jpg", mimeType: "image/jpeg", width: 100, height: 100 });
@@ -176,8 +179,8 @@ async function mount(path: string) {
   await act(async () => {
     root.render(
       h(QueryClientProvider, { client },
-        h(AppStateProvider, null,
-          h(MemoryRouter, { initialEntries: [path] },
+        h(MemoryRouter, { initialEntries: [path] },
+          h(AppStateProvider, null,
             h(Probe),
             h(Routes, null,
               h(Route, { path: "/practice/sessions/:sessionId", element: h(SessionRoute) },
@@ -250,4 +253,35 @@ test("standing on a page is not re-validated when the session advances", async (
   assert.equal(shown(), "page-learn-task");
   await go(`${BASE}/learn`);
   assert.equal(shown(), "page-ispy-1");
+});
+
+
+test("session entry fetches details once and avoids unrelated datasets", async () => {
+  fixture = detail("inProgress", [task("learn", "pending", 0)]);
+  requests.length = 0;
+  await mount(`${BASE}/learn`);
+  assert.equal(shown(), "page-learn");
+  assert.equal(requests.filter(path => path === `/api/v1/sessions/${SESSION_ID}`).length, 1);
+  for (const path of ["/api/v1/me/vocabulary", "/api/v1/me/progress", "/api/v1/journals", "/api/v1/preloaded-scenes"]) {
+    assert.ok(!requests.includes(path), path);
+  }
+});
+
+test("navigation loads only each page's datasets, including direct journal entry", async () => {
+  requests.length = 0;
+  await mount("/profile/edit");
+  assert.deepEqual(requests.sort(), ["/api/v1/me", "/api/v1/me/language-profiles"]);
+  requests.length = 0;
+  await go("/home");
+  assert.deepEqual(requests.sort(), ["/api/v1/me/progress", "/api/v1/me/vocabulary"]);
+  requests.length = 0;
+  await go("/practice");
+  assert.deepEqual(requests, ["/api/v1/preloaded-scenes"]);
+  requests.length = 0;
+  await go("/journal");
+  assert.deepEqual(requests, ["/api/v1/journals"]);
+  requests.length = 0;
+  await mount("/journal/new");
+  assert.ok(requests.includes("/api/v1/me/vocabulary"));
+  assert.ok(!requests.includes("/api/v1/journals"));
 });

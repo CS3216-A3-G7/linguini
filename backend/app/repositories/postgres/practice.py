@@ -85,8 +85,25 @@ class SessionBackedLearningRepository:
                     func.lower(vocabulary_items.c.language_code) == language_code.lower()
                 )
             xp = connection.execute(query).scalar_one() * 5
+            task_counts = (
+                select(
+                    session_tasks.c.session_id,
+                    func.count().label("total_task_count"),
+                    func.count().filter(session_tasks.c.status == "completed").label(
+                        "completed_task_count"
+                    ),
+                )
+                .join(sessions, sessions.c.id == session_tasks.c.session_id)
+                .where(sessions.c.user_id == user_id)
+                .group_by(session_tasks.c.session_id)
+                .subquery()
+            )
             query = (
-                select(sessions, preloaded_scenes.c.slug, preloaded_scenes.c.title)
+                select(
+                    sessions, preloaded_scenes.c.slug, preloaded_scenes.c.title,
+                    task_counts.c.total_task_count, task_counts.c.completed_task_count,
+                )
+                .join(task_counts, task_counts.c.session_id == sessions.c.id)
                 .join(language_profiles, language_profiles.c.id == sessions.c.language_profile_id)
                 .outerjoin(
                     preloaded_scenes,
@@ -104,17 +121,6 @@ class SessionBackedLearningRepository:
                 )
             scenarios = {}
             for row in connection.execute(query).mappings():
-                states = (
-                    connection.execute(
-                        select(session_tasks.c.status).where(
-                            session_tasks.c.session_id == row["id"]
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
-                if not states:
-                    continue
                 scene_id = row["slug"] or str(row["id"])
                 scenarios[scene_id] = ScenarioProgress(
                     scene_id=scene_id,
@@ -122,8 +128,8 @@ class SessionBackedLearningRepository:
                     media_asset_id=row["scene_media_asset_id"],
                     title=row["title"] or "Your uploaded photo",
                     status="completed" if row["status"] == "completed" else "in-progress",
-                    completed_task_count=states.count("completed"),
-                    total_task_count=len(states),
+                    completed_task_count=row["completed_task_count"],
+                    total_task_count=row["total_task_count"],
                     level="Starter",
                 )
             return StoredProgress(
