@@ -143,7 +143,8 @@ def _strictify(node: Any, defs: dict[str, Any]) -> Any:
 
     ref = node.get("$ref")
     if ref is not None:
-        assert isinstance(ref, str) and ref.startswith("#/$defs/"), ref
+        if not isinstance(ref, str) or not ref.startswith("#/$defs/"):
+            raise ValueError(f"unsupported schema reference {ref!r}")
         target = defs[ref.removeprefix("#/$defs/")]
         return _strictify(target, defs)
 

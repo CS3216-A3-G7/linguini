@@ -8,6 +8,7 @@ no database writes.
 from __future__ import annotations
 
 import logging
+from enum import StrEnum
 
 from app.schemas.scene_analysis import SceneAnalysisModelResult
 from app.services.prompts.scene_analysis_v1 import (
@@ -33,7 +34,7 @@ from app.services.vision_model import (
 logger = logging.getLogger(__name__)
 
 
-class SceneAnalysisModelErrorCode:
+class SceneAnalysisModelErrorCode(StrEnum):
     """Stable application error codes for model-backed scene analysis."""
 
     MODEL_OUTPUT_INVALID = "modelOutputInvalid"

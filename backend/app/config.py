@@ -7,6 +7,7 @@ import httpx
 
 from app.services.media_urls import PrivateMediaUrls
 from app.services.vision_model import VisionModelClient, VisionModelConfig
+from app.services.vision_openai import build_vision_client
 
 DEFAULT_DEMO_USER_ID = "11111111-1111-4111-8111-111111111111"
 
@@ -55,8 +56,6 @@ def get_openai_api_key() -> str:
 
 
 def get_vision_model_client(client: httpx.Client | None = None) -> VisionModelClient:
-    from app.services.vision_openai import build_vision_client
-
     return build_vision_client(
         get_vision_provider(),
         get_openai_api_key(),

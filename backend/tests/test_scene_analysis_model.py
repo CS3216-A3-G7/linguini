@@ -3,6 +3,7 @@ import json
 import httpx
 import pytest
 
+from app.schemas.scene_analysis import SceneAnalysisModelResult
 from app.services.prompts.scene_analysis_v1 import (
     SCENE_ANALYSIS_PROMPT_VERSION,
     SCENE_ANALYSIS_SYSTEM_PROMPT,
@@ -115,8 +116,6 @@ def adapter(
 
 
 def request() -> VisionModelRequest:
-    from app.schemas.scene_analysis import SceneAnalysisModelResult
-
     return VisionModelRequest(
         image=image(),
         system_prompt="sys",
