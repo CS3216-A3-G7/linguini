@@ -3894,7 +3894,7 @@
   }
 
   .journal-editor__actions {
-    bottom: var(--space-5);
+    position: static;
     align-items: flex-end;
     padding-block: 0;
     background: none;
