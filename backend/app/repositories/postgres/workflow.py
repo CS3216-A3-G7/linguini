@@ -1,6 +1,7 @@
 """Atomic normalized session workflow. Locks serialize each user's transitions."""
 
 from contextlib import contextmanager
+from datetime import timedelta
 from uuid import uuid5
 
 from sqlalchemy import case, delete, func, insert, select, update
@@ -21,6 +22,7 @@ from app.repositories.postgres.vocabulary import (
     vocabulary_translations,
 )
 from app.repositories.practice import (
+    ActiveSessionExistsError,
     PracticeConflictError,
     PracticeNotFoundError,
     PracticeStorageError,
@@ -45,6 +47,9 @@ from app.services.session_plan import build_objects, build_tasks
 
 TERMINAL = {"completed", "abandoned", "failed"}
 READ_TASKS = {"vocabularyIntroduction", "grammarExplanation", "syntaxExplanation"}
+ANALYSIS_TIMEOUT = timedelta(minutes=15)
+PRE_REVIEW_TIMEOUT = timedelta(hours=24)
+STALE_IN_PROGRESS_TIMEOUT = timedelta(days=7)
 
 
 def task_progress(tasks):
@@ -256,15 +261,26 @@ class PostgresWorkflowRepository:
                     if existing["scene_media_asset_id"] != request.media_asset_id:
                         raise PracticeConflictError("This request key was used for another image.")
                     return self._detail(c, parse_session(existing))
-            c.execute(
-                update(sessions)
-                .where(
-                    sessions.c.user_id == self.user_id,
-                    sessions.c.language_profile_id == request.language_profile_id,
-                    sessions.c.status.not_in(TERMINAL),
+            self._reap(c, request.language_profile_id)
+            existing = (
+                c.execute(
+                    select(sessions).where(
+                        sessions.c.user_id == self.user_id,
+                        sessions.c.language_profile_id == request.language_profile_id,
+                        sessions.c.status.not_in(TERMINAL),
+                    )
                 )
-                .values(status="abandoned", abandoned_at=utc_now())
+                .mappings()
+                .one_or_none()
             )
+            if existing is not None:
+                if existing["scene_media_asset_id"] == request.media_asset_id:
+                    return self._detail(c, parse_session(existing))
+                raise ActiveSessionExistsError(
+                    "You have a practice session in progress. "
+                    "Continue it or discard it before starting a new one.",
+                    active_session_id=existing["id"],
+                )
             session = Session(
                 user_id=self.user_id,
                 language_profile_id=request.language_profile_id,
@@ -276,6 +292,46 @@ class PostgresWorkflowRepository:
                 )
             )
             return self._detail(c, session)
+
+    def _reap(self, c, profile_id):
+        """Expire stale non-terminal sessions so a crashed request cannot block a new run."""
+        scope = [
+            sessions.c.user_id == self.user_id,
+            sessions.c.language_profile_id == profile_id,
+        ]
+        c.execute(
+            update(sessions)
+            .where(
+                *scope,
+                sessions.c.status.in_(["analyzingScene", "generatingTasks"]),
+                sessions.c.updated_at < utc_now() - ANALYSIS_TIMEOUT,
+            )
+            .values(status="failed", failure_code="analysis_timeout", analysis_draft=None)
+        )
+        c.execute(
+            update(sessions)
+            .where(
+                *scope,
+                sessions.c.status.in_(["created", "awaitingObjectReview"]),
+                sessions.c.updated_at < utc_now() - PRE_REVIEW_TIMEOUT,
+            )
+            .values(status="abandoned", abandoned_at=utc_now(), analysis_draft=None)
+        )
+        attempts = (
+            select(task_attempts.c.id)
+            .join(session_tasks, session_tasks.c.id == task_attempts.c.session_task_id)
+            .where(session_tasks.c.session_id == sessions.c.id)
+        )
+        c.execute(
+            update(sessions)
+            .where(
+                *scope,
+                sessions.c.status == "inProgress",
+                sessions.c.updated_at < utc_now() - STALE_IN_PROGRESS_TIMEOUT,
+                ~attempts.exists(),
+            )
+            .values(status="abandoned", abandoned_at=utc_now())
+        )
 
     def analyze(self, session_id, profile_id):
         with self.transaction() as c:

@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { CameraIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
-import { createPractice } from "../lib/api";
+import { ActiveSessionConflict } from "../components/ActiveSessionConflict";
+import { ApiError, createPractice, getActivePractice } from "../lib/api";
 import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
@@ -15,8 +16,16 @@ export function PracticeSelect() {
   const [selected, setSelected] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<string | null>(null);
   const busy = useRef(false);
   const request = useRef<{ asset: string; key: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getActivePractice()
+      .then(detail => { if (!cancelled && detail) setConflict(detail.session.id); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const start = async (asset: string) => {
     if (busy.current || !activeProfile) return;
     busy.current = true; setSelected(true); setStarting(true); setError(null);
@@ -24,8 +33,18 @@ export function PracticeSelect() {
     try {
       const detail = await createPractice(activeProfile.id, asset, request.current.key);
       navigate(`/practice/sessions/${detail.session.id}/analysis`);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to start practice."); }
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.code === "active_session_exists" && reason.activeSessionId) {
+        setConflict(reason.activeSessionId);
+      } else {
+        setError(reason instanceof Error ? reason.message : "Unable to start practice.");
+      }
+    }
     finally { busy.current = false; setStarting(false); }
+  };
+  const discarded = async () => {
+    setConflict(null);
+    if (request.current) await start(request.current.asset);
   };
   return <div className="stack practice-select">
     <h1>Capture a scene</h1>
@@ -36,7 +55,8 @@ export function PracticeSelect() {
         onBusyChange={setUploading} onUploaded={image => void start(image.id)} />
     </div>
     {starting ? <p role="status">Starting analysis...</p> : null}
-    {error ? <div className="stack-2"><p role="alert">{error}</p><Button disabled={starting || uploading} onClick={() => request.current && void start(request.current.asset)}>Retry</Button></div> : null}
+    {conflict ? <ActiveSessionConflict activeSessionId={conflict} onDiscarded={discarded} />
+      : error ? <div className="stack-2"><p role="alert">{error}</p><Button disabled={starting || uploading} onClick={() => request.current && void start(request.current.asset)}>Retry</Button></div> : null}
     {!activeProfile ? <p role="alert">Choose a learning language in Profile to start.</p> : null}
     <h2>Or practise with the below</h2>
     <SceneCatalogStatus />

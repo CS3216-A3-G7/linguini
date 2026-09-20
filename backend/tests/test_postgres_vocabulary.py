@@ -370,6 +370,11 @@ def test_encounter_parent_links_and_counter_rollback(
     elif invalid == "other_session":
         profile = PostgresLanguageProfileRepository(engine).list_for_user(owner.id)[0]
         with TestClient(create_app()) as client:
+            # The open session must be closed before a second session can exist.
+            assert (
+                client.post(f"/api/v1/sessions/{encounter_task.session_id}/abandon").status_code
+                == 200
+            )
             event.session_task_id = create_encounter_task(engine, client, profile).id
     else:
         # A valid progress pair ensures the new owner FK, rather than the old progress FK,
@@ -453,10 +458,16 @@ def test_encounter_links_cascade_deletion(database, encounter_task, parent):
         )
 
         if parent != "user":
-            progress = connection.execute(select(user_vocabulary_progress).where(
-                user_vocabulary_progress.c.user_id == owner.id,
-                user_vocabulary_progress.c.vocabulary_item_id == ids[0],
-            )).mappings().one()
+            progress = (
+                connection.execute(
+                    select(user_vocabulary_progress).where(
+                        user_vocabulary_progress.c.user_id == owner.id,
+                        user_vocabulary_progress.c.vocabulary_item_id == ids[0],
+                    )
+                )
+                .mappings()
+                .one()
+            )
             assert progress["exposure_count"] == progress["correct_attempt_count"] == 0
             assert progress["first_learned_at"] is None
             assert connection.execute(

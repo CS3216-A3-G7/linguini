@@ -1,10 +1,11 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 
 from app.database import create_database_engine
@@ -14,12 +15,14 @@ from app.repositories.postgres.language_profiles import (
 )
 from app.repositories.postgres.media_assets import media_assets
 from app.repositories.postgres.practice import sessions
-from app.repositories.postgres.tasks import session_tasks, task_attempts
+from app.repositories.postgres.tasks import entity_values, session_tasks, task_attempts
 from app.repositories.postgres.users import users
 from app.repositories.postgres.vocabulary import user_vocabulary_progress, vocabulary_encounters
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
+from app.schemas.base import utc_now
 from app.schemas.enums import TaskKind
 from app.schemas.media import MediaAsset
+from app.schemas.tasks import TaskAttempt
 from app.schemas.users import LanguageProfile, User
 
 
@@ -249,12 +252,66 @@ def test_task_updates_roll_back_with_encounter_failure(database, monkeypatch):
     assert client.get(f"/api/v1/sessions/{sid}").json()["tasks"][1]["status"] == "pending"
 
 
+def upload_asset(engine, owner):
+    asset = MediaAsset(
+        owner_user_id=owner.id,
+        source="userUpload",
+        media_type="image",
+        storage_key=f"users/{owner.id}/images/{uuid4()}.jpg",
+        mime_type="image/jpeg",
+    )
+    with engine.begin() as c:
+        c.execute(insert(media_assets).values(**asset.model_dump(by_alias=False)))
+    return asset.id
+
+
+def create_with_asset(client, profile, asset_id, key):
+    return client.post(
+        "/api/v1/sessions",
+        json={
+            "languageProfileId": str(profile.id),
+            "mediaAssetId": str(asset_id),
+            "idempotencyKey": key,
+        },
+    )
+
+
+def age_session(engine, session_id, status, updated_at):
+    # The sessions_updated_at trigger overwrites updated_at on every UPDATE, so
+    # it must be disabled to backdate a row for the timeout rules.
+    with engine.begin() as c:
+        c.execute(text("ALTER TABLE sessions DISABLE TRIGGER sessions_updated_at"))
+        c.execute(
+            update(sessions)
+            .where(sessions.c.id == session_id)
+            .values(status=status, updated_at=updated_at)
+        )
+        c.execute(text("ALTER TABLE sessions ENABLE TRIGGER sessions_updated_at"))
+
+
 def test_active_session_replacement_and_owner_scope(database, monkeypatch):
     engine, owner, profile, client = database
     first = create_run(client, profile)["session"]["id"]
-    replacement = create_run(client, profile, "replacement-key")["session"]["id"]
-    assert client.get(f"/api/v1/sessions/{first}").json()["session"]["status"] == "abandoned"
+    # The same image under a different key continues the open run.
+    continued = create_run(client, profile, "replacement-key")
+    assert continued["session"]["id"] == first
+    assert client.get(f"/api/v1/sessions/{first}").json()["session"]["status"] == "created"
+    # A different image conflicts while a session is still active.
+    asset = upload_asset(engine, owner)
+    conflict = create_with_asset(client, profile, asset, "other-asset-key")
+    assert conflict.status_code == 409
+    detail = conflict.json()["detail"]
+    assert detail["code"] == "active_session_exists"
+    assert detail["activeSessionId"] == first
+    with engine.connect() as c:
+        ids = c.execute(select(sessions.c.id).where(sessions.c.user_id == owner.id)).scalars().all()
+    assert ids == [UUID(first)]
+    # Discarding the open run frees the profile for the new image.
+    assert client.post(f"/api/v1/sessions/{first}/abandon").status_code == 200
     assert client.post(f"/api/v1/sessions/{first}/analyze").status_code == 409
+    created = create_with_asset(client, profile, asset, "other-asset-key-2")
+    assert created.status_code == 202, created.text
+    replacement = created.json()["session"]["id"]
     assert client.get("/api/v1/sessions/active").json()["session"]["id"] == replacement
     with pytest.raises(IntegrityError), engine.begin() as c:
         c.execute(
@@ -262,6 +319,45 @@ def test_active_session_replacement_and_owner_scope(database, monkeypatch):
         )
     monkeypatch.setenv("DEMO_USER_ID", str(uuid4()))
     assert client.get(f"/api/v1/sessions/{replacement}").status_code == 404
+
+
+def test_reap_expires_stale_sessions_but_keeps_real_work(database):
+    engine, owner, profile, client = database
+    # A crashed analysis older than 15 minutes is failed, not blocking.
+    first = create_run(client, profile)["session"]["id"]
+    age_session(engine, UUID(first), "analyzingScene", utc_now() - timedelta(minutes=30))
+    asset = upload_asset(engine, owner)
+    created = create_with_asset(client, profile, asset, "after-analysis-timeout")
+    assert created.status_code == 202, created.text
+    second = created.json()["session"]["id"]
+    assert second != first
+    with engine.connect() as c:
+        old = c.execute(select(sessions).where(sessions.c.id == UUID(first))).mappings().one()
+    assert old["status"] == "failed" and old["failure_code"] == "analysis_timeout"
+    # A pre-review session older than 24 hours is abandoned; no work is lost.
+    age_session(engine, UUID(second), "created", utc_now() - timedelta(hours=25))
+    asset2 = upload_asset(engine, owner)
+    created2 = create_with_asset(client, profile, asset2, "after-stale-created")
+    assert created2.status_code == 202, created2.text
+    third = created2.json()["session"]["id"]
+    with engine.connect() as c:
+        old = c.execute(select(sessions).where(sessions.c.id == UUID(second))).mappings().one()
+    assert old["status"] == "abandoned" and old["abandoned_at"] is not None
+    # An in-progress session with recorded attempts is never reaped.
+    detail = analyze(client, third)
+    attempt = TaskAttempt(
+        session_task_id=UUID(detail["tasks"][0]["id"]),
+        attempt_number=1,
+        input_mode="text",
+        response_payload={"text": "hola"},
+    )
+    with engine.begin() as c:
+        c.execute(insert(task_attempts).values(**entity_values(attempt)))
+    age_session(engine, UUID(third), "inProgress", utc_now() - timedelta(days=8))
+    asset3 = upload_asset(engine, owner)
+    conflict = create_with_asset(client, profile, asset3, "still-blocked")
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["activeSessionId"] == third
 
 
 def test_all_task_kinds_complete_with_server_evaluation(database):

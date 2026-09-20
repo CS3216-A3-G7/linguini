@@ -10,6 +10,7 @@ from app.repositories.language_profiles import (
 from app.repositories.learning import LearningStorageError
 from app.repositories.media_assets import MediaAssetConflictError, MediaAssetStorageError
 from app.repositories.practice import (
+    ActiveSessionExistsError,
     PracticeConflictError,
     PracticeNotFoundError,
     PracticeStorageError,
@@ -87,6 +88,11 @@ def register_learning_errors(app: FastAPI) -> None:
             "practice_conflict",
             "This practice action is not valid for the current session.",
         ),
+        ActiveSessionExistsError: (
+            409,
+            "active_session_exists",
+            "You have a practice session in progress.",
+        ),
         JournalStorageError: (500, "journal_storage_error", "Unable to load or save journal data."),
         JournalNotFoundError: (404, "journal_not_found", "Journal not found."),
         JournalConflictError: (
@@ -127,9 +133,10 @@ def register_learning_errors(app: FastAPI) -> None:
         status, code, message = errors[type(exc)]
         if isinstance(exc, PracticeConflictError):
             message = str(exc)
-        return JSONResponse(
-            status_code=status, content={"detail": {"code": code, "message": message}}
-        )
+        detail = {"code": code, "message": message}
+        if isinstance(exc, ActiveSessionExistsError):
+            detail["activeSessionId"] = str(exc.active_session_id)
+        return JSONResponse(status_code=status, content={"detail": detail})
 
     for error_type in errors:
         app.add_exception_handler(error_type, handle_error)
