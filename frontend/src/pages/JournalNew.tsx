@@ -1,30 +1,32 @@
 import { LoadingScreen } from "../components/LoadingScreen";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button, Feedback } from "../components/ui";
 import { UploadIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
 import { MediaImage } from "../components/MediaImage";
-import { SceneVisual } from "../components/SceneVisual";
-import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
-import { getTodayJournal } from "../lib/api";
+import { getJournalContext } from "../lib/api";
+import type { JournalPhotoOption } from "../lib/api";
 import { useApiData } from "../lib/useApiData";
 import type { JournalEntry } from "../data/types";
 
 export function JournalNew() {
-  const { data, loading, error } = useApiData(getTodayJournal);
-  if (loading) return <LoadingScreen label="Loading today's journal…" />;
+  const { date } = useParams<{ date?: string }>();
+  const load = useCallback((signal?: AbortSignal) => getJournalContext(date, signal), [date]);
+  const { data, loading, error } = useApiData(load);
+  if (loading) return <LoadingScreen label="Loading journal…" />;
   if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
-  return <JournalForm key={data.entry?.id ?? "new"} entry={data.entry} date={data.date} />;
+  return <JournalForm key={data.entry?.id ?? `new-${data.date}`} entry={data.entry} date={data.date} photoOptions={data.photoOptions} />;
 }
 
-export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | null; date: string; onSaved?: (entry: JournalEntry) => void }) {
+export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: JournalEntry | null; date: string; photoOptions: JournalPhotoOption[]; onSaved?: (entry: JournalEntry) => void }) {
   const navigate = useNavigate();
-  const { saveJournalEntry, journalSaving, journalSaveError, scenes, vocabulary, vocabularyError, vocabularyLoading, learner, activeProfile } = useAppState();
+  const { saveJournalEntry, journalSaving, journalSaveError, vocabulary, vocabularyError, vocabularyLoading, learner, activeProfile } = useAppState();
   const sameLanguage = !entry || entry.languageProfileId === activeProfile?.id;
   const journalWordSuggestions = sameLanguage ? [...new Set(vocabulary.map((item) => item.word))] : [];
-  const today = new Date(`${date}T12:00:00`);
+  const shownDate = new Date(`${date}T12:00:00`);
+  const isToday = date === new Date().toLocaleDateString("en-CA");
   const [title, setTitle] = useState(entry?.title ?? "");
   const [body, setBody] = useState(entry?.body ?? "");
   const [photos, setPhotos] = useState(entry?.photos ?? []);
@@ -44,7 +46,7 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
       photoAssetIds: photos.map(photo => photo.mediaAssetId),
       body: body.trim(),
       wordsUsed: selectedWords,
-    }, entry?.id);
+    }, entry?.id, date);
     if (saved) {
       if (onSaved) onSaved(saved);
       else navigate(`/journal/${saved.id}`);
@@ -53,8 +55,8 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
 
   return (
     <div className="stack">
-      <h3 className="center-text">{today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}</h3>
-      <h1>{entry ? "Edit journal entry" : "Today's journal"}</h1>
+      <h3 className="center-text">{shownDate.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}</h3>
+      <h1>{entry ? "Edit journal entry" : isToday ? "Today's journal" : "Journal entry"}</h1>
 
       <div className="field">
         <label className="field__label" htmlFor="entry-title">
@@ -88,19 +90,20 @@ export function JournalForm({ entry, date, onSaved }: { entry: JournalEntry | nu
           <span style={{ color: "var(--teal-dark)" }}><UploadIcon size={40} /></span>
           <p className="small muted">Add a few photos from your day</p>
         </div>}
-        <SceneCatalogStatus />
-        <div className="grid-2 journal-new__scene-grid">
-          {scenes.map((scene) => {
-            const selected = photos.some(photo => photo.mediaAssetId === scene.mediaAssetId);
-            return <button key={scene.id} type="button" disabled={uploading || journalSaving}
-              className={`scene-pick${selected ? " scene-pick--selected" : ""}`} aria-pressed={selected}
-              onClick={() => setPhotos(current => selected
-                ? current.filter(photo => photo.mediaAssetId !== scene.mediaAssetId)
-                : [...current, { mediaAssetId: scene.mediaAssetId, imageUrl: scene.imageUrl, displayOrder: current.length }])}>
-              <SceneVisual scene={scene} />
-            </button>;
-          })}
-        </div>
+        {photoOptions.length ? (
+          <div className="grid-2 journal-new__scene-grid">
+            {photoOptions.map((option) => {
+              const selected = photos.some(photo => photo.mediaAssetId === option.mediaAssetId);
+              return <button key={option.mediaAssetId} type="button" disabled={uploading || journalSaving}
+                className={`scene-pick${selected ? " scene-pick--selected" : ""}`} aria-pressed={selected}
+                onClick={() => setPhotos(current => selected
+                  ? current.filter(photo => photo.mediaAssetId !== option.mediaAssetId)
+                  : [...current, { mediaAssetId: option.mediaAssetId, imageUrl: option.imageUrl, displayOrder: current.length }])}>
+                <MediaImage assetId={option.mediaAssetId} imageUrl={option.imageUrl} title="Photo from your practice session" />
+              </button>;
+            })}
+          </div>
+        ) : <p className="small muted">No photos from completed sessions on this day — add one from your camera or gallery below.</p>}
         <div className="journal-new__upload">
           <ImageUpload cameraEnabled={learner.cameraOn} disabled={journalSaving} onBusyChange={setUploading}
             onUploaded={(image) => setPhotos(current => current.some(photo => photo.mediaAssetId === image.id) ? current
