@@ -1,5 +1,6 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -524,10 +525,19 @@ def test_status_ladder_mastery_and_replay(database, encounter_task):
     assert row["exposure_count"] == 2 and row["correct_attempt_count"] == 1
     assert row["last_practised_at"] == practised.occurred_at
 
+    # An out-of-order write can never move last_practised_at backwards.
+    earlier = practised.model_copy(
+        update={"id": uuid4(), "occurred_at": practised.occurred_at - timedelta(days=1)}
+    )
+    repository.record_encounter(earlier)
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["last_practised_at"] == practised.occurred_at
+    assert row["exposure_count"] == 3
+
     # Replays of the same event id never move counters again.
     assert repository.record_encounter(practised).id == practised.id
     row = progress_row(engine, owner.id, ids[0])
-    assert row["exposure_count"] == 2 and row["correct_attempt_count"] == 1
+    assert row["exposure_count"] == 3 and row["correct_attempt_count"] == 2
     with pytest.raises(VocabularyEncounterConflictError):
         repository.record_encounter(
             practised.model_copy(update={"outcome": VocabularyEncounterOutcome.INCORRECT})
@@ -546,13 +556,13 @@ def test_status_ladder_mastery_and_replay(database, encounter_task):
     assert row["status"] == "mastered" and row["mastery_score"] == 1
 
     # Journal evidence is not an encounter and never counts as exposure.
-    assert row["exposure_count"] == 2 and row["correct_attempt_count"] == 1
+    assert row["exposure_count"] == 3 and row["correct_attempt_count"] == 2
 
     # A later practice encounter cannot downgrade mastered, and nothing emits familiar.
     repository.record_encounter(encounter(ids[0], "practised", "incorrect"))
     row = progress_row(engine, owner.id, ids[0])
     assert row["status"] == "mastered" and row["mastery_score"] == 1
-    assert row["exposure_count"] == 3
+    assert row["exposure_count"] == 4
     with engine.connect() as connection:
         statuses = (
             connection.execute(

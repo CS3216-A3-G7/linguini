@@ -202,7 +202,7 @@ class JournalService:
                 )
 
     def _record_usage(self, journal: Journal, user_id: UUID) -> None:
-        if self.vocabulary is not None and journal.selected_words:
+        if self.vocabulary is not None:
             self.vocabulary.record_journal_usage(
                 user_id=user_id,
                 language_profile_id=journal.language_profile_id,

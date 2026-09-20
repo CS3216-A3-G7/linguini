@@ -757,7 +757,10 @@ class PostgresWorkflowRepository:
                 xp_earned=c.execute(
                     select(func.coalesce(func.sum(xp_events.c.amount), 0))
                     .select_from(xp_events)
-                    .where(xp_events.c.session_id == session.id)
+                    .where(
+                        xp_events.c.session_id == session.id,
+                        xp_events.c.user_id == self.user_id,
+                    )
                 ).scalar_one(),
                 **self._ispy_summary(c, session.id),
             )

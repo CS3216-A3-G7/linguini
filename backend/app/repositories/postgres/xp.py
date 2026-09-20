@@ -3,22 +3,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import (
-    Column,
-    DateTime,
-    ForeignKey,
-    Integer,
-    MetaData,
-    String,
-    Table,
-    Text,
-    Uuid,
-)
+from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Text, Uuid
 from sqlalchemy.dialects.postgresql import insert
 
-from app.repositories.postgres.language_profiles import language_profiles
-from app.repositories.postgres.practice import sessions
-from app.repositories.postgres.users import users
 from app.schemas.base import utc_now
 from app.schemas.enums import XpEventType
 from app.schemas.progress import XpEvent
@@ -29,22 +16,9 @@ xp_events = Table(
     "xp_events",
     metadata,
     Column("id", Uuid, primary_key=True),
-    Column(
-        "user_id",
-        Uuid,
-        ForeignKey("public.users.id", ondelete="CASCADE", onupdate="CASCADE"),
-        nullable=False,
-    ),
-    Column(
-        "language_profile_id",
-        Uuid,
-        ForeignKey("public.language_profiles.id", ondelete="CASCADE", onupdate="CASCADE"),
-    ),
-    Column(
-        "session_id",
-        Uuid,
-        ForeignKey("public.sessions.id", ondelete="SET NULL", onupdate="CASCADE"),
-    ),
+    Column("user_id", Uuid, nullable=False),
+    Column("language_profile_id", Uuid),
+    Column("session_id", Uuid),
     Column("event_type", String(20), nullable=False),
     Column("amount", Integer, nullable=False),
     Column("idempotency_key", Text, nullable=False),
@@ -90,6 +64,3 @@ def award(
         .returning(xp_events.c.id)
     ).scalar_one_or_none()
     return event.amount if inserted else 0
-
-
-__all__ = ["award", "language_profiles", "sessions", "users", "xp_events"]

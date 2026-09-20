@@ -189,7 +189,9 @@ def record_vocabulary_evidence(
     if occurred_at is not None and (
         encounter is None or encounter.encounter_type.value != "introduced"
     ):
-        values["last_practised_at"] = occurred_at
+        values["last_practised_at"] = func.greatest(
+            user_vocabulary_progress.c.last_practised_at, occurred_at
+        )
     if values:
         connection.execute(
             update(user_vocabulary_progress)
