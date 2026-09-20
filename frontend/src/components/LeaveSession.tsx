@@ -1,17 +1,30 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui";
+import { CloseIcon } from "./icons";
 import { abandonPractice } from "../lib/api";
 
 export function LeaveSession({ sessionId, warning }: { sessionId: string; warning: string }) {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!expanded) {
-    return <Button variant="quiet" onClick={() => setExpanded(true)}>Leave this session</Button>;
-  }
+  const titleId = useId();
+  const dialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!asking) return;
+    dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !leaving) setAsking(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [asking, leaving]);
+
+  // Stays disabled after a successful abandon so a queued click cannot reach the picker.
   const leave = async () => {
+    if (leaving) return;
     setLeaving(true);
     setError(null);
     try {
@@ -22,16 +35,52 @@ export function LeaveSession({ sessionId, warning }: { sessionId: string; warnin
       setLeaving(false);
     }
   };
+
   return (
-    <div className="stack-2">
-      <p role="status">{warning}</p>
-      {error ? <p role="alert">{error}</p> : null}
-      <Button variant="secondary" disabled={leaving} onClick={() => void leave()}>
-        Leave and start over
-      </Button>
-      <Button variant="quiet" disabled={leaving} onClick={() => setExpanded(false)}>
-        Keep this session
-      </Button>
-    </div>
+    <>
+      <button
+        type="button"
+        className="leave-session__trigger"
+        aria-haspopup="dialog"
+        aria-expanded={asking}
+        onClick={() => setAsking(true)}
+      >
+        <CloseIcon size={16} />
+        <span>Leave</span>
+      </button>
+      {asking ? (
+        <div
+          className="help-modal__backdrop"
+          onMouseDown={() => {
+            if (!leaving) setAsking(false);
+          }}
+        >
+          <section
+            ref={dialogRef}
+            className="help-modal leave-session__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id={titleId}>Leave this session?</h2>
+            <p>{warning}</p>
+            {error ? (
+              <p className="leave-session__error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className="leave-session__actions">
+              <Button variant="secondary" block disabled={leaving} onClick={() => void leave()}>
+                {leaving ? "Leaving..." : "Leave and start over"}
+              </Button>
+              <Button variant="quiet" block disabled={leaving} onClick={() => setAsking(false)}>
+                Keep practising
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -410,8 +410,68 @@
 }
 
 /* Scene analysis */
-.analysis-page > h1 {
-  margin-bottom: var(--space-1);
+.analysis-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.analysis-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.analysis-stage-column,
+.analysis-review-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.analysis-restore {
+  display: flex;
+  padding-top: var(--space-2);
+}
+
+.leave-session__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.leave-session__trigger:hover {
+  background: var(--cream);
+  color: var(--ink);
+}
+
+.leave-session__dialog h2 {
+  margin-bottom: var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-heading);
+}
+
+.leave-session__error {
+  margin-bottom: var(--space-4);
+  color: var(--danger);
+}
+
+.leave-session__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .analysis-loading {
@@ -2932,5 +2992,42 @@
   .journal-list-entry .thumb--lg {
     width: 112px;
     height: 88px;
+  }
+
+  .shell--focus > .shell__content--desktop-wide {
+    max-width: 1080px;
+  }
+
+  .analysis-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
+    align-items: start;
+    column-gap: var(--space-8);
+  }
+
+  .analysis-stage-column {
+    position: sticky;
+    top: var(--space-5);
+  }
+
+  .analysis-word-list {
+    max-height: min(36vh, 300px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+
+  .analysis-word-list::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .analysis-word-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .analysis-word-list::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: var(--radius-pill);
   }
 }

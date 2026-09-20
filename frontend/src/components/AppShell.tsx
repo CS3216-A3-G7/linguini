@@ -43,11 +43,15 @@ export function AppShell() {
 /** Full-bleed shell for focused flows (onboarding, practice steps, I-Spy). */
 export function FocusShell() {
   const { pathname } = useLocation();
+  const usesWideCanvas = pathname.endsWith("/analysis");
 
   return (
     <div className="shell shell--focus">
       <BrandBar back={pathname !== "/"} />
-      <main className="shell__content" style={{ paddingBottom: "var(--space-8)" }}>
+      <main
+        className={`shell__content${usesWideCanvas ? " shell__content--desktop-wide" : ""}`}
+        style={{ paddingBottom: "var(--space-8)" }}
+      >
         <Outlet />
       </main>
     </div>
