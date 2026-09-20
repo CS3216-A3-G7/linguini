@@ -211,15 +211,21 @@ export async function getJournals(signal?: AbortSignal): Promise<JournalEntry[]>
 export async function getJournal(id: string, signal?: AbortSignal): Promise<JournalEntry> {
   return journalEntry(await request<JournalDetail>(`/api/v1/journals/${id}`, signal));
 }
-export async function getTodayJournal(signal?: AbortSignal) {
-  const context = await request<{ localDate: string; journal: JournalRecord | null }>("/api/v1/journal/today/context", signal);
-  return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null };
+export interface JournalPhotoOption {
+  mediaAssetId: string;
+  imageUrl: string | null;
+  sessionId: string;
+  completedAt: string;
+}
+export async function getJournalContext(date?: string, signal?: AbortSignal) {
+  const context = await request<{ localDate: string; journal: JournalRecord | null; eligiblePhotos: JournalPhotoOption[] }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
+  return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null, photoOptions: context.eligiblePhotos };
 }
 export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed"> & { photoAssetIds?: string[] };
-export async function saveJournal(draft: JournalDraft, profileId: string, id?: string) {
+export async function saveJournal(draft: JournalDraft, profileId: string, id?: string, date?: string) {
   const body = { title: draft.title, ...(draft.photoAssetIds === undefined ? { mediaAssetId: draft.mediaAssetId } : {}), content: draft.body, selectedWords: draft.wordsUsed };
   const row = id ? await write<JournalRecord>(`/api/v1/journals/${id}`, "PATCH", body)
-    : await write<JournalRecord>("/api/v1/journal/today", "PUT", { ...body, languageProfileId: profileId });
+    : await write<JournalRecord>(`/api/v1/journal/${date ?? "today"}`, "PUT", { ...body, languageProfileId: profileId });
   if (draft.photoAssetIds !== undefined) {
     const desired = [...new Set(draft.photoAssetIds)];
     const current = await getJournal(row.id);

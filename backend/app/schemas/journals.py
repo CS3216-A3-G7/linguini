@@ -17,7 +17,6 @@ from app.schemas.enums import (
     JournalSuggestionType,
     WordMatchMethod,
 )
-from app.schemas.media import MediaAsset
 from app.schemas.vocabulary import DailyVocabularyItem
 
 
@@ -135,10 +134,17 @@ class CompleteJournalRequest(ApiModel):
     current_revision_id: UUID
 
 
+class JournalPhotoOption(ApiModel):
+    media_asset_id: UUID
+    image_url: str | None = None
+    session_id: UUID
+    completed_at: AwareDatetime
+
+
 class JournalTodayContextResponse(ApiModel):
     local_date: date
     journal: Journal | None = None
-    eligible_photos: list[MediaAsset] = Field(default_factory=list)
+    eligible_photos: list[JournalPhotoOption] = Field(default_factory=list)
     learned_words: list[DailyVocabularyItem] = Field(default_factory=list)
     can_create: bool
 

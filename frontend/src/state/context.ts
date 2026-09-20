@@ -26,7 +26,7 @@ export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof u
   journalError: string | null;
   journalSaving: boolean;
   journalSaveError: string | null;
-  saveJournalEntry: (draft: JournalDraft, id?: string) => Promise<JournalEntry | null>;
+  saveJournalEntry: (draft: JournalDraft, id?: string, date?: string) => Promise<JournalEntry | null>;
 };
 
 export const AppStateContext = createContext<AppState | null>(null);

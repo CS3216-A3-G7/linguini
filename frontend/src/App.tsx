@@ -47,6 +47,7 @@ export default function App() {
         <Route path="/vocabulary" element={<Vocabulary />} />
         <Route path="/journal" element={<Journal />} />
         <Route path="/journal/new" element={<JournalNew />} />
+        <Route path="/journal/new/:date" element={<JournalNew />} />
         <Route path="/journal/:entryId" element={<JournalEntryPage />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />

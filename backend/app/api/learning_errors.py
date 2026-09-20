@@ -23,7 +23,11 @@ from app.repositories.scenes import SceneStorageError
 from app.repositories.tasks import TaskConflictError, TaskNotFoundError, TaskStorageError
 from app.repositories.users import UserRepositoryError
 from app.services.image_storage import InvalidImageUpload, UploadObjectMissing
-from app.services.journals import JournalConflictError, JournalNotFoundError
+from app.services.journals import (
+    FutureJournalDateError,
+    JournalConflictError,
+    JournalNotFoundError,
+)
 from app.services.language_profiles import NoActiveLanguageError
 from app.services.learning import InvalidCursorError, ProgressNotFoundError
 from app.services.media_assets import MediaAssetNotFoundError
@@ -95,6 +99,11 @@ def register_learning_errors(app: FastAPI) -> None:
         ),
         JournalStorageError: (500, "journal_storage_error", "Unable to load or save journal data."),
         JournalNotFoundError: (404, "journal_not_found", "Journal not found."),
+        FutureJournalDateError: (
+            409,
+            "journal_future_date",
+            "Cannot create a journal entry for a future date.",
+        ),
         JournalConflictError: (
             409,
             "journal_conflict",

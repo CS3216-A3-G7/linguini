@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -39,6 +40,20 @@ def get_today_journal_context(service: JournalServiceDep) -> JournalTodayContext
 @router.put("/journal/today", response_model=Journal)
 def upsert_today_journal(request: UpsertTodayJournalRequest, service: JournalServiceDep) -> Journal:
     return service.upsert_today(request)
+
+
+@router.get("/journal/{local_date}/context", response_model=JournalTodayContextResponse)
+def get_journal_day_context(
+    local_date: date, service: JournalServiceDep
+) -> JournalTodayContextResponse:
+    return service.day_context(local_date)
+
+
+@router.put("/journal/{local_date}", response_model=Journal)
+def upsert_journal_day(
+    local_date: date, request: UpsertTodayJournalRequest, service: JournalServiceDep
+) -> Journal:
+    return service.upsert(request, local_date)
 
 
 @router.get("/journals/{journal_id}", response_model=JournalDetailResponse)
