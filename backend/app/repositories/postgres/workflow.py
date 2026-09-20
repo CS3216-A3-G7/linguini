@@ -82,6 +82,22 @@ def parse_session(row):
     return Session.model_validate({k: row[k] for k in Session.model_fields})
 
 
+PROCESSING_STATUSES = ("analyzingScene", "generatingTasks")
+PROCESSING_FAILURE_CODES = {
+    "analyzingScene": "sceneAnalysisFailed",
+    "generatingTasks": "taskGenerationFailed",
+}
+
+
+def _stale_processing(status=None):
+    """The one staleness predicate shared by the read check, `_active_row` and `_reap`."""
+    return and_(
+        sessions.c.status == status if status else sessions.c.status.in_(PROCESSING_STATUSES),
+        sessions.c.analysis_draft["processingStartedAt"].astext.cast(DateTime(timezone=True))
+        < utc_now() - ANALYSIS_TIMEOUT,
+    )
+
+
 class PostgresWorkflowRepository:
     def __init__(self, engine, user_id, analyzer=None):
         self.engine, self.user_id = engine, user_id
@@ -288,13 +304,7 @@ class PostgresWorkflowRepository:
             c.execute(
                 select(
                     sessions,
-                    and_(
-                        sessions.c.status.in_(("analyzingScene", "generatingTasks")),
-                        sessions.c.analysis_draft["processingStartedAt"].astext.cast(
-                            DateTime(timezone=True)
-                        )
-                        < utc_now() - ANALYSIS_TIMEOUT,
-                    ).label("is_stale"),
+                    _stale_processing().label("is_stale"),
                 )
                 .where(
                     sessions.c.user_id == self.user_id,
@@ -309,6 +319,21 @@ class PostgresWorkflowRepository:
 
     def get(self, session_id, profile_id=None):
         with self.read_connection() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.status not in PROCESSING_STATUSES:
+                return self._detail(c, session)
+            stale = c.execute(
+                select(_stale_processing()).select_from(sessions).where(sessions.c.id == session.id)
+            ).scalar_one()
+            if not stale:
+                return self._detail(c, session)
+        # Only an expired processing session needs the write path.
+        with self.transaction() as c:
+            self._expire_stale(
+                c,
+                sessions.c.id == session_id,
+                sessions.c.user_id == self.user_id,
+            )
             return self._detail(c, self._session(c, session_id, profile_id))
 
     def active(self, profile_id):
@@ -424,28 +449,22 @@ class PostgresWorkflowRepository:
             c.execute(insert(sessions).values(**session.model_dump(by_alias=False)))
             return self._detail(c, session)
 
-    def _reap(self, c, profile_id):
-        """Expire stale non-terminal sessions so a crashed request cannot block a new run."""
-        scope = [
-            sessions.c.user_id == self.user_id,
-            sessions.c.language_profile_id == profile_id,
-        ]
-        for status, failure_code in (
-            ("analyzingScene", "sceneAnalysisFailed"),
-            ("generatingTasks", "taskGenerationFailed"),
-        ):
+    def _expire_stale(self, c, *scope):
+        """Fail stale processing sessions inside `scope` with their status's code."""
+        for status, failure_code in PROCESSING_FAILURE_CODES.items():
             c.execute(
                 update(sessions)
-                .where(
-                    *scope,
-                    sessions.c.status == status,
-                    sessions.c.analysis_draft["processingStartedAt"].astext.cast(
-                        DateTime(timezone=True)
-                    )
-                    < utc_now() - ANALYSIS_TIMEOUT,
-                )
+                .where(*scope, _stale_processing(status))
                 .values(status="failed", failure_code=failure_code)
             )
+
+    def _reap(self, c, profile_id):
+        """Expire stale non-terminal sessions so a crashed request cannot block a new run."""
+        self._expire_stale(
+            c,
+            sessions.c.user_id == self.user_id,
+            sessions.c.language_profile_id == profile_id,
+        )
 
     def analyze(self, session_id, profile_id):
         with self.transaction() as c:

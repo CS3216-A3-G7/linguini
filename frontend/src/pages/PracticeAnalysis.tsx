@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
 import { ArrowRightIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
@@ -7,13 +7,14 @@ import { LeaveSession } from "../components/LeaveSession";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { checkPracticeWord } from "../lib/api";
+import { sessionDestination } from "../lib/sessionRoute";
 import type { PracticeReview } from "../lib/api";
 import type { LanguageItem } from "../data/types";
 
 export function PracticeAnalysis() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, saveReview, practiceSaving, practiceError } = useAppState();
+  const { session, saveReview, practiceSaving, practiceError, practiceStalled, loadSession } = useAppState();
   const [removed, setRemoved] = useState<string[]>([]);
   const [added, setAdded] = useState<PracticeReview["addedObjects"]>([]);
   const [relations, setRelations] = useState<PracticeReview["relations"]>(() => session?.sceneObjectRelations ?? []);
@@ -27,12 +28,18 @@ export function PracticeAnalysis() {
   const photoRef = useRef<HTMLDivElement>(null);
   const base = `/practice/sessions/${scene.sessionId}`;
   if (!session) return null;
+  if (["completed", "failed", "abandoned"].includes(session.session.status)) {
+    const dest = sessionDestination(session);
+    return <Navigate to={dest.path} replace state={dest.notice ? { practiceNotice: dest.notice } : undefined} />;
+  }
   if (["created", "analyzingScene", "generatingTasks"].includes(session.session.status)) return <div className="stack analysis-page">
     <h1>Scene analysis</h1>
-    <section className="analysis-loading" aria-live="polite" aria-busy="true">
+    {practiceStalled ? <section className="analysis-loading" aria-live="polite">
+      <div className="analysis-loading__copy"><h2>Still working on your scene...</h2><p className="muted">This is taking longer than usual. You can check again.</p><Button onClick={() => loadSession(session.session.id)}>Retry</Button></div>
+    </section> : <section className="analysis-loading" aria-live="polite" aria-busy="true">
       <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={scene} items={[]} /><span className="analysis-scan__line" /></div>
       <div className="analysis-loading__copy"><h2>{session.session.status === "generatingTasks" ? "Preparing your practice..." : "Finding objects in your image..."}</h2><p className="muted">This will only take a moment.</p></div>
-    </section>
+    </section>}
   </div>;
   const locked = session.tasks.some(task => task.status !== "pending");
   const kept = scene.items.filter(item => !removed.includes(item.id));

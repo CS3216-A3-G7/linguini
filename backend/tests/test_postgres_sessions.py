@@ -380,6 +380,28 @@ def test_active_lookup_reaps_expired_analysis(database):
     assert row["status"] == "failed" and row["failure_code"] == "sceneAnalysisFailed"
 
 
+def test_get_session_reaps_stale_processing(database):
+    engine, _, profile, client = database
+    # A session stuck past the timeout fails on its own detail read.
+    sid = create_run(client, profile)["session"]["id"]
+    age_session(engine, UUID(sid), "analyzingScene", utc_now() - timedelta(minutes=30))
+    detail = client.get(f"/api/v1/sessions/{sid}").json()
+    assert detail["session"]["status"] == "failed"
+    assert detail["session"]["failureCode"] == "sceneAnalysisFailed"
+    again = client.get(f"/api/v1/sessions/{sid}").json()
+    assert again["session"]["status"] == "failed"
+    assert again["session"]["failureCode"] == "sceneAnalysisFailed"
+    second = create_run(client, profile, "generating-key")["session"]["id"]
+    age_session(engine, UUID(second), "generatingTasks", utc_now() - timedelta(minutes=30))
+    detail = client.get(f"/api/v1/sessions/{second}").json()
+    assert detail["session"]["status"] == "failed"
+    assert detail["session"]["failureCode"] == "taskGenerationFailed"
+    # A fresh processing session is returned untouched.
+    third = create_run(client, profile, "fresh-key")["session"]["id"]
+    age_session(engine, UUID(third), "analyzingScene", utc_now())
+    assert client.get(f"/api/v1/sessions/{third}").json()["session"]["status"] == "analyzingScene"
+
+
 def test_all_task_kinds_complete_with_server_evaluation(database):
     engine, owner, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
