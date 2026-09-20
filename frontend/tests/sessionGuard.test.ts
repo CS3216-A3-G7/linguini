@@ -86,28 +86,39 @@ writeFileSync(entryPath, [
   `export { AppStateProvider } from "${join(here, "../src/state/AppState")}";`,
   `export { useAppState } from "${join(here, "../src/state/useAppState")}";`,
 ].join("\n"));
-const bundler = await rolldown({
-  input: entryPath,
-  platform: "node",
-  resolve: { extensions: [".tsx", ".ts", ".js"] },
-  plugins: [{
-    name: "api-base-url",
-    transform: (code: string) => code.replaceAll("import.meta.env.VITE_API_BASE_URL", '"http://test.local"'),
-  }, {
-    name: "stub-css",
-    resolveId: (id: string) => (id.endsWith(".css") ? "\0empty-css" : null),
-    load: (id: string) => (id === "\0empty-css" ? "export default {};" : null),
-  }],
-});
-const { output } = await bundler.generate({ format: "esm" });
-await bundler.close();
-rmSync(entryPath);
+let bundleCode: string;
+try {
+  const bundler = await rolldown({
+    input: entryPath,
+    platform: "node",
+    resolve: { extensions: [".tsx", ".ts", ".js"] },
+    plugins: [{
+      name: "api-base-url",
+      transform: (code: string) => code.replaceAll("import.meta.env.VITE_API_BASE_URL", '"http://test.local"'),
+    }, {
+      name: "stub-css",
+      resolveId: (id: string) => (id.endsWith(".css") ? "\0empty-css" : null),
+      load: (id: string) => (id === "\0empty-css" ? "export default {};" : null),
+    }],
+  });
+  const { output } = await bundler.generate({ format: "esm" });
+  await bundler.close();
+  bundleCode = output[0].code;
+} finally {
+  rmSync(entryPath, { force: true });
+}
 const bundlePath = join(workdir, "bundle.mjs");
-writeFileSync(bundlePath, output[0].code);
+writeFileSync(bundlePath, bundleCode);
+let bundled: unknown;
+try {
+  bundled = await import(pathToFileURL(bundlePath).href);
+} finally {
+  rmSync(workdir, { recursive: true, force: true });
+}
 const {
   h, act, createRoot, MemoryRouter, Route, Routes, useNavigate,
   QueryClient, QueryClientProvider, SessionRoute, AppStateProvider, useAppState,
-} = (await import(pathToFileURL(bundlePath).href)) as Record<string, never> as {
+} = bundled as Record<string, never> as {
   h: typeof import("react").createElement;
   act: typeof import("react").act;
   createRoot: typeof import("react-dom/client").createRoot;
