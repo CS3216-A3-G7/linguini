@@ -16,6 +16,16 @@ maximum, so `(min,max)` notation maps directly onto the symbols:
 | `}|` | one or more | `(1,n)` |
 | `o{` | zero or more | `(0,n)` |
 
+The same legend as Mermaid draws it, each pair using one symbol on both ends:
+
+```mermaid
+erDiagram
+    exactly_one_A ||--|| exactly_one_B : "(1,1)"
+    zero_or_one_A |o--o| zero_or_one_B : "(0,1)"
+    one_or_more_A }|--|{ one_or_more_B : "(1,n)"
+    zero_or_more_A }o--o{ zero_or_more_B : "(0,n)"
+```
+
 So `users ||--o{ language_profiles` reads: a language profile belongs to exactly
 one user `(1,1)`, and a user has zero or more language profiles `(0,n)`. A
 nullable foreign key produces `|o` on the child side, for example
