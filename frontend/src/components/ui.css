@@ -3896,6 +3896,8 @@
   .journal-editor__actions {
     bottom: var(--space-5);
     align-items: flex-end;
+    padding-block: 0;
+    background: none;
   }
 
   .journal-editor__save {
