@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { BookIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, HomeIcon, JournalIcon, PersonIcon } from "./icons";
+import { BookIcon, CameraIcon, ChevronLeftIcon, HomeIcon, JournalIcon, PersonIcon } from "./icons";
 import { BrandBar } from "./ui";
 import { BackActionProvider, useRegisteredBackAction } from "./BackAction";
 
@@ -38,15 +38,6 @@ export function AppShell() {
         <Outlet />
       </main>
       <nav className="bottom-nav" aria-label="Main">
-        <button
-          type="button"
-          className="bottom-nav__toggle"
-          aria-expanded={!navCollapsed}
-          aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
-          onClick={toggleNav}
-        >
-          {navCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-        </button>
         {items.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
@@ -57,6 +48,16 @@ export function AppShell() {
             <span>{label}</span>
           </NavLink>
         ))}
+        <button
+          type="button"
+          className="bottom-nav__toggle"
+          aria-expanded={!navCollapsed}
+          aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+          onClick={toggleNav}
+        >
+          <ChevronLeftIcon />
+          <span>Collapse</span>
+        </button>
       </nav>
     </div>
   );

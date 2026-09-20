@@ -865,10 +865,11 @@
     flex-direction: column;
     justify-content: flex-start;
     gap: var(--space-2);
-    padding: var(--space-8) var(--space-4);
+    padding: var(--space-10) var(--space-4);
     border-top: 0;
     border-right: 1px solid rgba(222, 215, 200, 0.7);
     background: transparent;
+    transition: width 200ms ease-out, padding 200ms ease-out;
   }
 
   .shell--app .bottom-nav__item {
@@ -881,10 +882,15 @@
     gap: var(--space-3);
     padding-inline: var(--space-4);
     font-size: var(--text-small);
+    white-space: nowrap;
   }
 
   .shell--app .bottom-nav__item:hover {
     background: var(--cream);
+  }
+
+  .shell--app .bottom-nav__item.is-active {
+    background: rgba(232, 93, 50, 0.1);
   }
 
   .shell--app {
@@ -897,38 +903,63 @@
 
   .shell--nav-collapsed > .bottom-nav {
     width: 76px;
-    padding-inline: var(--space-2);
   }
 
   .shell--nav-collapsed .bottom-nav__item {
-    justify-content: center;
-    padding-inline: 0;
+    position: relative;
+    width: 44px;
+    justify-content: flex-start;
   }
 
-  .shell--nav-collapsed .bottom-nav__item > span {
+  .shell--nav-collapsed .bottom-nav__item > svg {
+    flex: none;
+  }
+
+  .shell--nav-collapsed .bottom-nav__item > span,
+  .shell--nav-collapsed .bottom-nav__toggle > span {
     position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
+    left: calc(100% + var(--space-4));
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    padding: 6px 10px;
     border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--ink);
+    color: var(--butter);
+    font-size: var(--text-small);
+    box-shadow: var(--shadow-card);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 30;
+    transition: opacity 140ms ease-out, transform 140ms ease-out;
+  }
+
+  .shell--nav-collapsed .bottom-nav__item:hover > span,
+  .shell--nav-collapsed .bottom-nav__item:focus-visible > span,
+  .shell--nav-collapsed .bottom-nav__toggle:hover > span,
+  .shell--nav-collapsed .bottom-nav__toggle:focus-visible > span {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
   }
 
   .bottom-nav__toggle {
     display: flex;
     align-items: center;
-    justify-content: center;
-    align-self: flex-end;
-    width: 44px;
-    height: 44px;
-    margin-bottom: var(--space-3);
+    justify-content: flex-start;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 52px;
+    margin-top: auto;
+    padding: var(--space-3) var(--space-4) 0;
     border: none;
+    border-top: 1px solid var(--line);
     border-radius: var(--radius-md);
     background: transparent;
     color: var(--ink-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-small);
+    font-weight: 800;
     cursor: pointer;
   }
 
@@ -937,8 +968,18 @@
     color: var(--teal-dark);
   }
 
+  .bottom-nav__toggle svg {
+    flex: none;
+    transition: transform 200ms ease-out;
+  }
+
   .shell--nav-collapsed .bottom-nav__toggle {
-    align-self: center;
+    position: relative;
+    width: 44px;
+  }
+
+  .shell--nav-collapsed .bottom-nav__toggle svg {
+    transform: rotate(180deg);
   }
 
   .home {
