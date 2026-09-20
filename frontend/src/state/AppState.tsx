@@ -2,7 +2,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { VocabStatus } from "../data/types";
+import type { JournalEntry, VocabRecord, VocabStatus } from "../data/types";
 import { AppStateContext } from "./context";
 import { useAccount } from "./useAccount";
 import { usePractice } from "./usePractice";
@@ -29,6 +29,7 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
   const onLearningChanged = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.progress(profileId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.vocabulary(profileId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.activeSession(profileId) });
   }, [queryClient, profileId]);
 
   const practice = usePractice(account.user?.id ?? "", profileId, onLearningChanged);
@@ -38,8 +39,8 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
 
   const setVocabStatus = useCallback((id: string, status: VocabStatus) => {
     queryClient.setQueryData(queryKeys.vocabulary(profileId),
-      (rows: typeof vocabulary.data) => rows?.map((row) => row.id === id ? { ...row, status } : row));
-  }, [queryClient, profileId, vocabulary.data]);
+      (rows: VocabRecord[] | undefined) => rows?.map((row) => row.id === id ? { ...row, status } : row));
+  }, [queryClient, profileId]);
 
   const saveJournalEntry = useCallback(async (draft: JournalDraft, id?: string, date?: string) => {
     if (saving.current) return null;
@@ -50,7 +51,7 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
       if (!account.activeProfile && !id) throw new Error("Choose a language first.");
       const entry = await saveJournal(draft, account.activeProfile?.id ?? "", id, date);
       queryClient.setQueryData(queryKeys.journals(profileId),
-        (rows: typeof journal.data) => [entry, ...(rows ?? []).filter((row) => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)));
+        (rows: JournalEntry[] | undefined) => [entry, ...(rows ?? []).filter((row) => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)));
       return entry;
     } catch (error) {
       setJournalSaveError(`${error instanceof Error ? error.message : "Unable to save journal."} Your text is still here; retry saving.`);

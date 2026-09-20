@@ -1,26 +1,36 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, ProgressTrail } from "../components/ui";
 import { BookIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { MediaImage } from "../components/MediaImage";
 import { getActivePractice } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
-import { useApiData } from "../lib/useApiData";
+import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 
 export function Home() {
   const navigate = useNavigate();
-  const { learner, progress, progressLoading, progressError,
+  const { learner, activeProfile, progress, progressLoading, progressError,
     vocabulary, vocabularyLoading, vocabularyError } = useAppState();
-  const loadActive = useCallback(() => getActivePractice(), []);
-  const { data: resume, setData: setResume, error: resumeError, loading: resumeLoading } = useApiData(loadActive);
+  const queryClient = useQueryClient();
+  const profileId = activeProfile?.id ?? "";
+  const { data: resume, error: resumeQueryError, isPending: resumeLoading } = useQuery({
+    queryKey: queryKeys.activeSession(profileId),
+    queryFn: () => getActivePractice(),
+  });
+  const resumeError = queryError(resumeQueryError);
   const [continueError, setContinueError] = useState<string | null>(null);
   const hasSessionToContinue = Boolean(resume);
   const continuePractice = async () => {
     setContinueError(null);
     try {
-      const fresh = await getActivePractice();
-      if (!fresh) { setResume(null); return; }
+      const fresh = await queryClient.fetchQuery({
+        queryKey: queryKeys.activeSession(profileId),
+        queryFn: () => getActivePractice(),
+        staleTime: 0,
+      });
+      if (!fresh) { queryClient.setQueryData(queryKeys.activeSession(profileId), null); return; }
       navigate(sessionDestination(fresh).path);
     } catch (reason) { setContinueError(reason instanceof Error ? reason.message : "Unable to load your practice."); }
   };
