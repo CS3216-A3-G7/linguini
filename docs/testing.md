@@ -52,5 +52,6 @@ tests write and delete data and require an isolated disposable database.
 - **docs** installs the pinned MkDocs dependencies and runs
   `mkdocs build --strict`.
 
-The frontend, database, and backend jobs use separate service containers so
-their test databases cannot interfere with one another.
+The database and backend jobs each start their own PostgreSQL service
+container, so their databases cannot interfere with one another. The frontend
+and docs jobs need no database.
