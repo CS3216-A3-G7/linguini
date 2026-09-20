@@ -33,6 +33,9 @@ coverage/
 # Local database backups; never commit user data
 .local-backups/
 
+# Generated MkDocs site
+site/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
