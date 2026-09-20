@@ -56,7 +56,7 @@ export function AppShell() {
           onClick={toggleNav}
         >
           <ChevronLeftIcon />
-          <span>Collapse</span>
+          <span>{navCollapsed ? "Expand" : "Collapse"}</span>
         </button>
       </nav>
     </div>

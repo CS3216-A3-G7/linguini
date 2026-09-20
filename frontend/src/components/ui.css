@@ -944,6 +944,7 @@
   }
 
   .bottom-nav__toggle {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -953,7 +954,6 @@
     margin-top: auto;
     padding: var(--space-3) var(--space-4) 0;
     border: none;
-    border-top: 1px solid var(--line);
     border-radius: var(--radius-md);
     background: transparent;
     color: var(--ink-muted);
@@ -961,6 +961,16 @@
     font-size: var(--text-small);
     font-weight: 800;
     cursor: pointer;
+  }
+
+  .bottom-nav__toggle::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: calc(-1 * var(--space-4));
+    right: calc(-1 * var(--space-4));
+    height: 1px;
+    background: var(--line);
   }
 
   .bottom-nav__toggle:hover {
@@ -974,7 +984,6 @@
   }
 
   .shell--nav-collapsed .bottom-nav__toggle {
-    position: relative;
     width: 44px;
   }
 
