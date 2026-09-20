@@ -19,7 +19,6 @@ export function LeaveSession({ sessionId, warning }: { sessionId: string; warnin
       navigate("/practice", { replace: true });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to leave the session.");
-    } finally {
       setLeaving(false);
     }
   };
