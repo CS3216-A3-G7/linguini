@@ -185,9 +185,11 @@ def test_unknown_word_cannot_create_catalog_entries():
     assert all(call.args[0].is_select for call in connection.execute.call_args_list)
 
 
-def test_analysis_saves_draft_without_scene_objects_or_tasks(monkeypatch):
-    from app.schemas.media import MediaAsset, SceneObject
+def test_analysis_saves_draft_without_scene_objects_or_tasks():
+    from app.schemas.enums import SessionStatus
+    from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
     from app.schemas.sessions import Session
+    from app.services.scene_analysis import SceneAnalysisResult
 
     owner, profile = uuid4(), uuid4()
     asset = MediaAsset(
@@ -203,32 +205,50 @@ def test_analysis_saves_draft_without_scene_objects_or_tasks(monkeypatch):
         label="chair",
         bounding_box={"x": 0.1, "y": 0.1, "width": 0.1, "height": 0.1},
     )
+    other = SceneObject(session_id=session.id, label="table")
+    relation = SceneObjectRelation(
+        subject_scene_object_id=obj.id,
+        relation="beside",
+        reference_scene_object_id=other.id,
+        source_relation_key="provider:0",
+    )
     repo = PostgresWorkflowRepository(None, owner)
+    repo.analyzer = SimpleNamespace(
+        analyze=lambda *args: SceneAnalysisResult(
+            title="A title", summary="A summary.", objects=[obj, other], relations=[relation]
+        )
+    )
     connection = MagicMock()
-    connection.execute.return_value.scalar_one_or_none.return_value = None
-    connection.execute.return_value.mappings.return_value.one.side_effect = [asset.model_dump(), {}]
+    connection.execute.return_value.mappings.return_value.one.side_effect = [
+        asset.model_dump(),
+        {},
+    ]
 
     @contextmanager
     def transaction():
         yield connection
 
     repo.transaction = transaction
-    repo._session = lambda *args: session
-    repo._detail = lambda *args: "draft detail"
-    monkeypatch.setattr(
-        "app.repositories.postgres.workflow.build_objects", lambda *args: ([obj], [], [])
+    repo._session = MagicMock(
+        side_effect=[
+            session,
+            session.model_copy(update={"status": SessionStatus.ANALYZING_SCENE}),
+        ]
     )
+    repo._detail = lambda *args: "draft detail"
     assert repo.analyze(session.id, profile) == "draft detail"
     writes = [
         call.args[0] for call in connection.execute.call_args_list if not call.args[0].is_select
     ]
     assert len(writes) == 2
     assert all(write.table.name == "sessions" for write in writes)
-    draft = writes[1].compile().params["analysis_draft"]
-    assert draft["objects"][0]["id"] == str(obj.id)
-    assert draft["relations"] == []
     assert writes[0].compile().params["status"] == "analyzingScene"
-    assert writes[1].compile().params["status"] == "awaitingObjectReview"
+    persist = writes[1].compile().params
+    assert persist["status"] == "awaitingObjectReview"
+    assert persist["session_title"] == "A title"
+    assert persist["session_summary"] == "A summary."
+    assert persist["analysis_draft"]["objects"][0]["id"] == str(obj.id)
+    assert persist["analysis_draft"]["relations"][0]["source_relation_key"] == "provider:0"
 
 
 def test_relations_require_selected_distinct_endpoints_and_no_duplicates():

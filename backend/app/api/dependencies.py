@@ -32,6 +32,7 @@ from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
 from app.services.practice import PracticeService
+from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.scenes import SceneService
 from app.services.tasks import TaskService
 from app.services.users import UserService
@@ -129,7 +130,11 @@ def get_scene_service(
 def get_practice_repository(
     request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
 ) -> PostgresWorkflowRepository:
-    return PostgresWorkflowRepository(request.app.state.database_engine, demo_user_id)
+    engine = request.app.state.database_engine
+    # The only place a different scene-analysis provider gets swapped in.
+    return PostgresWorkflowRepository(
+        engine, demo_user_id, analyzer=DeterministicSceneAnalyzer(engine)
+    )
 
 
 def get_practice_service(
