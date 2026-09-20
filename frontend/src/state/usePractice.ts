@@ -6,17 +6,21 @@ import type { PracticeDetail, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
 import { queryKeys } from "../lib/queryKeys";
 
+const PROCESSING = ["analyzingScene", "generatingTasks"];
+
 export function usePractice(_userId: string, profileId: string, onLearningChanged: () => void) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<PracticeDetail | null>(null);
   const [practiceSaving, setSaving] = useState(false);
   const [practiceError, setError] = useState<string | null>(null);
+  const [practiceStalled, setStalled] = useState(false);
   const busy = useRef(false);
   const loadVersion = useRef(0);
   const creation = useRef<{ asset: string; key: string } | null>(null);
   const [micReady, setMicReady] = useState(false);
   const loadSession = useCallback(async (id: string) => {
     const version = ++loadVersion.current;
+    setStalled(false);
     let data = await getPractice(id);
     if (data.session.status === "created") {
       try { data = await analyzePractice(id); }
@@ -26,14 +30,25 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
         data = await getPractice(id);
       }
     }
-    for (let attempt = 0; attempt < 20 && ["analyzingScene", "generatingTasks"].includes(data.session.status); attempt += 1) {
+    for (let attempt = 0; attempt < 20 && PROCESSING.includes(data.session.status); attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       if (version !== loadVersion.current) break;
       data = await getPractice(id);
     }
-    if (version === loadVersion.current) setSession(data);
+    if (version === loadVersion.current) {
+      setSession(data);
+      setStalled(PROCESSING.includes(data.session.status));
+    }
     return data;
   }, []);
+  const retryProcessing = useCallback(async (id: string) => {
+    setError(null);
+    try { await loadSession(id); }
+    catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to check your scene. Please retry.");
+      setStalled(true);
+    }
+  }, [loadSession]);
   const startSession = useCallback(async (sceneId: string) => {
     const scene = await getSceneDetail(sceneId);
     if (creation.current?.asset !== scene.mediaAssetId) creation.current = { asset: scene.mediaAssetId, key: crypto.randomUUID() };
@@ -77,5 +92,5 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       return false;
     } finally { busy.current = false; setSaving(false); }
   }, [session]);
-  return { session, practiceSaving, practiceError, startSession, loadSession, actOnTask, completeSession, saveReview, micReady, setMicReady };
+  return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, retryProcessing, actOnTask, completeSession, saveReview, micReady, setMicReady };
 }

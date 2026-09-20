@@ -52,13 +52,32 @@ test("sessions with no task rows resume at analysis", () => {
   assert.equal(sessionDestination(detail("awaitingObjectReview")).path, "/practice/sessions/s1/analysis");
 });
 
-test("the route guard allows only the steps valid for each status", () => {
+test("the route guard allows only the canonical destination", () => {
   assert.equal(isSessionRouteAllowed(detail("created"), "/practice/sessions/s1/learn"), false);
   assert.equal(isSessionRouteAllowed(detail("created"), "/practice/sessions/s1/analysis"), true);
-  assert.equal(isSessionRouteAllowed(detail("inProgress"), "/practice/sessions/s1/learn/task-1"), true);
-  assert.equal(isSessionRouteAllowed(detail("inProgress"), "/practice/sessions/s1/analysis"), false);
-  assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/learn"), true);
+
+  const pendingLearn = [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)];
+  assert.equal(isSessionRouteAllowed(detail("inProgress", pendingLearn), "/practice/sessions/s1/learn"), true);
+  assert.equal(isSessionRouteAllowed(detail("inProgress", pendingLearn), "/practice/sessions/s1/learn/task-1"), true);
+  assert.equal(isSessionRouteAllowed(detail("inProgress", pendingLearn), "/practice/sessions/s1/mic-test"), true);
+  for (const step of ["summary", "ispy-1", "ispy-2", "analysis"]) {
+    assert.equal(isSessionRouteAllowed(detail("inProgress", pendingLearn), `/practice/sessions/s1/${step}`), false);
+  }
+
+  const reflectionStage = [task("learn", "completed", 0), task("clues", "completed", 1), task("reflection", "pending", 2)];
+  assert.equal(isSessionRouteAllowed(detail("inProgress", reflectionStage), "/practice/sessions/s1/ispy-2"), true);
+  assert.equal(isSessionRouteAllowed(detail("inProgress", reflectionStage), "/practice/sessions/s1/learn"), false);
+  assert.equal(isSessionRouteAllowed(detail("inProgress", reflectionStage), "/practice/sessions/s1/mic-test"), false);
+
+  const clueStage = [task("learn", "completed", 0), task("clues", "pending", 1), task("reflection", "pending", 2)];
+  assert.equal(isSessionRouteAllowed(detail("inProgress", clueStage), "/practice/sessions/s1/ispy-1"), true);
+  assert.equal(isSessionRouteAllowed(detail("inProgress", clueStage), "/practice/sessions/s1/ispy-1/extra"), false);
+  assert.equal(isSessionRouteAllowed(detail("inProgress", clueStage), "/practice/sessions/s1/mic-test"), false);
+
+  assert.equal(isSessionRouteAllowed(detail("completed"), "/practice/sessions/s1/mic-test"), false);
+
   assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/mic-test"), true);
+  assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/learn"), false);
   assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/ispy-1"), false);
   for (const status of ["abandoned", "failed"] as const) {
     for (const step of ["analysis", "mic-test", "learn", "ispy-1", "ispy-2", "summary"]) {
@@ -67,6 +86,7 @@ test("the route guard allows only the steps valid for each status", () => {
   }
   assert.equal(isSessionRouteAllowed(detail("completed"), "/practice/sessions/s1/summary"), true);
   assert.equal(isSessionRouteAllowed(detail("completed"), "/practice/sessions/s1/learn"), false);
+  assert.equal(isSessionRouteAllowed(detail("completed"), "/practice/sessions/s1/summary/extra"), false);
 });
 
 test("loading copy matches the destination segment", () => {

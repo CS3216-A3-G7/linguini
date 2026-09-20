@@ -45,27 +45,11 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
   }
 }
 
-function sessionStep(detail: PracticeDetail, pathname: string): string | null {
-  const base = `/practice/sessions/${detail.session.id}/`;
-  if (!pathname.startsWith(base)) return null;
-  return pathname.slice(base.length).split("/")[0] || null;
-}
-
-const allowedSubPaths: Record<string, string[]> = {
-  created: ["analysis"],
-  analyzingScene: ["analysis"],
-  awaitingObjectReview: ["analysis"],
-  generatingTasks: ["analysis"],
-  ready: ["mic-test", "learn"],
-  inProgress: ["learn", "ispy-1", "ispy-2", "summary", "mic-test"],
-  completed: ["summary"],
-  abandoned: [],
-  failed: [],
-};
-
 export function isSessionRouteAllowed(detail: PracticeDetail, pathname: string): boolean {
-  const step = sessionStep(detail, pathname);
-  return step !== null && (allowedSubPaths[detail.session.status]?.includes(step) ?? false);
+  const canonical = sessionDestination(detail).path;
+  if (pathname === canonical) return true;
+  if (!canonical.endsWith("/learn")) return false;
+  return pathname.startsWith(`${canonical}/`) || pathname === `${canonical.slice(0, -"/learn".length)}/mic-test`;
 }
 
 export interface SessionLoadingCopy {
