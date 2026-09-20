@@ -1,7 +1,8 @@
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useNavigate, useParams } from "react-router-dom";
 import { useCallback, useState } from "react";
-import { getJournal } from "../lib/api";
+import { getJournal, getJournalContext } from "../lib/api";
+import type { JournalEntry } from "../data/types";
 import { useApiData } from "../lib/useApiData";
 import { JournalForm } from "./JournalNew";
 import { Button, Card, IconButton, TopBar } from "../components/ui";
@@ -35,7 +36,7 @@ function JournalEntryDetail({ entryId }: { entryId: string }) {
 
   const linked = entry.languageProfileId === activeProfile?.id
     ? vocabulary.filter((record) => entry.wordsUsed.includes(record.word)) : [];
-  if (editing) return <JournalForm key={entry.id} entry={entry} date={entry.date} onSaved={(saved) => { setData(saved); setEditing(false); }} />;
+  if (editing) return <JournalEntryEditor key={entry.id} entry={entry} onSaved={(saved) => { setData(saved); setEditing(false); }} />;
   const photoIndex = Math.min(activePhotoIndex, entry.photos.length - 1);
   const photo = entry.photos[photoIndex];
   const changePhoto = (offset: number) => setActivePhotoIndex((photoIndex + offset + entry.photos.length) % entry.photos.length);
@@ -87,4 +88,12 @@ function JournalEntryDetail({ entryId }: { entryId: string }) {
       </div>
     </div>
   );
+}
+
+function JournalEntryEditor({ entry, onSaved }: { entry: JournalEntry; onSaved: (entry: JournalEntry) => void }) {
+  const load = useCallback((signal?: AbortSignal) => getJournalContext(entry.date, signal), [entry.date]);
+  const { data, loading, error } = useApiData(load);
+  if (loading) return <LoadingScreen label="Loading journal…" />;
+  if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
+  return <JournalForm entry={entry} date={entry.date} photoOptions={data.photoOptions} onSaved={onSaved} />;
 }

@@ -1,5 +1,6 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -18,6 +19,8 @@ from app.repositories.postgres.tasks import session_tasks, task_attempts
 from app.repositories.postgres.users import users
 from app.repositories.postgres.vocabulary import user_vocabulary_progress, vocabulary_encounters
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
+from app.repositories.practice import PracticeConflictError
+from app.schemas.base import utc_now
 from app.schemas.enums import TaskKind
 from app.schemas.media import MediaAsset
 from app.schemas.users import LanguageProfile, User
@@ -247,24 +250,128 @@ def test_task_updates_roll_back_with_encounter_failure(database, monkeypatch):
     assert client.get(f"/api/v1/sessions/{sid}").json()["tasks"][1]["status"] == "pending"
 
 
-def test_active_session_conflict_and_owner_scope(database, monkeypatch):
-    engine, owner, profile, client = database
-    first = create_run(client, profile)["session"]["id"]
-    replacement = client.post(
+def upload_asset(engine, owner):
+    asset = MediaAsset(
+        owner_user_id=owner.id,
+        source="userUpload",
+        media_type="image",
+        storage_key=f"users/{owner.id}/images/{uuid4()}.jpg",
+        mime_type="image/jpeg",
+    )
+    with engine.begin() as c:
+        c.execute(insert(media_assets).values(**asset.model_dump(by_alias=False)))
+    return asset.id
+
+
+def create_with_asset(client, profile, asset_id, key):
+    return client.post(
         "/api/v1/sessions",
         json={
             "languageProfileId": str(profile.id),
-            "mediaAssetId": client.get("/api/v1/preloaded-scenes").json()[0]["mediaAsset"]["id"],
-            "idempotencyKey": "replacement-key",
+            "mediaAssetId": str(asset_id),
+            "idempotencyKey": key,
         },
     )
-    assert replacement.status_code == 409
+
+
+def age_session(engine, session_id, status, processing_started_at):
+    with engine.begin() as c:
+        c.execute(
+            update(sessions)
+            .where(sessions.c.id == session_id)
+            .values(
+                status=status,
+                analysis_draft={"processingStartedAt": processing_started_at.isoformat()},
+            )
+        )
+
+
+def test_active_session_replacement_and_owner_scope(database, monkeypatch):
+    engine, owner, profile, client = database
+    first = create_run(client, profile)["session"]["id"]
+    # The same image under a different key continues the open run.
+    continued = create_run(client, profile, "replacement-key")
+    assert continued["session"]["id"] == first
     assert client.get(f"/api/v1/sessions/{first}").json()["session"]["status"] == "created"
-    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == first
+    # A different image conflicts while a session is still active.
+    asset = upload_asset(engine, owner)
+    conflict = create_with_asset(client, profile, asset, "other-asset-key")
+    assert conflict.status_code == 409
+    detail = conflict.json()["detail"]
+    assert detail["code"] == "active_session_exists"
+    assert detail["activeSessionId"] == first
+    with engine.connect() as c:
+        ids = c.execute(select(sessions.c.id).where(sessions.c.user_id == owner.id)).scalars().all()
+    assert ids == [UUID(first)]
+
+    # The state machine rejects edges outside ALLOWED_TRANSITIONS.
+    repository = PostgresWorkflowRepository(engine, owner.id)
+    with repository.transaction() as connection:
+        session = repository._session(connection, UUID(first))
+        with pytest.raises(PracticeConflictError):
+            repository._transition(connection, session, "completed")
+
+    # created -> analyzingScene -> awaitingObjectReview -> generatingTasks -> inProgress.
+    assert client.post(f"/api/v1/sessions/{first}/analyze").status_code == 200
+    detail = client.get(f"/api/v1/sessions/{first}").json()
+    assert detail["session"]["status"] == "awaitingObjectReview"
+    reviewed = client.put(
+        f"/api/v1/sessions/{first}/review",
+        json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["session"]["status"] == "inProgress"
+    assert reviewed.json()["session"]["startedAt"] is not None
+    for task in reviewed.json()["tasks"]:
+        assert client.post(f"/api/v1/tasks/{task['id']}/skip", json={}).status_code == 200
+    assert client.post(f"/api/v1/sessions/{first}/complete").status_code == 200
+    completed = client.get(f"/api/v1/sessions/{first}").json()["session"]
+    assert completed["status"] == "completed" and completed["completedAt"] is not None
+
+    # A terminal session frees the profile; discard is the only route to abandoned.
+    created = create_with_asset(client, profile, asset, "other-asset-key-2")
+    assert created.status_code == 202, created.text
+    replacement = created.json()["session"]["id"]
+    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == replacement
+    assert client.post(f"/api/v1/sessions/{replacement}/abandon").status_code == 200
+    assert client.post(f"/api/v1/sessions/{replacement}/analyze").status_code == 409
+    abandoned = client.get(f"/api/v1/sessions/{replacement}").json()["session"]
+    assert abandoned["status"] == "abandoned" and abandoned["abandonedAt"] is not None
+    third = create_run(client, profile, "third-session-key")
+    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == third["session"]["id"]
     with pytest.raises(IntegrityError), engine.begin() as c:
-        c.execute(update(sessions).where(sessions.c.id == UUID(first)).values(status="completed"))
+        c.execute(
+            update(sessions)
+            .where(sessions.c.id == UUID(third["session"]["id"]))
+            .values(status="completed")
+        )
     monkeypatch.setenv("DEMO_USER_ID", str(uuid4()))
     assert client.get(f"/api/v1/sessions/{replacement}").status_code == 404
+
+
+def test_reap_fails_stuck_analysis(database):
+    engine, owner, profile, client = database
+    # A crashed analysis older than 15 minutes is failed, not blocking.
+    first = create_run(client, profile)["session"]["id"]
+    age_session(engine, UUID(first), "analyzingScene", utc_now() - timedelta(minutes=30))
+    asset = upload_asset(engine, owner)
+    created = create_with_asset(client, profile, asset, "after-analysis-timeout")
+    assert created.status_code == 202, created.text
+    assert created.json()["session"]["id"] != first
+    with engine.connect() as c:
+        old = c.execute(select(sessions).where(sessions.c.id == UUID(first))).mappings().one()
+    assert old["status"] == "failed" and old["failure_code"] == "sceneAnalysisFailed"
+
+
+def test_active_lookup_reaps_expired_analysis(database):
+    engine, _, profile, client = database
+    sid = create_run(client, profile)["session"]["id"]
+    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == sid
+    age_session(engine, UUID(sid), "analyzingScene", utc_now() - timedelta(minutes=30))
+    assert client.get("/api/v1/sessions/active").json() is None
+    with engine.connect() as c:
+        row = c.execute(select(sessions).where(sessions.c.id == UUID(sid))).mappings().one()
+    assert row["status"] == "failed" and row["failure_code"] == "sceneAnalysisFailed"
 
 
 def test_all_task_kinds_complete_with_server_evaluation(database):

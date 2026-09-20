@@ -11,6 +11,43 @@ from app.repositories.practice import PracticeConflictError
 from app.schemas.sessions import ReviewPracticeRequest
 
 
+def test_processing_transition_preserves_draft_and_records_timeout_clock():
+    from datetime import datetime
+
+    from app.repositories.postgres.workflow import ALLOWED_TRANSITIONS
+    from app.schemas.base import utc_now
+    from app.schemas.enums import SessionStatus
+    from app.schemas.sessions import Session
+
+    assert set(ALLOWED_TRANSITIONS) == set(SessionStatus)
+    draft = {"objects": [{"source_object_key": "object-1"}], "relations": []}
+    session = Session(
+        user_id=uuid4(),
+        language_profile_id=uuid4(),
+        scene_media_asset_id=uuid4(),
+        status="awaitingObjectReview",
+        analysis_draft=draft,
+    )
+    connection = MagicMock()
+    connection.execute.return_value.rowcount = 1
+    repository = PostgresWorkflowRepository(None, session.user_id)
+    before = utc_now()
+    processing = repository._transition(connection, session, "generatingTasks")
+    assert processing.analysis_draft["objects"] == draft["objects"]
+    assert processing.analysis_draft["relations"] == []
+    assert (
+        before
+        <= datetime.fromisoformat(processing.analysis_draft["processingStartedAt"])
+        <= utc_now()
+    )
+    assert "processingStartedAt" not in session.analysis_draft
+    running = repository._transition(connection, processing, "inProgress")
+    assert running.started_at is not None
+    assert running.analysis_draft == processing.analysis_draft
+    with pytest.raises(PracticeConflictError):
+        repository._transition(connection, running, "analyzingScene")
+
+
 def test_review_requires_unique_nonempty_selection_and_in_bounds_positions():
     object_id = uuid4()
     for body in [
@@ -185,12 +222,13 @@ def test_analysis_saves_draft_without_scene_objects_or_tasks(monkeypatch):
     writes = [
         call.args[0] for call in connection.execute.call_args_list if not call.args[0].is_select
     ]
-    assert len(writes) == 1
-    assert writes[0].table.name == "sessions"
-    draft = writes[0].compile().params["analysis_draft"]
+    assert len(writes) == 2
+    assert all(write.table.name == "sessions" for write in writes)
+    draft = writes[1].compile().params["analysis_draft"]
     assert draft["objects"][0]["id"] == str(obj.id)
     assert draft["relations"] == []
-    assert writes[0].compile().params["status"] == "awaitingObjectReview"
+    assert writes[0].compile().params["status"] == "analyzingScene"
+    assert writes[1].compile().params["status"] == "awaitingObjectReview"
 
 
 def test_relations_require_selected_distinct_endpoints_and_no_duplicates():
@@ -268,7 +306,12 @@ def test_review_maps_manual_relation_endpoints_and_preserves_only_trusted_proven
     from app.schemas.sessions import Session
     from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
 
-    session = Session(user_id=uuid4(), language_profile_id=uuid4(), scene_media_asset_id=uuid4())
+    session = Session(
+        user_id=uuid4(),
+        language_profile_id=uuid4(),
+        scene_media_asset_id=uuid4(),
+        status="awaitingObjectReview",
+    )
     word = VocabularyItem(
         language_code="es", lemma="mesa", display_text="mesa", part_of_speech="noun"
     )

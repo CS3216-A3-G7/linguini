@@ -40,14 +40,14 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
     setVocabulary((rows) => rows?.map((row) => row.id === id ? { ...row, status } : row) ?? null);
   }, [setVocabulary]);
 
-  const saveJournalEntry = useCallback(async (draft: JournalDraft, id?: string) => {
+  const saveJournalEntry = useCallback(async (draft: JournalDraft, id?: string, date?: string) => {
     if (saving.current) return null;
     saving.current = true;
     setJournalSaving(true);
     setJournalSaveError(null);
     try {
       if (!account.activeProfile && !id) throw new Error("Choose a language first.");
-      const entry = await saveJournal(draft, account.activeProfile?.id ?? "", id);
+      const entry = await saveJournal(draft, account.activeProfile?.id ?? "", id, date);
       setJournal((rows) => [entry, ...(rows ?? []).filter((row) => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)));
       return entry;
     } catch (error) {

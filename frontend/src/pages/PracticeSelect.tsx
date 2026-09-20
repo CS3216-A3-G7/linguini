@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { CameraIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
-import { createPractice, getActivePractice } from "../lib/api";
+import { ApiError, createPractice, getActivePractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
 import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
@@ -12,6 +12,7 @@ import { useAppState } from "../state/useAppState";
 export function PracticeSelect() {
   const navigate = useNavigate();
   const { scenes, learner, activeProfile } = useAppState();
+  const activeProfileId = activeProfile?.id;
   const [uploading, setUploading] = useState(false);
   const [selected, setSelected] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -23,7 +24,7 @@ export function PracticeSelect() {
   const request = useRef<{ asset: string; key: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    if (!activeProfile) {
+    if (!activeProfileId) {
       setActiveSession(null);
       setActiveCheckLoading(false);
       return () => { cancelled = true; };
@@ -38,7 +39,7 @@ export function PracticeSelect() {
       })
       .finally(() => { if (!cancelled) setActiveCheckLoading(false); });
     return () => { cancelled = true; };
-  }, [activeProfile?.id]);
+  }, [activeProfileId]);
   const interactionDisabled = selected || starting || activeCheckLoading || !!activeSession || !!activeCheckError || !activeProfile;
   const start = async (asset: string) => {
     if (busy.current || !activeProfile || activeCheckLoading || activeSession || activeCheckError) return;
@@ -47,7 +48,14 @@ export function PracticeSelect() {
     try {
       const detail = await createPractice(activeProfile.id, asset, request.current.key);
       navigate(`/practice/sessions/${detail.session.id}/analysis`);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to start practice."); }
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.code === "active_session_exists" && reason.activeSessionId) {
+        setSelected(false);
+        navigate(`/practice/sessions/${reason.activeSessionId}/analysis`);
+        return;
+      }
+      setError(reason instanceof Error ? reason.message : "Unable to start practice.");
+    }
     finally { busy.current = false; setStarting(false); }
   };
   return <div className="stack practice-select">

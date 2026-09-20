@@ -1,5 +1,6 @@
 """SQLAlchemy metadata persistence; only trusted server code may register assets."""
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -18,7 +19,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.repositories.media_assets import MediaAssetConflictError, MediaAssetStorageError
+from app.repositories.media_assets import (
+    MediaAssetConflictError,
+    MediaAssetStorageError,
+    SessionImage,
+)
 from app.schemas.media import MediaAsset
 
 media_assets = Table(
@@ -55,6 +60,55 @@ class PostgresMediaAssetRepository:
                 return {row["id"]: MediaAsset.model_validate(dict(row)) for row in rows}
         except (SQLAlchemyError, ValidationError) as exc:
             raise MediaAssetStorageError("Unable to read media assets.") from exc
+
+    def list_completed_session_images(
+        self, user_id: UUID, start: datetime, end: datetime
+    ) -> list[SessionImage]:
+        from app.repositories.postgres.practice import sessions
+
+        try:
+            with self.engine.connect() as connection:
+                rows = connection.execute(
+                    select(
+                        sessions.c.id.label("session_id"),
+                        sessions.c.completed_at,
+                        media_assets,
+                    )
+                    .select_from(
+                        sessions.join(
+                            media_assets,
+                            sessions.c.scene_media_asset_id == media_assets.c.id,
+                        )
+                    )
+                    .where(
+                        sessions.c.user_id == user_id,
+                        sessions.c.status == "completed",
+                        sessions.c.completed_at >= start,
+                        sessions.c.completed_at < end,
+                        media_assets.c.media_type == "image",
+                    )
+                    .order_by(sessions.c.completed_at.asc())
+                ).mappings()
+                seen: set[UUID] = set()
+                images: list[SessionImage] = []
+                asset_columns = {column.key for column in media_assets.c}
+                for row in rows:
+                    asset = MediaAsset.model_validate(
+                        {key: value for key, value in dict(row).items() if key in asset_columns}
+                    )
+                    if asset.id in seen:
+                        continue
+                    seen.add(asset.id)
+                    images.append(
+                        SessionImage(
+                            session_id=row["session_id"],
+                            completed_at=row["completed_at"],
+                            asset=asset,
+                        )
+                    )
+                return images
+        except (SQLAlchemyError, ValidationError) as exc:
+            raise MediaAssetStorageError("Unable to read session images.") from exc
 
     def create(self, asset: MediaAsset) -> MediaAsset:
         try:

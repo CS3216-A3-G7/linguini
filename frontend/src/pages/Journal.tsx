@@ -71,6 +71,21 @@ function JournalMonths({ journal }: { journal: ReturnType<typeof useAppState>["j
         <PlusIcon size={18} /> Add today&apos;s entry
       </Button>
 
+      <div className="field">
+        <label className="field__label" htmlFor="journal-missed-day">
+          Add an entry for another day
+        </label>
+        <input
+          id="journal-missed-day"
+          type="date"
+          className="input"
+          max={new Date().toLocaleDateString("en-CA")}
+          onChange={(event) => {
+            if (event.target.value) navigate(`/journal/new/${event.target.value}`);
+          }}
+        />
+      </div>
+
       {visibleEntries.length === 0 ? (
         <Card>
           <div className="stack-2 center-text" style={{ alignItems: "center" }}>

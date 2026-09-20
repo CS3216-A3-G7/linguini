@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
 import { ArrowRightIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
+import { LeaveSession } from "../components/LeaveSession";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { checkPracticeWord } from "../lib/api";
@@ -69,83 +70,98 @@ export function PracticeAnalysis() {
     if (locked || await saveReview({ acceptedObjectIds: kept.map(item => item.id), addedObjects: added, relations: visibleRelations })) navigate(`${base}/mic-test`);
   };
   return <div className="stack analysis-page">
-    <h1>Scene analysis</h1>
-    {session.analysisMode === "placeholder" ? <p className="small muted">These are sample suggestions. Keep what matches your photo and add anything missing.</p> : null}
-    <div ref={photoRef} className={`analysis-photo-stage${pending ? " analysis-photo-stage--placing" : ""}`}>
-      {pending ? <div className="analysis-placement-prompt" role="status">
-        <span>Tap where you see <strong>{pending.label}</strong></span>
-        <button type="button" onClick={() => setPending(null)}>Cancel</button>
-      </div> : null}
-      <ScenePhoto scene={scene} items={[...kept, ...custom]} onLocationSelect={pending ? place : undefined}
-        locationLabel={pending ? `Choose the location of ${pending.label}` : undefined} />
+    <div className="analysis-titlebar">
+      <h1>Scene analysis</h1>
+      <LeaveSession sessionId={session.session.id} warning={locked ? "Words you have already practised stay in your word bank, but this scene's remaining tasks are dropped." : "The words you picked for this scene will not be saved."} />
     </div>
-    <section className="analysis-results" aria-labelledby="analysis-found-title">
-      <div><h2 id="analysis-found-title">{kept.length + added.length} words selected</h2>
-        <p className="muted">{locked ? "Your lesson has started. Start a new practice to change its words." : "Keep what matches your photo. Remove or add anything you need."}</p>
-      </div>
-      <Card plain className="analysis-word-card">
-        <div className="analysis-word-list" aria-label="Words in this scene">
-          {kept.map(item => <div className="analysis-word-row" key={item.id}>
-            <span className="analysis-word-row__marker">{item.marker}</span>
-            <div className="grow"><strong>{item.translation}</strong></div>
-            {!locked ? <button className="analysis-word-row__remove" type="button" disabled={checking || practiceSaving} aria-label={`Remove ${item.translation}`}
-              onClick={() => setRemoved(current => [...current, item.id])}><CloseIcon size={18} /></button> : null}
-          </div>)}
-          {added.map((item, index) => <div className="analysis-word-row" key={item.id}>
-            <span className="analysis-word-row__marker analysis-word-row__marker--custom">{scene.items.length + index + 1}</span>
-            <div className="grow"><strong>{item.label}</strong>
-            </div>
-            <button className="analysis-word-row__remove" type="button" disabled={checking || practiceSaving} aria-label={`Remove ${item.label}`}
-              onClick={() => setAdded(current => current.filter(row => row.id !== item.id))}><CloseIcon size={18} /></button>
-          </div>)}
-          {removed.length ? <Button variant="quiet" disabled={checking || practiceSaving} onClick={() => setRemoved([])}>Restore removed words</Button> : null}
-          {!kept.length && !added.length ? <p className="small muted">Add a word you can see below.</p> : null}
+    <div className="analysis-layout">
+      <div className="analysis-stage-column">
+        {session.analysisMode === "placeholder" ? <p className="small muted">These are sample suggestions. Keep what matches your photo and add anything missing.</p> : null}
+        <div ref={photoRef} className={`analysis-photo-stage${pending ? " analysis-photo-stage--placing" : ""}`}>
+          {pending ? <div className="analysis-placement-prompt" role="status">
+            <span>Tap where you see <strong>{pending.label}</strong></span>
+            <button type="button" onClick={() => setPending(null)}>Cancel</button>
+          </div> : null}
+          <ScenePhoto scene={scene} items={[...kept, ...custom]} onLocationSelect={pending ? place : undefined}
+            locationLabel={pending ? `Choose the location of ${pending.label}` : undefined} />
         </div>
         {!locked ? <form className="analysis-add-word" onSubmit={event => { event.preventDefault(); void startAdding(); }}>
           <label className="field__label" htmlFor="analysis-new-word">Add another object you see</label>
           <div className="analysis-add-word__controls">
             <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={checking || practiceSaving || !!pending} onChange={event => setLabel(event.target.value)} />
-            <Button variant="secondary" type="submit" disabled={checking || !label.trim() || !!pending || practiceSaving || added.length >= 20}>{checking ? "Checking word..." : "Choose location"}</Button>
+            <Button variant="secondary" type="submit" disabled={checking || !label.trim() || !!pending || practiceSaving || added.length >= 20}>{checking ? "Checking..." : "Add"}</Button>
           </div>
         </form> : null}
-      </Card>
-    </section>
-    <section className="analysis-results" aria-labelledby="analysis-relations-title">
-      <h2 id="analysis-relations-title">How objects relate</h2>
-      <p className="muted">Keep or add connections you can see, such as a cup on a table. Removing a word also removes its connections.</p>
-      <Card plain className="analysis-word-card">
-        <div className="analysis-word-list">
-          {visibleRelations.map((row, index) => <div className="analysis-relation-row" key={row.id}>
-            <span className="analysis-word-row__marker analysis-relation-row__marker">{index + 1}</span>
-            <div className="analysis-relation-row__flow">
-              <strong>{relationObjects.find(item => item.id === row.subjectSceneObjectId)?.label}</strong>
-              <span className="analysis-relation-row__relation">{row.relation}</span>
-              <strong>{relationObjects.find(item => item.id === row.referenceSceneObjectId)?.label}</strong>
+      </div>
+      <div className="analysis-review-column">
+        <section className="analysis-results" aria-labelledby="analysis-found-title">
+          <div><h2 id="analysis-found-title">{kept.length + added.length} words selected</h2>
+            <p className="muted">{locked ? "Your lesson has started. Start a new practice to change its words." : "Keep what matches your photo. Remove or add anything you need."}</p>
+          </div>
+          <Card plain className="analysis-word-card">
+            <div className="analysis-word-list" aria-label="Words in this scene">
+              {kept.map(item => <div className="analysis-word-row" key={item.id}>
+                <span className="analysis-word-row__marker">{item.marker}</span>
+                <div className="grow"><strong>{item.translation}</strong></div>
+                {!locked ? <button className="analysis-word-row__remove" type="button" disabled={checking || practiceSaving} aria-label={`Remove ${item.translation}`}
+                  onClick={() => setRemoved(current => [...current, item.id])}><CloseIcon size={18} /></button> : null}
+              </div>)}
+              {added.map((item, index) => <div className="analysis-word-row" key={item.id}>
+                <span className="analysis-word-row__marker analysis-word-row__marker--custom">{scene.items.length + index + 1}</span>
+                <div className="grow"><strong>{item.label}</strong>
+                </div>
+                <button className="analysis-word-row__remove" type="button" disabled={checking || practiceSaving} aria-label={`Remove ${item.label}`}
+                  onClick={() => setAdded(current => current.filter(row => row.id !== item.id))}><CloseIcon size={18} /></button>
+              </div>)}
+              {!kept.length && !added.length ? <p className="small muted">Add a word you can see below.</p> : null}
             </div>
-            {!locked ? <button type="button" className="analysis-word-row__remove" disabled={practiceSaving} aria-label={`Remove relation ${row.relation}`} onClick={() => setRelations(current => current.filter(item => item.id !== row.id))}><CloseIcon size={18} /></button> : null}
-          </div>)}
-          {!visibleRelations.length ? <p className="small muted">No connections selected. You can continue without adding any.</p> : null}
-        </div>
-        {!locked ? <form className="stack" onSubmit={event => { event.preventDefault(); addRelation(); }}>
-          <label className="field__label" htmlFor="relation-subject">Object</label>
-          <select className="input" id="relation-subject" value={subject} disabled={practiceSaving} onChange={event => setSubject(event.target.value)}>
-            <option value="">Choose an object</option>
-            {relationObjects.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select>
-          <label className="field__label" htmlFor="relation-text">Connection</label>
-          <input className="input" id="relation-text" value={relationText} maxLength={200} placeholder="e.g. on, beside, under" disabled={practiceSaving} onChange={event => setRelationText(event.target.value)} />
-          <label className="field__label" htmlFor="relation-reference">Related object</label>
-          <select className="input" id="relation-reference" value={reference} disabled={practiceSaving} onChange={event => setReference(event.target.value)}>
-            <option value="">Choose another object</option>
-            {relationObjects.filter(item => item.id !== subject).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select>
-          <Button type="submit" variant="secondary" disabled={practiceSaving || !relationText.trim() || subject === reference || !selectedIds.has(subject) || !selectedIds.has(reference) || visibleRelations.length >= 100}>Add connection</Button>
-        </form> : null}
-      </Card>
-    </section>
-    {error || practiceError ? <p role="alert">{error ?? practiceError}</p> : null}
-    <Button block disabled={checking || practiceSaving || !!pending || (!kept.length && !added.length)} onClick={() => void proceed()}>
-      {practiceSaving ? "Saving your words..." : "Continue"} <ArrowRightIcon />
-    </Button>
+            {removed.length ? (
+              <div className="analysis-restore">
+                <Button variant="quiet" disabled={checking || practiceSaving} onClick={() => setRemoved([])}>
+                  Restore removed words
+                </Button>
+              </div>
+            ) : null}
+          </Card>
+        </section>
+        <section className="analysis-results" aria-labelledby="analysis-relations-title">
+          <h2 id="analysis-relations-title">How objects relate</h2>
+          <p className="muted">Keep or add connections you can see, such as a cup on a table. Removing a word also removes its connections.</p>
+          <Card plain className="analysis-word-card">
+            <div className="analysis-word-list">
+              {visibleRelations.map((row, index) => <div className="analysis-relation-row" key={row.id}>
+                <span className="analysis-word-row__marker analysis-relation-row__marker">{index + 1}</span>
+                <div className="analysis-relation-row__flow">
+                  <strong>{relationObjects.find(item => item.id === row.subjectSceneObjectId)?.label}</strong>
+                  <span className="analysis-relation-row__relation">{row.relation}</span>
+                  <strong>{relationObjects.find(item => item.id === row.referenceSceneObjectId)?.label}</strong>
+                </div>
+                {!locked ? <button type="button" className="analysis-word-row__remove" disabled={practiceSaving} aria-label={`Remove relation ${row.relation}`} onClick={() => setRelations(current => current.filter(item => item.id !== row.id))}><CloseIcon size={18} /></button> : null}
+              </div>)}
+              {!visibleRelations.length ? <p className="small muted">No connections selected. You can continue without adding any.</p> : null}
+            </div>
+            {!locked ? <form className="stack" onSubmit={event => { event.preventDefault(); addRelation(); }}>
+              <label className="field__label" htmlFor="relation-subject">Object</label>
+              <select className="input" id="relation-subject" value={subject} disabled={practiceSaving} onChange={event => setSubject(event.target.value)}>
+                <option value="">Choose an object</option>
+                {relationObjects.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+              <label className="field__label" htmlFor="relation-text">Connection</label>
+              <input className="input" id="relation-text" value={relationText} maxLength={200} placeholder="e.g. on, beside, under" disabled={practiceSaving} onChange={event => setRelationText(event.target.value)} />
+              <label className="field__label" htmlFor="relation-reference">Related object</label>
+              <select className="input" id="relation-reference" value={reference} disabled={practiceSaving} onChange={event => setReference(event.target.value)}>
+                <option value="">Choose another object</option>
+                {relationObjects.filter(item => item.id !== subject).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+              <Button type="submit" variant="secondary" disabled={practiceSaving || !relationText.trim() || subject === reference || !selectedIds.has(subject) || !selectedIds.has(reference) || visibleRelations.length >= 100}>Add connection</Button>
+            </form> : null}
+          </Card>
+        </section>
+        {error || practiceError ? <p role="alert">{error ?? practiceError}</p> : null}
+        <Button block className="analysis-continue" disabled={checking || practiceSaving || !!pending || (!kept.length && !added.length)} onClick={() => void proceed()}>
+          {practiceSaving ? "Saving your words..." : "Continue"} <ArrowRightIcon />
+        </Button>
+      </div>
+    </div>
   </div>;
 }

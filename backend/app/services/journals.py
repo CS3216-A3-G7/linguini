@@ -1,9 +1,14 @@
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from app.repositories.journals import JournalConflictError, JournalNotFoundError, JournalRepository
-from app.repositories.media_assets import MediaAssetRepository
+from app.repositories.journals import (
+    FutureJournalDateError,
+    JournalConflictError,
+    JournalNotFoundError,
+    JournalRepository,
+)
+from app.repositories.media_assets import MediaAssetRepository, SessionImage
 from app.schemas.base import utc_now
 from app.schemas.enums import JournalStatus, JournalSuggestionStatus, MediaSource, MediaType
 from app.schemas.journals import (
@@ -11,6 +16,7 @@ from app.schemas.journals import (
     Journal,
     JournalDetailResponse,
     JournalMedia,
+    JournalPhotoOption,
     JournalRevision,
     JournalSuggestion,
     JournalTodayContextResponse,
@@ -113,11 +119,44 @@ class JournalService:
         return entry
 
     def today(self) -> JournalTodayContextResponse:
+        return self.day_context(None)
+
+    def day_context(self, day: date | None = None) -> JournalTodayContextResponse:
         user = self.users.get_current_user()
-        day = datetime.now(ZoneInfo(user.timezone)).date()
+        tz = ZoneInfo(user.timezone)
+        today = datetime.now(tz).date()
+        day = day or today
+        if day > today:
+            raise FutureJournalDateError("Cannot create a journal entry for a future date.")
         entry = next((row for row in self.list_entries() if row.journal.local_date == day), None)
+        eligible_photos: list[JournalPhotoOption] = []
+        if self.media is not None:
+            start = datetime.combine(day, time.min, tzinfo=tz)
+            end = start + timedelta(days=1)
+            unique: dict[UUID, SessionImage] = {}
+            for image in self.media.list_completed_session_images(user.id, start, end):
+                unique.setdefault(image.asset.id, image)
+            images = list(unique.values())
+            keys = [image.asset.storage_key for image in images]
+            urls = (
+                self.private_media_urls.resolve(keys)
+                if self.private_media_urls
+                else {key: public_media_url(key, self.media_public_base_url) for key in keys}
+            )
+            eligible_photos = [
+                JournalPhotoOption(
+                    media_asset_id=image.asset.id,
+                    image_url=urls.get(image.asset.storage_key),
+                    session_id=image.session_id,
+                    completed_at=image.completed_at,
+                )
+                for image in images
+            ]
         return JournalTodayContextResponse(
-            local_date=day, journal=entry.journal if entry else None, can_create=entry is None
+            local_date=day,
+            journal=entry.journal if entry else None,
+            eligible_photos=eligible_photos,
+            can_create=entry is None,
         )
 
     @staticmethod
@@ -160,7 +199,14 @@ class JournalService:
                 )
 
     def upsert_today(self, request: UpsertTodayJournalRequest) -> Journal:
+        return self.upsert(request, None)
+
+    def upsert(self, request: UpsertTodayJournalRequest, day: date | None = None) -> Journal:
         user = self.users.get_current_user()
+        today = datetime.now(ZoneInfo(user.timezone)).date()
+        day = day or today
+        if day > today:
+            raise FutureJournalDateError("Cannot create a journal entry for a future date.")
         if request.media_asset_id is not None:
             self._check_media(request.media_asset_id, user.id, MediaType.IMAGE)
         if not any(
@@ -168,7 +214,6 @@ class JournalService:
             for row in self.profiles.list_profiles()
         ):
             raise JournalConflictError("Choose the active language profile before saving.")
-        day = datetime.now(ZoneInfo(user.timezone)).date()
 
         def change(rows: list[JournalDetailResponse]) -> Journal:
             entry = next(
@@ -191,7 +236,7 @@ class JournalService:
                 rows.append(entry)
             elif entry.journal.language_profile_id != request.language_profile_id:
                 raise JournalConflictError(
-                    "Today's journal uses another language. Open it from journal history."
+                    "That day's journal uses another language. Open it from journal history."
                 )
             if request.content is not None:
                 entry.journal.title = request.title

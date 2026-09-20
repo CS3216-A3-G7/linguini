@@ -12,6 +12,10 @@ class JournalConflictError(Exception):
     pass
 
 
+class FutureJournalDateError(JournalConflictError):
+    pass
+
+
 class JournalNotFoundError(Exception):
     pass
 
