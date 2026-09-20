@@ -30,6 +30,27 @@ class MediaSource(StrEnum):
     GENERATED = "generated"
 
 
+class SceneRelationType(StrEnum):
+    ABOVE = "above"
+    BELOW = "below"
+    LEFT_OF = "leftOf"
+    RIGHT_OF = "rightOf"
+    IN_FRONT_OF = "inFrontOf"
+    BEHIND = "behind"
+    ON = "on"
+    IN = "in"
+    UNDER = "under"
+    HOLDING = "holding"
+    PART_OF = "partOf"
+    NEXT_TO = "nextTo"
+    NEAR = "near"
+
+
+SYMMETRIC_SCENE_RELATION_TYPES: frozenset[SceneRelationType] = frozenset(
+    {SceneRelationType.NEXT_TO, SceneRelationType.NEAR}
+)
+
+
 class PartOfSpeech(StrEnum):
     NOUN = "noun"
     VERB = "verb"
