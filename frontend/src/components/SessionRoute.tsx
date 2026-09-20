@@ -1,10 +1,11 @@
 import { practiceScene } from "../lib/practiceScene";
 import { useCallback, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { getMedia, getPractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
 import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
-import { useApiData } from "../lib/useApiData";
+import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
 import { ScenePhoto } from "./ScenePhoto";
@@ -27,7 +28,13 @@ function SessionLoader({ id }: { id: string }) {
     setDetail(loaded);
     return practiceScene(loaded, media, learner.language);
   }, [id, loadSession, learner.language]);
-  const { data, loading, error } = useApiData(load);
+  // Side-effecting session resolution: never served from or retained in cache.
+  const { data, isPending: loading, error: queryErrorValue } = useQuery({
+    queryKey: queryKeys.sessionScene(id),
+    queryFn: ({ signal }) => load(signal),
+    staleTime: 0, gcTime: 0, retry: false, refetchOnMount: "always",
+  });
+  const error = queryError(queryErrorValue);
   const copy = sessionLoadingCopy(location.pathname);
   if (loading) return copy.scan && preview ? <div className="stack analysis-page">
     <h1>{copy.title}</h1>
