@@ -48,7 +48,8 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
 export function isSessionRouteAllowed(detail: PracticeDetail, pathname: string): boolean {
   const canonical = sessionDestination(detail).path;
   if (pathname === canonical) return true;
-  return canonical.endsWith("/learn") && pathname.startsWith(`${canonical}/`);
+  if (!canonical.endsWith("/learn")) return false;
+  return pathname.startsWith(`${canonical}/`) || pathname === `${canonical.slice(0, -"/learn".length)}/mic-test`;
 }
 
 export interface SessionLoadingCopy {
