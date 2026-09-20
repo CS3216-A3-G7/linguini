@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { BookIcon, CameraIcon, ChevronLeftIcon, HomeIcon, JournalIcon, PersonIcon } from "./icons";
+import { BookIcon, CameraIcon, HomeIcon, JournalIcon, PersonIcon } from "./icons";
 import { BrandBar } from "./ui";
 import { BackActionProvider, useRegisteredBackAction } from "./BackAction";
 
@@ -22,17 +21,9 @@ export function AppShell() {
     ["/home", "/practice", "/vocabulary", "/journal"].includes(pathname) ||
     pathname === "/journal/new" ||
     /^\/journal\/[^/]+$/.test(pathname);
-  const [navCollapsed, setNavCollapsed] = useState(() => {
-    try { return localStorage.getItem("linguini.navCollapsed") === "true"; } catch { return false; }
-  });
-  const toggleNav = () => setNavCollapsed((current) => {
-    const next = !current;
-    try { localStorage.setItem("linguini.navCollapsed", String(next)); } catch { /* Storage may be unavailable. */ }
-    return next;
-  });
 
   return (
-    <div className={`shell shell--app${navCollapsed ? " shell--nav-collapsed" : ""}`}>
+    <div className="shell shell--app">
       <BrandBar back={isDetailPage} />
       <main className={`shell__content${usesWideCanvas ? " shell__content--desktop-wide" : ""}`}>
         <Outlet />
@@ -48,16 +39,6 @@ export function AppShell() {
             <span>{label}</span>
           </NavLink>
         ))}
-        <button
-          type="button"
-          className="bottom-nav__toggle"
-          aria-expanded={!navCollapsed}
-          aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
-          onClick={toggleNav}
-        >
-          <ChevronLeftIcon />
-          <span>{navCollapsed ? "Expand" : "Collapse"}</span>
-        </button>
       </nav>
     </div>
   );
