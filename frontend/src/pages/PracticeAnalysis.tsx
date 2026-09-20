@@ -69,6 +69,13 @@ export function PracticeAnalysis() {
           <ScenePhoto scene={scene} items={[...kept, ...custom]} onLocationSelect={pending ? place : undefined}
             locationLabel={pending ? `Choose the location of ${pending.label}` : undefined} />
         </div>
+        {!locked ? <form className="analysis-add-word" onSubmit={event => { event.preventDefault(); void startAdding(); }}>
+          <label className="field__label" htmlFor="analysis-new-word">Add another object you see</label>
+          <div className="analysis-add-word__controls">
+            <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={checking || practiceSaving || !!pending} onChange={event => setLabel(event.target.value)} />
+            <Button variant="secondary" type="submit" disabled={checking || !label.trim() || !!pending || practiceSaving || added.length >= 20}>{checking ? "Checking..." : "Add"}</Button>
+          </div>
+        </form> : null}
       </div>
       <div className="analysis-review-column">
         <section className="analysis-results" aria-labelledby="analysis-found-title">
@@ -99,13 +106,6 @@ export function PracticeAnalysis() {
                 </Button>
               </div>
             ) : null}
-            {!locked ? <form className="analysis-add-word" onSubmit={event => { event.preventDefault(); void startAdding(); }}>
-              <label className="field__label" htmlFor="analysis-new-word">Add another object you see</label>
-              <div className="analysis-add-word__controls">
-                <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={checking || practiceSaving || !!pending} onChange={event => setLabel(event.target.value)} />
-                <Button variant="secondary" type="submit" disabled={checking || !label.trim() || !!pending || practiceSaving || added.length >= 20}>{checking ? "Checking..." : "Add"}</Button>
-              </div>
-            </form> : null}
           </Card>
         </section>
         {error || practiceError ? <p role="alert">{error ?? practiceError}</p> : null}
