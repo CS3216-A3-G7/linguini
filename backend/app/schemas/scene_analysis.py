@@ -22,26 +22,24 @@ class ModelBoundingBox(ApiModel):
 
 
 class ModelSceneObject(ApiModel):
-    key: NonEmptyText
+    object_key: NonEmptyText
     label: NonEmptyText
-    confidence: Annotated[float, Field(ge=0, le=1)]
     bounding_box: ModelBoundingBox
-    attributes: dict[NonEmptyText, NonEmptyText]
+    attributes: list[NonEmptyText] = []
+    confidence_score: Annotated[float, Field(ge=0, le=1)]
 
 
 class ModelSceneRelation(ApiModel):
-    key: NonEmptyText
-    relation_type: SceneRelationType
-    source_object_key: NonEmptyText
-    target_object_key: NonEmptyText
-    confidence: Annotated[float, Field(ge=0, le=1)]
+    relation_key: NonEmptyText
+    subject_object_key: NonEmptyText
+    relation: SceneRelationType
+    reference_object_key: NonEmptyText
 
 
 class SceneAnalysisModelResult(ApiModel):
-    title: NonEmptyText
-    summary: NonEmptyText
-    objects: Annotated[list[ModelSceneObject], Field(min_length=1)]
-    relations: list[ModelSceneRelation]
+    suggested_scene_title: NonEmptyText
+    objects: list[ModelSceneObject]
+    relations: list[ModelSceneRelation] = []
 
 
 class SceneAnalysisIssueCode(StrEnum):

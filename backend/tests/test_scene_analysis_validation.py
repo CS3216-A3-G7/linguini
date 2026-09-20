@@ -21,38 +21,36 @@ from app.services.scene_analysis_validation import (
 
 def object_payload(key: str = "chair", **box: float) -> dict:
     return {
-        "key": key,
+        "objectKey": key,
         "label": key,
-        "confidence": 0.9,
         "boundingBox": {
             "x": box.get("x", 0.1),
             "y": box.get("y", 0.1),
             "width": box.get("width", 0.2),
             "height": box.get("height", 0.2),
         },
-        "attributes": {},
+        "attributes": [],
+        "confidenceScore": 0.9,
     }
 
 
 def relation_payload(
     key: str = "near-1",
-    relation_type: str = "nextTo",
-    source: str = "chair",
-    target: str = "table",
+    relation: str = "next_to",
+    subject: str = "chair",
+    reference: str = "table",
 ) -> dict:
     return {
-        "key": key,
-        "relationType": relation_type,
-        "sourceObjectKey": source,
-        "targetObjectKey": target,
-        "confidence": 0.8,
+        "relationKey": key,
+        "subjectObjectKey": subject,
+        "relation": relation,
+        "referenceObjectKey": reference,
     }
 
 
 def valid_payload() -> dict:
     return {
-        "title": "Kitchen",
-        "summary": "A chair is next to a table.",
+        "suggestedSceneTitle": "Kitchen",
         "objects": [object_payload(), object_payload("table", x=0.4)],
         "relations": [relation_payload()],
     }
@@ -64,23 +62,23 @@ def valid_result(
     relations: list[ModelSceneRelation] | None = None,
 ) -> SceneAnalysisModelResult:
     return SceneAnalysisModelResult(
-        title="Kitchen",
-        summary="A chair is next to a table.",
+        suggested_scene_title="Kitchen",
         objects=objects
-        or [
+        if objects is not None
+        else [
             ModelSceneObject(
-                key="chair",
+                object_key="chair",
                 label="chair",
-                confidence=0.9,
                 bounding_box=ModelBoundingBox(x=0.1, y=0.1, width=0.2, height=0.2),
-                attributes={},
+                attributes=[],
+                confidence_score=0.9,
             ),
             ModelSceneObject(
-                key="table",
+                object_key="table",
                 label="table",
-                confidence=0.9,
                 bounding_box=ModelBoundingBox(x=0.4, y=0.1, width=0.2, height=0.2),
-                attributes={},
+                attributes=[],
+                confidence_score=0.9,
             ),
         ],
         relations=relations or [],
@@ -90,16 +88,15 @@ def valid_result(
 def model_relation(
     *,
     key: str = "relation-1",
-    relation_type: SceneRelationType = SceneRelationType.NEXT_TO,
-    source: str = "chair",
-    target: str = "table",
+    relation: SceneRelationType = SceneRelationType.NEXT_TO,
+    subject: str = "chair",
+    reference: str = "table",
 ) -> ModelSceneRelation:
     return ModelSceneRelation(
-        key=key,
-        relation_type=relation_type,
-        source_object_key=source,
-        target_object_key=target,
-        confidence=0.8,
+        relation_key=key,
+        subject_object_key=subject,
+        relation=relation,
+        reference_object_key=reference,
     )
 
 
@@ -113,8 +110,17 @@ def test_valid_payload_round_trips_with_camel_case_aliases() -> None:
 
     assert parse_scene_analysis(dumped) == parsed
     assert "boundingBox" in dumped["objects"][0]
-    assert "sourceObjectKey" in dumped["relations"][0]
-    assert "relationType" in dumped["relations"][0]
+    assert "subjectObjectKey" in dumped["relations"][0]
+    assert "relation" in dumped["relations"][0]
+
+
+def test_empty_objects_array_is_accepted() -> None:
+    payload = {"suggestedSceneTitle": "Blurry Photo", "objects": [], "relations": []}
+
+    parsed = parse_scene_analysis(payload)
+
+    assert parsed.objects == []
+    assert parsed.relations == []
 
 
 @pytest.mark.parametrize(
@@ -149,15 +155,14 @@ def test_extra_properties_are_reported_as_invalid_schema(extra: dict) -> None:
 
 
 @pytest.mark.parametrize(
-    ("section", "value"),
-    [("objects", 1.1), ("relations", -0.1)],
+    ("section", "field", "value"),
+    [("objects", "confidenceScore", 1.1), ("relations", "relation", "holding")],
 )
-def test_confidence_is_rejected_at_schema_level(section: str, value: float) -> None:
+def test_out_of_range_values_are_rejected_at_schema_level(
+    section: str, field: str, value: float
+) -> None:
     payload = valid_payload()
-    if section == "objects":
-        payload["objects"][0]["confidence"] = value
-    else:
-        payload["relations"][0]["confidence"] = value
+    payload[section][0][field] = value
 
     with pytest.raises(SceneAnalysisValidationError) as raised:
         parse_scene_analysis(payload)
@@ -181,8 +186,8 @@ def test_duplicate_object_key() -> None:
 
 def test_duplicate_relation_key() -> None:
     relations = [
-        model_relation(key="same", relation_type=SceneRelationType.ABOVE),
-        model_relation(key="same", relation_type=SceneRelationType.BELOW),
+        model_relation(key="same", relation=SceneRelationType.ABOVE),
+        model_relation(key="same", relation=SceneRelationType.BELOW),
     ]
 
     with pytest.raises(SceneAnalysisValidationError) as raised:
@@ -233,7 +238,7 @@ def test_bounding_box_outside_image() -> None:
 
 
 def test_unknown_relation_object() -> None:
-    relation = model_relation(source="missing", target="also-missing")
+    relation = model_relation(subject="missing", reference="also-missing")
 
     with pytest.raises(SceneAnalysisValidationError) as raised:
         validate_scene_analysis(valid_result(relations=[relation]))
@@ -249,7 +254,7 @@ def test_unknown_relation_object() -> None:
 
 
 def test_self_relation() -> None:
-    relation = model_relation(source="chair", target="chair")
+    relation = model_relation(subject="chair", reference="chair")
 
     with pytest.raises(SceneAnalysisValidationError) as raised:
         validate_scene_analysis(valid_result(relations=[relation]))
@@ -259,8 +264,8 @@ def test_self_relation() -> None:
 
 def test_duplicate_relation() -> None:
     relations = [
-        model_relation(key="first", relation_type=SceneRelationType.ABOVE),
-        model_relation(key="second", relation_type=SceneRelationType.ABOVE),
+        model_relation(key="first", relation=SceneRelationType.ABOVE),
+        model_relation(key="second", relation=SceneRelationType.ABOVE),
     ]
 
     with pytest.raises(SceneAnalysisValidationError) as raised:
@@ -272,19 +277,19 @@ def test_duplicate_relation() -> None:
 def test_symmetric_duplicate_relation_but_not_non_symmetric_reverse() -> None:
     symmetric = [
         model_relation(key="first"),
-        model_relation(key="second", source="table", target="chair"),
+        model_relation(key="second", subject="table", reference="chair"),
     ]
     with pytest.raises(SceneAnalysisValidationError) as raised:
         validate_scene_analysis(valid_result(relations=symmetric))
     assert SceneAnalysisIssueCode.SYMMETRIC_DUPLICATE_RELATION in issue_codes(raised.value)
 
     non_symmetric = [
-        model_relation(key="first", relation_type=SceneRelationType.ABOVE),
+        model_relation(key="first", relation=SceneRelationType.ABOVE),
         model_relation(
             key="second",
-            relation_type=SceneRelationType.ABOVE,
-            source="table",
-            target="chair",
+            relation=SceneRelationType.ABOVE,
+            subject="table",
+            reference="chair",
         ),
     ]
     validate_scene_analysis(valid_result(relations=non_symmetric))
@@ -294,8 +299,8 @@ def test_validator_collects_violations_across_the_whole_payload() -> None:
     duplicate_object = valid_result().objects[0]
     duplicate_object.bounding_box.x = math.nan
     relations = [
-        model_relation(key="same", source="missing"),
-        model_relation(key="same", source="chair", target="chair"),
+        model_relation(key="same", subject="missing"),
+        model_relation(key="same", subject="chair", reference="chair"),
     ]
 
     with pytest.raises(SceneAnalysisValidationError) as raised:

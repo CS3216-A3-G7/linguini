@@ -49,27 +49,27 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
 
     object_keys: set[str] = set()
     for index, scene_object in enumerate(result.objects):
-        if scene_object.key in object_keys:
+        if scene_object.object_key in object_keys:
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.DUPLICATE_OBJECT_KEY,
-                    f"duplicate object key {scene_object.key!r}",
-                    f"objects[{index}].key",
+                    f"duplicate object key {scene_object.object_key!r}",
+                    f"objects[{index}].objectKey",
                 )
             )
-        object_keys.add(scene_object.key)
+        object_keys.add(scene_object.object_key)
 
     relation_keys: set[str] = set()
     for index, relation in enumerate(result.relations):
-        if relation.key in relation_keys:
+        if relation.relation_key in relation_keys:
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.DUPLICATE_RELATION_KEY,
-                    f"duplicate relation key {relation.key!r}",
-                    f"relations[{index}].key",
+                    f"duplicate relation key {relation.relation_key!r}",
+                    f"relations[{index}].relationKey",
                 )
             )
-        relation_keys.add(relation.key)
+        relation_keys.add(relation.relation_key)
 
     box_fields = ("x", "y", "width", "height")
     for index, scene_object in enumerate(result.objects):
@@ -83,7 +83,7 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
                 issues.append(
                     _issue(
                         SceneAnalysisIssueCode.NON_FINITE_BOUNDING_BOX,
-                        f"object {scene_object.key!r} has non-finite {field}={value!r}",
+                        f"object {scene_object.object_key!r} has non-finite {field}={value!r}",
                         f"objects[{index}].boundingBox.{field}",
                     )
                 )
@@ -95,7 +95,7 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
                 issues.append(
                     _issue(
                         SceneAnalysisIssueCode.BOUNDING_BOX_OUT_OF_RANGE,
-                        f"object {scene_object.key!r} has {field}={value!r}, expected 0..1",
+                        f"object {scene_object.object_key!r} has {field}={value!r}, expected 0..1",
                         f"objects[{index}].boundingBox.{field}",
                     )
                 )
@@ -106,7 +106,7 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
                 issues.append(
                     _issue(
                         SceneAnalysisIssueCode.NON_POSITIVE_BOUNDING_BOX_SIZE,
-                        f"object {scene_object.key!r} has non-positive {field}={value!r}",
+                        f"object {scene_object.object_key!r} has non-positive {field}={value!r}",
                         f"objects[{index}].boundingBox.{field}",
                     )
                 )
@@ -115,7 +115,7 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.BOUNDING_BOX_OUTSIDE_IMAGE,
-                    f"object {scene_object.key!r} has x + width={box.x + box.width!r}",
+                    f"object {scene_object.object_key!r} has x + width={box.x + box.width!r}",
                     f"objects[{index}].boundingBox",
                 )
             )
@@ -123,7 +123,7 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.BOUNDING_BOX_OUTSIDE_IMAGE,
-                    f"object {scene_object.key!r} has y + height={box.y + box.height!r}",
+                    f"object {scene_object.object_key!r} has y + height={box.y + box.height!r}",
                     f"objects[{index}].boundingBox",
                 )
             )
@@ -131,66 +131,66 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
     seen_relations: set[tuple[SceneRelationType, str, str]] = set()
     for index, relation in enumerate(result.relations):
         relation_path = f"relations[{index}]"
-        if relation.source_object_key not in object_keys:
+        if relation.subject_object_key not in object_keys:
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.UNKNOWN_RELATION_OBJECT,
-                    f"relation {relation.key!r} has unknown source object key "
-                    f"{relation.source_object_key!r}",
-                    f"{relation_path}.sourceObjectKey",
+                    f"relation {relation.relation_key!r} has unknown subject object key "
+                    f"{relation.subject_object_key!r}",
+                    f"{relation_path}.subjectObjectKey",
                 )
             )
-        if relation.target_object_key not in object_keys:
+        if relation.reference_object_key not in object_keys:
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.UNKNOWN_RELATION_OBJECT,
-                    f"relation {relation.key!r} has unknown target object key "
-                    f"{relation.target_object_key!r}",
-                    f"{relation_path}.targetObjectKey",
+                    f"relation {relation.relation_key!r} has unknown reference object key "
+                    f"{relation.reference_object_key!r}",
+                    f"{relation_path}.referenceObjectKey",
                 )
             )
 
-        is_self_relation = relation.source_object_key == relation.target_object_key
+        is_self_relation = relation.subject_object_key == relation.reference_object_key
         if is_self_relation:
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.SELF_RELATION,
-                    f"relation {relation.key!r} connects object "
-                    f"{relation.source_object_key!r} to itself",
+                    f"relation {relation.relation_key!r} connects object "
+                    f"{relation.subject_object_key!r} to itself",
                     relation_path,
                 )
             )
             continue
 
         relation_tuple = (
-            relation.relation_type,
-            relation.source_object_key,
-            relation.target_object_key,
+            relation.relation,
+            relation.subject_object_key,
+            relation.reference_object_key,
         )
         if relation_tuple in seen_relations:
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.DUPLICATE_RELATION,
-                    f"relation {relation.key!r} duplicates "
-                    f"{relation.relation_type.value} {relation.source_object_key!r}"
-                    f"->{relation.target_object_key!r}",
+                    f"relation {relation.relation_key!r} duplicates "
+                    f"{relation.relation.value} {relation.subject_object_key!r}"
+                    f"->{relation.reference_object_key!r}",
                     relation_path,
                 )
             )
         elif (
-            relation.relation_type in SYMMETRIC_SCENE_RELATION_TYPES
+            relation.relation in SYMMETRIC_SCENE_RELATION_TYPES
             and (
-                relation.relation_type,
-                relation.target_object_key,
-                relation.source_object_key,
+                relation.relation,
+                relation.reference_object_key,
+                relation.subject_object_key,
             )
             in seen_relations
         ):
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.SYMMETRIC_DUPLICATE_RELATION,
-                    f"relation {relation.key!r} reverses an earlier "
-                    f"{relation.relation_type.value} relation",
+                    f"relation {relation.relation_key!r} reverses an earlier "
+                    f"{relation.relation.value} relation",
                     relation_path,
                 )
             )
