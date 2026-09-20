@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import timedelta
 from uuid import uuid5
 
-from sqlalchemy import DateTime, and_, case, delete, func, insert, select, update
+from sqlalchemy import DateTime, and_, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as upsert
 from sqlalchemy.exc import SQLAlchemyError
 
