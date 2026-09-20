@@ -21,6 +21,8 @@ from app.repositories.postgres.media_assets import (
     PostgresMediaAssetRepository,
     media_assets,
 )
+from app.repositories.postgres.practice import sessions
+from app.repositories.postgres.tasks import entity_values, session_tasks
 from app.repositories.postgres.users import users
 from app.repositories.postgres.vocabulary import (
     PostgresVocabularyRepository,
@@ -31,6 +33,7 @@ from app.repositories.postgres.vocabulary import (
     vocabulary_translations,
 )
 from app.schemas.media import MediaAsset
+from app.schemas.tasks import SessionTask
 from app.schemas.users import LanguageProfile, User
 from app.schemas.vocabulary import (
     UserVocabularyProgress,
@@ -368,10 +371,6 @@ def test_encounter_parent_links_and_counter_rollback(
     elif invalid == "missing_task":
         event.session_task_id = uuid4()
     elif invalid == "other_session":
-        from app.repositories.postgres.practice import sessions
-        from app.repositories.postgres.tasks import entity_values, session_tasks
-        from app.schemas.tasks import SessionTask
-
         with engine.begin() as connection:
             copied = dict(
                 connection.execute(
