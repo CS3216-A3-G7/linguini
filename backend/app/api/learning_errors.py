@@ -9,7 +9,11 @@ from app.repositories.language_profiles import (
 )
 from app.repositories.learning import LearningStorageError
 from app.repositories.media_assets import MediaAssetConflictError, MediaAssetStorageError
-from app.repositories.practice import PracticeStorageError
+from app.repositories.practice import (
+    PracticeConflictError,
+    PracticeNotFoundError,
+    PracticeStorageError,
+)
 from app.repositories.scene_objects import (
     SceneObjectNotFoundError,
     SceneObjectReviewConflictError,
@@ -17,22 +21,32 @@ from app.repositories.scene_objects import (
 from app.repositories.scenes import SceneStorageError
 from app.repositories.tasks import TaskConflictError, TaskNotFoundError, TaskStorageError
 from app.repositories.users import UserRepositoryError
+from app.services.image_storage import InvalidImageUpload, UploadObjectMissing
 from app.services.journals import JournalConflictError, JournalNotFoundError
 from app.services.language_profiles import NoActiveLanguageError
 from app.services.learning import InvalidCursorError, ProgressNotFoundError
 from app.services.media_assets import MediaAssetNotFoundError
 from app.services.media_urls import MediaUrlError
-from app.services.practice import PracticeConflictError, PracticeNotFoundError
 from app.services.scenes import SceneNotFoundError
 from app.services.users import UserNotFoundError
 
 
 def register_learning_errors(app: FastAPI) -> None:
     errors = {
+        InvalidImageUpload: (
+            422,
+            "invalid_image_upload",
+            "Use a valid JPEG, PNG or WebP image up to 10 MB with the issued upload key.",
+        ),
+        UploadObjectMissing: (
+            404,
+            "upload_not_found",
+            "Uploaded image not found. Upload the file before confirming.",
+        ),
         MediaUrlError: (
             503,
             "media_url_error",
-            "Unable to load scene images. Check backend Storage configuration and retry.",
+            "Unable to access media storage. Check backend Storage configuration and retry.",
         ),
         TaskNotFoundError: (404, "task_not_found", "Task or session not found."),
         TaskConflictError: (409, "task_conflict", "Task record conflicts with the current state."),
@@ -111,6 +125,8 @@ def register_learning_errors(app: FastAPI) -> None:
 
     async def handle_error(request: Request, exc: Exception) -> JSONResponse:
         status, code, message = errors[type(exc)]
+        if isinstance(exc, PracticeConflictError):
+            message = str(exc)
         return JSONResponse(
             status_code=status, content={"detail": {"code": code, "message": message}}
         )

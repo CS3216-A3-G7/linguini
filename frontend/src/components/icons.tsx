@@ -35,6 +35,14 @@ export const BookIcon = ({ size = 22, className }: IconProps) => (
   </svg>
 );
 
+export const JournalIcon = ({ size = 22, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M6 4h11a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+    <path d="M8 4v16M11 8h5M11 12h4" />
+    <path d="m12 17 4.8-4.8 1.8 1.8-4.8 4.8-2.3.5z" />
+  </svg>
+);
+
 export const TrendIcon = ({ size = 22, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M4 15.5 9 10l3.5 3.5L20 6" />
@@ -71,13 +79,31 @@ export const ArrowRightIcon = ({ size = 20, className }: IconProps) => (
 
 export const ArrowLeftIcon = ({ size = 22, className }: IconProps) => (
   <svg {...base(size)} className={className}>
-    <path d="M20 12H5M10 7l-5 5 5 5" />
+  <path d="M20 12H5M10 7l-5 5 5 5" />
+  </svg>
+);
+
+export const ChevronLeftIcon = ({ size = 22, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m15 18-6-6 6-6" />
+  </svg>
+);
+
+export const ChevronRightIcon = ({ size = 22, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m9 18 6-6-6-6" />
   </svg>
 );
 
 export const CheckIcon = ({ size = 20, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M5 12.5 10 17l9-10" />
+  </svg>
+);
+
+export const CloseIcon = ({ size = 20, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m7 7 10 10M17 7 7 17" />
   </svg>
 );
 
@@ -91,6 +117,18 @@ export const HelpIcon = ({ size = 22, className }: IconProps) => (
 export const PlusIcon = ({ size = 20, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+export const FarfalleIcon = ({ size = 28, className }: IconProps) => (
+  <svg {...base(size)} className={className} viewBox="0 0 32 32">
+    <path
+      d="M4 6c4 0 7.1 2.7 9.4 6h5.2C20.9 8.7 24 6 28 6v20c-4 0-7.1-2.7-9.4-6h-5.2C11.1 23.3 8 26 4 26z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    />
+    <path d="M13.4 12h5.2v8h-5.2z" fill="#fffdf8" stroke="none" />
   </svg>
 );
 

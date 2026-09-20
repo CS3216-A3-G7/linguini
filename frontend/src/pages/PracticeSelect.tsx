@@ -1,95 +1,51 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, ProgressTrail, TopBar } from "../components/ui";
-import { ArrowRightIcon, CameraIcon, UploadIcon } from "../components/icons";
-import { SceneImage } from "../components/SceneImage";
+import { Button } from "../components/ui";
+import { CameraIcon } from "../components/icons";
+import { ImageUpload } from "../components/ImageUpload";
+import { createPractice } from "../lib/api";
+import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { useAppState } from "../state/useAppState";
 
 export function PracticeSelect() {
   const navigate = useNavigate();
-  const { startSession, scenes, learner } = useAppState();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [captured, setCaptured] = useState(false);
-
-  if (!scenes.length) return <div className="stack"><h1>Choose your environment</h1><SceneCatalogStatus /></div>;
-
-  const capture = () => {
-    setCaptured(true);
-    setSelected(scenes[0].id);
+  const { scenes, learner, activeProfile } = useAppState();
+  const [uploading, setUploading] = useState(false);
+  const [selected, setSelected] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const busy = useRef(false);
+  const request = useRef<{ asset: string; key: string } | null>(null);
+  const start = async (asset: string) => {
+    if (busy.current || !activeProfile) return;
+    busy.current = true; setSelected(true); setStarting(true); setError(null);
+    if (request.current?.asset !== asset) request.current = { asset, key: crypto.randomUUID() };
+    try {
+      const detail = await createPractice(activeProfile.id, asset, request.current.key);
+      navigate(`/practice/sessions/${detail.session.id}/analysis`);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to start practice."); }
+    finally { busy.current = false; setStarting(false); }
   };
-
-  const cont = () => {
-    if (!selected) return;
-    startSession(selected);
-    navigate(`/practice/${selected}/analysis`);
-  };
-
-  return (
-    <div className="stack">
-      <TopBar
-        title="Step 1: Select environment"
-        onBack={() => navigate("/home")}
-        help="Your photo becomes the basis of this learning session."
-      />
-      <ProgressTrail value={1} total={3} label="Step 1 of 3" />
-
-      <h1>Choose your environment</h1>
-      <p className="muted">Take a photo of the world around you, or start from a ready scene.</p>
-
-      <div className="dashed-capture">
-        {captured ? (
-          <>
-            <span className="thumb thumb--lg">
-              <SceneImage scene={scenes[0]} />
-            </span>
-            <p className="small muted">Photo captured — {scenes[0].title}</p>
-          </>
-        ) : (
-          <>
-            <span style={{ color: "var(--teal-dark)" }}>
-              <CameraIcon size={44} />
-            </span>
-            <p className="small muted center-text">Your photo goes here</p>
-          </>
-        )}
-        <div className="row">
-          <Button onClick={capture} disabled={!learner.cameraOn}>
-            <CameraIcon size={18} /> Open camera
-          </Button>
-          <Button variant="secondary" onClick={capture}>
-            <UploadIcon size={18} /> Upload
-          </Button>
-        </div>
-      </div>
-
-      <h2>Or practise with the below</h2>
-      <div className="grid-3">
-        {scenes.map((scene) => (
-          <button
-            key={scene.id}
-            type="button"
-            className={`scene-pick${selected === scene.id ? " scene-pick--selected" : ""}`}
-            aria-pressed={selected === scene.id}
-            onClick={() => {
-              setCaptured(false);
-              setSelected(scene.id);
-            }}
-          >
-            <SceneImage scene={scene} />
-            <span className="small" style={{ fontWeight: 700 }}>
-              {scene.title}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <Button block disabled={!selected} onClick={cont}>
-        Continue <ArrowRightIcon />
-      </Button>
-      {!selected ? (
-        <p className="small muted center-text">Pick a scene to continue.</p>
-      ) : null}
+  return <div className="stack practice-select">
+    <h1>Capture a scene</h1>
+    <p className="muted">Take a photo of the world around you, or start from a ready scene.</p>
+    <div className="dashed-capture">
+      <span style={{ color: "var(--teal-dark)" }}><CameraIcon size={44} /></span>
+      <ImageUpload compact disabled={selected || starting || !activeProfile} cameraEnabled={learner.cameraOn}
+        onBusyChange={setUploading} onUploaded={image => void start(image.id)} />
     </div>
-  );
+    {starting ? <p role="status">Starting analysis...</p> : null}
+    {error ? <div className="stack-2"><p role="alert">{error}</p><Button disabled={starting || uploading} onClick={() => request.current && void start(request.current.asset)}>Retry</Button></div> : null}
+    {!activeProfile ? <p role="alert">Choose a learning language in Profile to start.</p> : null}
+    <h2>Or practise with the below</h2>
+    <SceneCatalogStatus />
+    <div className="grid-2">
+      {scenes.map(scene => <button key={scene.id} type="button" className="scene-pick"
+        disabled={selected || uploading || starting || !activeProfile} aria-label={`Choose ${scene.title}`} onClick={() => void start(scene.mediaAssetId)}>
+        <SceneVisual scene={scene} />
+        <span className="small items-center justify-center" style={{ fontWeight: 700 }}>{scene.title}</span>
+      </button>)}
+    </div>
+  </div>;
 }

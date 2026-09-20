@@ -1,14 +1,13 @@
-from collections.abc import Callable
-from typing import Protocol
-
-from app.schemas.progress import StoredProgress
+"""Session repository errors shared by the workflow service and persistence layer."""
 
 
 class PracticeStorageError(Exception):
     pass
 
 
-class PracticeRepository(Protocol):
-    def read(self) -> list[StoredProgress]: ...
+class PracticeNotFoundError(Exception):
+    pass
 
-    def change[T](self, action: Callable[[list[StoredProgress]], T]) -> T: ...
+
+class PracticeConflictError(Exception):
+    pass

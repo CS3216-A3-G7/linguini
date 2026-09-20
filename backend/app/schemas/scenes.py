@@ -54,6 +54,12 @@ class DemoScenePrompt(ApiModel):
     feedback: str
 
 
+class PreloadedSceneCatalogDetail(PreloadedScene):
+    """Public catalog metadata; session activities and answers are not catalog data."""
+
+    items: Annotated[list[DemoSceneItem], Field(min_length=1)]
+
+
 class PreloadedSceneDetail(PreloadedScene):
     items: Annotated[list[DemoSceneItem], Field(min_length=1)]
     tasks: Annotated[list[DemoSceneTask], Field(min_length=1)]

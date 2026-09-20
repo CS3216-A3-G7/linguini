@@ -1,5 +1,13 @@
+# Dependency and build output
+node_modules/
+dist/
+dist-ssr/
+
+# Tool caches
+.vite/
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,10 +15,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Local environment and configuration
 *.local
+.env
+.env.*
+!.env.example
 
 # Local credentials (keep the setup templates tracked)
 .env
@@ -21,10 +30,13 @@ dist-ssr
 *.tsbuildinfo
 coverage/
 
+# Local database backups; never commit user data
+.local-backups/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*

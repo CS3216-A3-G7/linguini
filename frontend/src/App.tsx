@@ -8,16 +8,19 @@ import { PracticeSelect } from "./pages/PracticeSelect";
 import { PracticeAnalysis } from "./pages/PracticeAnalysis";
 import { MicTest } from "./pages/MicTest";
 import { Learn } from "./pages/Learn";
+import { LearningTaskPage } from "./pages/LearningTaskPage";
 import { ISpyPhase1 } from "./pages/ISpyPhase1";
 import { ISpyPhase2 } from "./pages/ISpyPhase2";
 import { SessionSummary } from "./pages/SessionSummary";
-import { Progress } from "./pages/Progress";
 import { Vocabulary } from "./pages/Vocabulary";
 import { Journal } from "./pages/Journal";
 import { JournalEntryPage } from "./pages/JournalEntryPage";
 import { JournalNew } from "./pages/JournalNew";
 import { Profile } from "./pages/Profile";
 import { SceneRoute } from "./components/SceneRoute";
+import { SessionRoute } from "./components/SessionRoute";
+import { ProfileEdit } from "./pages/ProfileEdit";
+import { Progress } from "./pages/Progress";
 
 export default function App() {
   return (
@@ -26,14 +29,16 @@ export default function App() {
         <Route path="/" element={<Welcome />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/practice/:sceneId" element={<SceneRoute />}>
+        <Route path="/practice/sessions/:sessionId" element={<SessionRoute />}>
           <Route path="analysis" element={<PracticeAnalysis />} />
           <Route path="mic-test" element={<MicTest />} />
           <Route path="learn" element={<Learn />} />
+          <Route path="learn/:taskId" element={<LearningTaskPage />} />
           <Route path="ispy-1" element={<ISpyPhase1 />} />
           <Route path="ispy-2" element={<ISpyPhase2 />} />
           <Route path="summary" element={<SessionSummary />} />
         </Route>
+        <Route path="/practice/:sceneId/*" element={<SceneRoute />} />
       </Route>
       <Route element={<AppShell />}>
         <Route path="/home" element={<Home />} />
@@ -44,6 +49,7 @@ export default function App() {
         <Route path="/journal/new" element={<JournalNew />} />
         <Route path="/journal/:entryId" element={<JournalEntryPage />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/edit" element={<ProfileEdit />} />
       </Route>
       <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>

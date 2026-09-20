@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Noodle, ProgressTrail, TopBar } from "../components/ui";
+import { Button, Card, ProgressTrail, TopBar } from "../components/ui";
 import { CameraIcon, CheckIcon, MicIcon } from "../components/icons";
 import { languages } from "../config/languages";
 import { useAppState } from "../state/useAppState";
@@ -40,11 +40,9 @@ export function Onboarding() {
     setStep((current) => current + 1);
   };
 
-  const back = () => (step === 0 ? navigate("/") : setStep((current) => current - 1));
-
   return (
     <div className="stack">
-      <TopBar title={steps[step]} onBack={back} help="Four short steps and you are ready to practise." />
+      <TopBar title={steps[step]} help="Four short steps and you are ready to practise." />
       <ProgressTrail value={step + 1} total={steps.length} label={`Step ${step + 1} of ${steps.length}`} />
 
       {step === 0 && (
@@ -121,7 +119,7 @@ export function Onboarding() {
 
       {step === 3 && (
         <div className="stack">
-          <h1>Two quick permissions</h1>
+          <h1>Permissions</h1>
           <p className="muted">
             Linguini uses your camera for scenes and your microphone for speaking practice. You can
             always type instead.
@@ -132,7 +130,7 @@ export function Onboarding() {
                 <CameraIcon />
                 <div>
                   <strong>Camera</strong>
-                  <p className="small muted">Capture the scene you want to learn from.</p>
+                  <p className="small muted">Capture scenes to learn from</p>
                 </div>
               </div>
               <input
@@ -149,7 +147,7 @@ export function Onboarding() {
                 <MicIcon />
                 <div>
                   <strong>Microphone</strong>
-                  <p className="small muted">Speak your clues out loud during I-Spy.</p>
+                  <p className="small muted">Speak your clues</p>
                 </div>
               </div>
               <input
@@ -160,10 +158,8 @@ export function Onboarding() {
               />
             </div>
           </Card>
-          <Noodle />
-          <p className="small muted center-text">
-            {name ? `${name}, ` : ""}you are learning {language.name} · {goal} · {minutes} min a day
-          </p>
+          
+         
         </div>
       )}
 

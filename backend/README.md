@@ -50,6 +50,91 @@ engine per process and disposes it at shutdown.
 
 ## Persistence and remaining static content
 
+### Image uploads
+
+Uploads currently use the existing `DEMO_USER_ID` identity, as explicitly chosen
+for this demo. This is not authentication; replace the current-user dependency
+with verified authentication before making user-owned uploads publicly available.
+The server requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; uploads use the
+private `media-assets` bucket. Install backend dependencies to include Pillow.
+
+1. `POST /api/v1/media/upload-url` with `fileName`, `fileSize`, `mimeType`, and
+   `source` (`camera` or `userUpload`). Sizes must be 1–10,485,760 bytes, and MIME
+   types must be JPEG, PNG or WebP. The response includes `assetId`, `storageKey`,
+   `uploadUrl`, and `expiresInSeconds`. No metadata row is inserted yet. Keys use
+   `users/{userId}/images/{assetId}.{extension}`, with the extension chosen by MIME.
+2. PUT the file bytes to `uploadUrl` with its `Content-Type`. Uploads do not permit
+   overwrites. The signed upload URL expires after 7,200 seconds.
+3. `POST /api/v1/media/confirm-upload` with `assetId`, `storageKey`, and `source`.
+   The server checks the key, downloads with a bounded byte limit, verifies and
+   decodes the image with Pillow, and saves the detected MIME and dimensions.
+   Invalid uploaded objects are deleted; transient Storage failures can be retried.
+   Repeated/concurrent confirmations return the existing owned asset.
+4. `GET /api/v1/media/{assetId}` returns metadata plus `signedUrl` and
+   `expiresInSeconds: 3600`. Missing and unauthorized assets both return 404.
+
+The frontend supports file selection and device camera capture, validation, upload
+status, error feedback, and a signed-image preview. Journal uploads can be selected
+and saved as attachments. Uploaded images can start a session and run the placeholder
+analysis workflow below. Desktop browsers may open a file picker for the camera control.
+
+### Unified image sessions
+
+Both image sources use `MediaAsset -> Session -> SceneObjects -> VocabularyItems ->
+SessionTasks -> attempts/completion/skipping -> progress`. The source is read from
+`MediaAsset.source`; there is no client-controlled session type.
+
+1. Create a session using `POST /api/v1/sessions` with `mediaAssetId`, the active
+   `languageProfileId`, and an optional retry `idempotencyKey`.
+2. `POST /api/v1/sessions/{id}/analyze` saves resumable object suggestions in
+   `sessions.analysis_draft`. It creates no `scene_objects` or lesson tasks yet;
+   `generate-plan` is an alias for this draft step. `GET` returns draft suggestions
+   in `sceneObjects` until review is confirmed.
+   `GET /api/v1/sessions/{id}/review-word?label=chair` checks an English label
+   against vocabulary for the active learning language.
+   `PUT /api/v1/sessions/{id}/review` accepts `acceptedObjectIds` and `addedObjects`
+   (`id`, English `label`, normalized `x`/`y`). It atomically saves only selected
+   objects, clears the draft and builds tasks. Unknown added words are rejected;
+   task activity locks further editing. Apply the session-analysis-draft migration
+   with `npm run db:deploy` before running this version of the API.
+3. Preloaded images use curated catalog objects. Uploaded photos use chair, table,
+   and plant samples with fixed positions, explicitly labeled in the UI. No pixels
+   are inspected. Vocabulary covers all six UI target languages with English as
+   the source language; other pairs return a clear conflict rather than mislabeling data.
+4. Both sources share analysis, mic test, practice and summary screens under
+   `/practice/sessions/:sessionId`. Every task is skippable. Pronunciation currently
+   uses typed answers; there is no speech grading or AI evaluation.
+5. `POST /tasks/{id}/start`, `/complete`, `/attempts`, and `/skip` persist actions.
+   Only reading tasks accept direct completion. Exercises are evaluated against
+   server-only keys. Reflection records participation. One evaluated attempt ends
+   each placeholder exercise, including incorrect answers. Retrying the same attempt
+   key and payload returns the saved attempt; a changed payload conflicts.
+6. Introductions and evaluated attempts atomically create vocabulary encounters and
+   increment exposure/correct counters. Analysis, explanations and skips earn no
+   vocabulary credit. XP is derived as five points per encounter. No mastery score
+   algorithm is implemented. Session completion requires every task completed or skipped.
+
+Vocabulary is bootstrapped idempotently during analysis and existing records are reused.
+No separate vocabulary bootstrap script is needed. The old object review and
+demo-event routes have been removed.
+
+Migration `20260919020000_normalize_session_workflow` preserves session IDs and
+normalized history, closes unfinished legacy sessions, and removes the obsolete JSON
+state column. Migration `20260919030000_remove_user_practice_progress` removes the
+unused practice snapshot table. Export any historical snapshot rows before deployment
+if they need to be retained. Run `npm run db:deploy` before restarting the backend.
+
+XP is not stored as a separate total. `/api/v1/me/progress` calculates five points per
+persisted `vocabulary_encounters` row for the current user and active target language.
+Session/task rows supply completion progress; `user_vocabulary_progress` retains
+per-word exposure and correct-attempt counters. Removing the old snapshot table does
+not alter these records or convert historical demo XP into learning credit.
+
+To run the workflow integration tests, set `TEST_DATABASE_URL` to a disposable
+PostgreSQL database with all Prisma migrations applied, then run
+`python -m pytest tests/test_postgres_sessions.py tests/test_api_workflows.py`
+from `backend`. These tests write records; use a separate test database.
+
 ### Preloaded scene images
 
 For a private bucket, set these backend-only variables in `backend/.env.local`:
@@ -95,7 +180,7 @@ See [Supabase public URLs](https://supabase.com/docs/reference/javascript/file-b
 | Users and language profiles | `users`, `language_profiles` |
 | Image/audio metadata | `media_assets` (file bytes are not stored here) |
 | Vocabulary | `vocabulary_items`, `vocabulary_translations`, `user_vocabulary_progress`, `vocabulary_encounters` |
-| Practice | `sessions`, `scene_objects`, `user_practice_progress` |
+| Practice | `sessions`, `scene_objects` |
 | Tasks | `session_tasks`, `task_attempts`, `task_hints` |
 | Journals | `journals`, `journal_media`, `journal_revisions`, `journal_suggestions`, `journal_word_mentions` |
 | AI observability | `ai_generation_runs` |
@@ -161,12 +246,10 @@ does not fabricate parents, delete encounters, or adjust counters. Foreign keys 
 deleted while referenced, but deleting an entire user's aggregate can cascade
 atomically. Prisma records the relations; SQL defines the deferred-check behavior.
 
-Practice sessions and XP update in one transaction. Retrying a scored demo event
-awards XP once. Sessions are owned by the user/profile; a new active session can
-abandon the prior session for that profile. Normalized task records protect private
-answers, attempts, hints, and completion state. The demo frontend still uses the
-scene's scripted task payload and `sessions.demo_state`; do not remove that JSONB
-column until the frontend uses normalized task APIs throughout.
+Practice actions, evaluated attempts, encounters, and vocabulary counters commit in
+one transaction. Stable event identities and a user lock prevent duplicate credit
+under concurrent retries. A new session abandons the prior active session for the
+same profile. Task answers are private and are omitted from every public task response.
 
 Journals are unique per user/local date across all target languages. Saves append
 immutable revisions, with identical retries avoiding duplicate revisions. Media
@@ -199,11 +282,12 @@ through backend repositories; the frontend must not query these tables directly.
 
 ## Remaining integration work
 
-Authentication, camera uploads/media processing, AI generation and speech evaluation
-are not implemented. AI runs are populated only when backend workers call the
+Authentication, real image analysis, AI generation and speech evaluation
+are not implemented. Uploaded images use validated storage uploads and deterministic
+placeholder objects. AI runs are populated only when backend workers call the
 repository; ordinary frontend use does not fabricate run records. Vocabulary
-"Move" is still local frontend state. Demo scoring is not yet connected to the
-vocabulary encounter writer. Daily vocabulary, home aggregation, and other unfinished
+"Move" is still local frontend state. Session learning credit comes from persisted
+vocabulary encounters; analysis and skipped tasks award none. Daily vocabulary, home aggregation, and other unfinished
 routes return an explicit 501. Journal eligible-photo/learned-word recommendations
 and automatic annotations remain unpopulated. Creating tables does not implement
 these provider or frontend flows.

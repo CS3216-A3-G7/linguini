@@ -1,109 +1,121 @@
-
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Noodle, ProgressTrail } from "../components/ui";
-import { ArrowRightIcon, BookIcon, CameraIcon, MicIcon, TrendIcon } from "../components/icons";
-import { SceneImage } from "../components/SceneImage";
-import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
+import { Button, Card, ProgressTrail } from "../components/ui";
+import { BookIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
+import { MediaImage } from "../components/MediaImage";
 import { useAppState } from "../state/useAppState";
-
 
 export function Home() {
   const navigate = useNavigate();
-  const { startSession, progress, progressLoading, progressError, scenes, user, learner } = useAppState();
+  const { learner, progress, progressLoading, progressError, scenes,
+    vocabulary, vocabularyLoading, vocabularyError } = useAppState();
   const resume = progress?.scenarios.find((item) => item.status === "in-progress");
   const resumeScene = scenes.find((scene) => scene.id === resume?.sceneId);
-  const suggestions = scenes.slice(0, 3);
-
-  const begin = (sceneId?: string) => {
-    if (sceneId) {
-      startSession(sceneId);
-      navigate(`/practice/${sceneId}/analysis`);
-      return;
-    }
-    navigate("/practice");
-  };
+  const hasSessionToContinue = Boolean(resume);
 
   return (
-    <div className="stack">
-      <div className="stack-2">
-        {user ? <h1>Hello, {user.displayName}!</h1> : <h1>Welcome</h1>}
-        <p className="small muted">Learning {learner.language} · {learner.dailyMinutes ?? "No"} min daily goal</p>
-      </div>
-
-      <Card lifted>
-        <div className="stack">
-          <div className="spread">
-            <div>
-              <h2>Start a new practice</h2>
-              <p className="small muted">Snap a scene, learn the words, then play I-Spy.</p>
-            </div>
-            <span aria-hidden="true" className="row" style={{ color: "var(--teal-dark)" }}>
-              <MicIcon />
-              <CameraIcon />
-            </span>
-          </div>
-          <Button block onClick={() => begin()}>
-            Choose an environment <ArrowRightIcon />
-          </Button>
+    <div className="home stack">
+      <section className="home-welcome">
+        <img
+          className="mascot"
+          src="/linguini-logo.png"
+          width={120}
+          height={120}
+          alt="Linguini mascot"
+        />
+        <div>
+          <h1>Welcome back, {learner.name}</h1>
+          <p>Every place has a few new words waiting for you.</p>
         </div>
-      </Card>
+      </section>
 
-      {progressLoading ? <p role="status" className="small muted">Loading your active scenario…</p> : null}
-      {progressError ? <p role="alert" className="small">{progressError} Reload to retry.</p> : null}
-      {resumeScene && resume ? (
-        <Card plain>
-          <div className="stack-2">
-            <span className="label muted">Pick up where you left off</span>
-            <div className="row">
-              <span className="thumb">
-                <SceneImage scene={resumeScene} />
-              </span>
-              <div className="grow stack-2">
-                <strong>{resumeScene.title}</strong>
-                <ProgressTrail
-                  value={resume.spokenItems}
-                  total={resume.totalItems}
-                  label={`${resume.spokenItems} / ${resume.totalItems} items found`}
-                />
-              </div>
-            </div>
-            <Button variant="secondary" onClick={() => begin(resumeScene.id)}>
-              Continue scenario
-            </Button>
-          </div>
-        </Card>
+      <div className="home-dashboard">
+        <div className="home-dashboard__left">
+      <section className="home-streak" aria-label="Your learning goal">
+        <div className="home-streak__heading">
+          <strong>Your daily goal</strong>
+          <span>{learner.dailyMinutes ? `${learner.dailyMinutes} minutes` : "Not set"}</span>
+        </div>
+        <p>Learning {learner.language}</p>
+        {progress ? <p>{progress.xp} XP earned</p> : null}
+      </section>
+
+      {hasSessionToContinue ? (
+        <Button
+          variant="quiet"
+          className="home-action-row home-action-row--new-practice"
+          onClick={() => navigate("/practice")}
+        >
+          <span className="home-action-row__icon home-action-row__icon--pasta">
+            <PlusIcon size={20} />
+          </span>
+          <span className="home-action-row__copy">
+            <strong>Find more words</strong>
+            <small>Use a new photo or ready scene</small>
+          </span>
+          <ChevronRightIcon />
+        </Button>
       ) : null}
 
-      <Noodle />
-
-      <div className="stack-2">
-        <h2>Or practise with a ready scene</h2>
-        <SceneCatalogStatus />
-        <div className="grid-3">
-          {suggestions.map((scene) => (
-            <button
-              key={scene.id}
-              type="button"
-              className="scene-pick"
-              onClick={() => begin(scene.id)}
-            >
-              <SceneImage scene={scene} />
-              <span className="small" style={{ fontWeight: 700 }}>
-                {scene.title}
-              </span>
-            </button>
-          ))}
+      {vocabulary.length > 0 ? <Button variant="quiet" className="home-action-row home-action-row--journal" onClick={() => navigate("/journal/new")}>
+        <span className="home-action-row__icon home-action-row__icon--teal">
+          <BookIcon size={20} />
+        </span>
+        <span className="home-action-row__copy">
+          <strong>Write a journal entry</strong>
+          <small>Use your recent words in a short reflection</small>
+        </span>
+        <ChevronRightIcon />
+      </Button> : null}
         </div>
-      </div>
 
-      <div className="grid-2">
-        <Button variant="secondary" onClick={() => navigate("/vocabulary")}>
-          <BookIcon size={18} /> Vocabulary
-        </Button>
-        <Button variant="secondary" onClick={() => navigate("/progress")}>
-          <TrendIcon size={18} /> Progress
-        </Button>
+      <section className="home-plan" aria-labelledby="home-plan-title">
+        <h2 id="home-plan-title">Today&apos;s plan</h2>
+        {progressLoading ? <p role="status">Loading your practice...</p> : progressError ? (
+          <p role="alert">{progressError} Reload to retry.</p>
+        ) : resume ? (
+          <Card className="home-featured">
+            <div className="home-featured__image"><MediaImage assetId={resume.mediaAssetId} title={resume.title} imageUrl={resumeScene?.imageUrl} /></div>
+            <div className="home-featured__body">
+              <div className="stack-2">
+                <h3>Continue learning</h3>
+                <p>{resume.title}</p>
+              </div>
+              <ProgressTrail
+                value={resume.completedTaskCount}
+                total={resume.totalTaskCount}
+                label={`${resume.completedTaskCount} of ${resume.totalTaskCount} tasks complete`}
+              />
+              <Button block onClick={() => navigate(`/practice/sessions/${resume.sessionId}/learn`)}>
+                Continue learning <ChevronRightIcon size={20} />
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <Card className="home-featured home-featured--new">
+            <div className="home-featured__body">
+              <div className="stack-2">
+                <h3>Turn a place into a lesson</h3>
+                <p>Choose a photo or one of our ready-made scenes.</p>
+              </div>
+              <Button block onClick={() => navigate("/practice")}>
+                Begin a new practice <ChevronRightIcon size={20} />
+              </Button>
+            </div>
+          </Card>
+        )}
+
+      </section>
       </div>
+      <section className="stack-2" aria-labelledby="home-word-bank">
+        <h2 id="home-word-bank">Your word bank</h2>
+        {vocabularyLoading ? <p role="status">Loading your words...</p> : vocabularyError ? (
+          <p role="alert">{vocabularyError} Reload to retry.</p>
+        ) : <p>{vocabulary.length ? `${vocabulary.length} words collected` : "Your words will appear here as you practise."}</p>}
+        <Button variant="secondary" onClick={() => navigate("/vocabulary")}>
+          <BookIcon size={20} /> Explore your words
+        </Button>
+      </section>
+
     </div>
   );
 }

@@ -41,6 +41,15 @@ export function useAccount() {
     return createLanguageProfile(code, minutes);
   }), [data, run]);
   const saveUser = useCallback((patch: UserPatch) => run(() => updateUser(patch)), [run]);
+  const saveProfileSettings = useCallback((code: string, patch: UserPatch, preferences: LanguageProfilePatch) => run(async () => {
+    if (!languages.some(language => language.code === code)) throw new Error("Choose a supported language.");
+    await updateUser(patch);
+    // A previous save may have created the profile before a later request failed.
+    const profiles = await getLanguageProfiles();
+    const existing = profiles.find(profile => profile.targetLanguageCode === code && profile.sourceLanguageCode === "en");
+    const profile = existing ?? await createLanguageProfile(code, preferences.dailyGoalMinutes ?? 10);
+    await updateLanguageProfile(profile.id, { ...preferences, isActive: true });
+  }), [run]);
   const activateLanguageProfile = useCallback((id: string) => run(async () => {
     if (!data?.profiles.some((profile) => profile.id === id)) throw new Error("Language profile not found.");
     return updateLanguageProfile(id, { isActive: true });
@@ -62,7 +71,7 @@ export function useAccount() {
     activeProfile,
     languageProfiles: data?.profiles ?? [],
     activateLanguageProfile,
-    profileSaving, profileError, setLanguage, saveUser, saveLanguageProfile, completeOnboarding,
+    profileSaving, profileError, setLanguage, saveUser, saveProfileSettings, saveLanguageProfile, completeOnboarding,
     learner: {
       name: data?.user.displayName ?? "",
       languageCode: activeProfile?.targetLanguageCode ?? "",

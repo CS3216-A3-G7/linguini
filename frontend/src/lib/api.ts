@@ -4,6 +4,37 @@ import type { JournalEntry } from "../data/types";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
 
+export interface UploadedImage {
+  id: string;
+  signedUrl: string;
+  mimeType: string;
+  width: number;
+  height: number;
+}
+
+export async function uploadImage(file: File, source: "camera" | "userUpload", onPhase: (phase: string) => void): Promise<UploadedImage> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Choose a JPEG, PNG or WebP image.");
+  if (!file.size || file.size > 10 * 1024 * 1024) throw new Error("Choose an image between 1 byte and 10 MB.");
+  onPhase("Preparing upload…");
+  const upload = await write<{ assetId: string; storageKey: string; uploadUrl: string }>("/api/v1/media/upload-url", "POST", {
+    fileName: file.name, fileSize: file.size, mimeType: file.type, source,
+  });
+  onPhase("Uploading image…");
+  const response = await fetch(upload.uploadUrl, {
+    method: "PUT", headers: { "Content-Type": file.type, "x-upsert": "false" }, body: file,
+  });
+  if (!response.ok) throw new Error("Image upload failed. Please try again.");
+  onPhase("Checking image…");
+  // Confirmation is idempotent; retry once if the server committed but its response was lost.
+  const confirm = () => write<UploadedImage>("/api/v1/media/confirm-upload", "POST", {
+    assetId: upload.assetId, storageKey: upload.storageKey, source,
+  });
+  try { return await confirm(); } catch (error) {
+    if (error instanceof Error && /HTTP 4\d\d/.test(error.message)) throw error;
+    return confirm();
+  }
+}
+
 // Matches the camelCase User response from GET /api/v1/me.
 export interface User {
   learningGoal: string;
@@ -36,6 +67,7 @@ async function request<T>(path: string, signal?: AbortSignal, options?: RequestI
     const message = typeof body?.detail?.message === "string" ? body.detail.message : "Request failed.";
     throw new Error(`${message} (HTTP ${response.status})`);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -112,10 +144,10 @@ export async function getScenes(signal?: AbortSignal): Promise<SceneSummary[]> {
 }
 
 export async function getSceneDetail(id: string, signal?: AbortSignal): Promise<Scene> {
-  const row = await request<PreloadedScene & Pick<Scene, "items" | "tasks" | "rounds" | "prompts">>(
+  const row = await request<PreloadedScene & Pick<Scene, "items">>(
     `/api/v1/preloaded-scenes/${encodeURIComponent(id)}`, signal,
   );
-  return { ...sceneSummary(row), items: row.items, tasks: row.tasks, rounds: row.rounds, prompts: row.prompts };
+  return { ...sceneSummary(row), items: row.items };
 }
 
 export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]> {
@@ -153,7 +185,9 @@ interface JournalDetail {
 }
 function journalEntry(detail: JournalDetail): JournalEntry {
   const row = detail.journal;
+  const media = [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder);
   return { id: row.id, languageProfileId: row.languageProfileId, date: row.localDate,
+    photos: media.map((photo, index) => ({ ...photo, imageUrl: index === 0 ? detail.imageUrl ?? null : null })),
     title: row.title, mediaAssetId: [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.mediaAssetId ?? null, imageUrl: detail.imageUrl ?? null, wordsUsed: row.selectedWords,
     body: detail.revisions.find((revision) => revision.id === row.currentRevisionId)?.content ?? "" };
 }
@@ -167,27 +201,82 @@ export async function getTodayJournal(signal?: AbortSignal) {
   const context = await request<{ localDate: string; journal: JournalRecord | null }>("/api/v1/journal/today/context", signal);
   return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null };
 }
-export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed">;
+export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed"> & { photoAssetIds?: string[] };
 export async function saveJournal(draft: JournalDraft, profileId: string, id?: string) {
-  const body = { title: draft.title, mediaAssetId: draft.mediaAssetId, content: draft.body, selectedWords: draft.wordsUsed };
+  const body = { title: draft.title, ...(draft.photoAssetIds === undefined ? { mediaAssetId: draft.mediaAssetId } : {}), content: draft.body, selectedWords: draft.wordsUsed };
   const row = id ? await write<JournalRecord>(`/api/v1/journals/${id}`, "PATCH", body)
     : await write<JournalRecord>("/api/v1/journal/today", "PUT", { ...body, languageProfileId: profileId });
+  if (draft.photoAssetIds !== undefined) {
+    const desired = [...new Set(draft.photoAssetIds)];
+    const current = await getJournal(row.id);
+    // Remove changed positions first; the API requires unique positions and asset IDs.
+    // Reading persisted attachments on every retry also recovers from a partial save.
+    for (const photo of current.photos) {
+      if (desired[photo.displayOrder] !== photo.mediaAssetId) {
+        await request<void>(`/api/v1/journals/${row.id}/media/${photo.mediaAssetId}`, undefined, { method: "DELETE" });
+      }
+    }
+    for (const [displayOrder, mediaAssetId] of desired.entries()) {
+      if (!current.photos.some(photo => photo.mediaAssetId === mediaAssetId && photo.displayOrder === displayOrder)) {
+        await write(`/api/v1/journals/${row.id}/media`, "POST", { mediaAssetId, displayOrder });
+      }
+    }
+  }
   return getJournal(row.id);
 }
 
-export interface PracticeDetail {
-  session: { id: string; status: string };
-  demoState: {
-    answers: Record<string, string>; clues: Record<string, string>;
-    sceneId: string; completedTaskIds: string[]; scoredRoundIds: string[];
-    analysisScored: boolean; roundsPlayed: number; correctRounds: number; sessionXp: number; micReady: boolean;
-  };
+export type TaskContent =
+  | { kind: "vocabularyIntroduction"; title: string; targetText: string; translation: string; partOfSpeech: WordClass; exampleSentence: string | null }
+  | { kind: "pronunciationPractice"; prompt: string; targetText: string }
+  | { kind: "grammarExplanation"; title: string; explanation: string; examples: string[] }
+  | { kind: "grammarPractice"; prompt: string; options: string[] }
+  | { kind: "syntaxExplanation"; title: string; sentencePattern: string; explanation: string; examples: string[] }
+  | { kind: "sentenceBuilding"; prompt: string; sourceText: string | null; tokenBank: string[] }
+  | { kind: "ispyRound"; clue: string; clueTranslation?: string | null; encouragement?: string | null; options: { optionId: string; label: string; sceneObjectId: string }[] }
+  | { kind: "reflection"; prompt: string };
+export interface SessionTask {
+  id: string; kind: TaskContent["kind"]; phase: "learning" | "ispy";
+  status: "pending" | "inProgress" | "completed" | "skipped";
+  isSkippable: true; orderIndex: number; publicContent: TaskContent;
+  vocabularyItemId: string | null; sceneObjectId: string | null;
 }
-export interface PracticeEvent { kind: "analysis" | "task" | "round" | "clue"; itemId?: string; answerId?: string; text?: string }
+export interface SessionProgress {
+  completedTaskCount: number; skippedTaskCount: number; terminalTaskCount: number; totalTaskCount: number;
+}
+export interface PracticeDetail {
+  session: { id: string; status: string; sceneMediaAssetId: string; planVersion: string | null };
+  mediaAsset: { id: string; source: "preloaded" | "camera" | "userUpload" };
+  sceneId: string | null; title: string;
+  analysisMode: "placeholder" | null;
+  sceneObjects: SceneObject[];
+  vocabulary: { id: string; displayText: string; partOfSpeech: WordClass; gender: string | null; exampleSentence: string | null; languageCode: string }[];
+  translations: { vocabularyItemId: string; translatedText: string }[];
+  tasks: SessionTask[]; nextTaskId: string | null; progress: SessionProgress;
+}
+export interface SceneObject {
+  id: string; detectedLabel: string; confirmedLabel: string | null; vocabularyItemId: string | null;
+  selectionStatus: "suggested" | "accepted" | "rejected" | "corrected";
+  boundingBox: { x: number | string; y: number | string; width: number | string; height: number | string };
+}
+export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string };
+export interface TaskActionResult {
+  task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;
+  attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null } | null;
+}
+export const getMedia = (id: string) => request<UploadedImage>(`/api/v1/media/${id}`);
+export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
+export interface PracticeReview {
+  acceptedObjectIds: string[];
+  addedObjects: { id: string; label: string; x: number; y: number }[];
+}
+export const reviewPractice = (id: string, review: PracticeReview) => write<PracticeDetail>(`/api/v1/sessions/${id}/review`, "PUT", review);
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);
 export const getActivePractice = () => request<PracticeDetail | null>("/api/v1/sessions/active");
 export const createPractice = (profileId: string, assetId: string, key: string) => write<PracticeDetail>("/api/v1/sessions", "POST", {
   languageProfileId: profileId, mediaAssetId: assetId, idempotencyKey: key,
 });
-export const recordPractice = (id: string, event: PracticeEvent) => write<PracticeDetail>(`/api/v1/sessions/${id}/demo-events`, "POST", event);
+export const taskAction = (id: string, action: "start" | "complete" | "skip" | "attempts", body: unknown = {}) => write<TaskActionResult>(`/api/v1/tasks/${id}/${action}`, "POST", body);
 export const completePractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/complete`, "POST", {});
+export const getPracticeSummary = (id: string) => request<{ progress: SessionProgress; learnedVocabularyIds: string[]; xpEarned: number; ispyCorrectCount: number; ispyAttemptCount: number }>(`/api/v1/sessions/${id}/summary`);
+
+export const checkPracticeWord = (id: string, label: string) => request<{ available: boolean }>(`/api/v1/sessions/${id}/review-word?label=${encodeURIComponent(label)}`);

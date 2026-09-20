@@ -1,6 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeftIcon, HelpIcon } from "./icons";
+import { ChevronLeftIcon, CloseIcon, HelpIcon } from "./icons";
 import "./ui.css";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -18,10 +18,11 @@ export function Button({ variant = "primary", block, className = "", ...rest }: 
 export function IconButton({
   label,
   children,
+  className = "",
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; children: ReactNode }) {
   return (
-    <button type="button" className="icon-btn" aria-label={label} {...rest}>
+    <button type="button" className={["icon-btn", className].filter(Boolean).join(" ")} aria-label={label} {...rest}>
       {children}
     </button>
   );
@@ -46,29 +47,72 @@ export function Card({
 
 export function TopBar({
   title,
-  onBack,
   help,
   right,
 }: {
   title: string;
-  onBack?: () => void;
   help?: string;
   right?: ReactNode;
 }) {
-  const navigate = useNavigate();
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const titleId = useId();
+  const modalRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!isHelpOpen) return;
+
+    modalRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsHelpOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isHelpOpen]);
+
   return (
-    <div className="topbar">
-      <IconButton label="Go back" onClick={onBack ?? (() => navigate(-1))}>
-        <ArrowLeftIcon />
-      </IconButton>
-      <span className="topbar__title">{title}</span>
-      {right}
-      {help ? (
-        <IconButton label="What happens here?" title={help} onClick={() => window.alert(help)}>
-          <HelpIcon />
-        </IconButton>
+    <>
+      <div className="topbar">
+        <span className="topbar__title">{title}</span>
+        {right}
+        {help ? (
+          <IconButton
+            label="What happens here?"
+            aria-haspopup="dialog"
+            aria-expanded={isHelpOpen}
+            onClick={() => setIsHelpOpen(true)}
+          >
+            <HelpIcon />
+          </IconButton>
+        ) : null}
+      </div>
+
+      {help && isHelpOpen ? (
+        <div className="help-modal__backdrop" onMouseDown={() => setIsHelpOpen(false)}>
+          <section
+            ref={modalRef}
+            className="help-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="help-modal__header">
+              <h2 id={titleId}>About this step</h2>
+              <IconButton
+                label="Close information"
+                onClick={() => setIsHelpOpen(false)}
+              >
+                <CloseIcon />
+              </IconButton>
+            </div>
+            <p>{help}</p>
+            <Button block onClick={() => setIsHelpOpen(false)}>
+              Got it
+            </Button>
+          </section>
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -88,11 +132,17 @@ export function Wordmark({ size = 26 }: { size?: number }) {
   );
 }
 
-/** Persistent yellow Linguini wordmark shown at the top of every screen. */
-export function BrandBar() {
+/** Centered Linguini wordmark in the shared brand strip at the top of every screen. */
+export function BrandBar({ back = false }: { back?: boolean }) {
+  const navigate = useNavigate();
   return (
-    <header className="brandbar">
-      <Wordmark />
+    <header className="brandbar" aria-label="Linguini">
+      {back ? (
+        <IconButton className="brandbar__back" label="Go back" onClick={() => navigate(-1)}>
+          <ChevronLeftIcon />
+        </IconButton>
+      ) : null}
+      <img className="brandbar__wordmark" src="/linguini-wordmark.png" alt="Linguini" />
     </header>
   );
 }
@@ -155,7 +205,7 @@ export function Tabs<T extends string>({
 
 export function Noodle({ className = "noodle-divider" }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 240 20" fill="none" role="presentation">
+    <svg className={className} viewBox="-25 0 240 20" fill="none" role="presentation">
       <path
         d="M4 14c18-14 34 8 52 0s26-14 44-6 28 14 46 6 24-10 40-2"
         stroke="#E85D32"
@@ -172,31 +222,17 @@ export function Noodle({ className = "noodle-divider" }: { className?: string })
   );
 }
 
-export function Mascot({ size = 96 }: { size?: number }) {
+export function Mascot({ size = 96, expression = "happy" }: { size?: number; expression?: "happy" | "sad" }) {
+  const isSad = expression === "sad";
+
   return (
-    <svg
+    <img
       className="mascot"
+      src={isSad ? "/linguini-logo-sad.svg" : "/linguini-logo.svg"}
       width={size}
       height={size}
-      viewBox="0 0 120 120"
-      fill="none"
-      role="img"
-      aria-label="Linguini mascot"
-    >
-      <rect x="6" y="6" width="108" height="108" rx="26" fill="#FFF6E4" />
-      <circle cx="60" cy="58" r="34" fill="#F9B233" />
-      <circle cx="60" cy="58" r="40" stroke="#E85D32" strokeWidth="5" fill="none" />
-      <circle cx="49" cy="50" r="4" fill="#C94E2C" />
-      <circle cx="71" cy="50" r="4" fill="#C94E2C" />
-      <path d="M50 66c4 5 16 5 20 0" stroke="#C94E2C" strokeWidth="4" strokeLinecap="round" />
-      <path
-        d="M28 58c-8-6-2-18 8-14s2 20-8 28c-8 7 6 18 20 12s20-8 30-2"
-        stroke="#E85D32"
-        strokeWidth="5"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
+      alt={`Linguini mascot, ${expression}`}
+    />
   );
 }
 
@@ -207,29 +243,5 @@ export function Feedback({
   tone?: "good" | "warn";
   children: ReactNode;
 }) {
-  return <div className={`feedback${tone === "warn" ? " feedback--warn" : ""}`}>{children}</div>;
-}
-
-export function Sheet({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="sheet">
-        <div className="spread" style={{ marginBottom: "var(--space-4)" }}>
-          <h2>{title}</h2>
-          <Button variant="quiet" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
+  return <div className={`feedback feedback--${tone}`}>{children}</div>;
 }

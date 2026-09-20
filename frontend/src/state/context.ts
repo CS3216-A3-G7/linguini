@@ -8,18 +8,7 @@ import type { SceneSummary } from "../data/types";
 
 export type Learner = ReturnType<typeof useAccount>["learner"];
 
-export type Session = {
-  sceneId: string;
-  completedTaskIds: string[];
-  scoredRoundIds: string[];
-  analysisScored: boolean;
-  roundsPlayed: number;
-  correctRounds: number;
-  sessionXp: number;
-  micReady: boolean;
-};
-
-export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof useAccount>, "user" | "activeProfile" | "languageProfiles" | "activateLanguageProfile" | "profileSaving" | "profileError" | "setLanguage" | "saveUser" | "saveLanguageProfile" | "completeOnboarding"> & {
+export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof useAccount>, "user" | "activeProfile" | "languageProfiles" | "activateLanguageProfile" | "profileSaving" | "profileError" | "setLanguage" | "saveUser" | "saveProfileSettings" | "saveLanguageProfile" | "completeOnboarding"> & {
   scenes: SceneSummary[];
   scenesLoading: boolean;
   scenesError: string | null;

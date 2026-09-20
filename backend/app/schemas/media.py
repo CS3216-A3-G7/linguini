@@ -83,27 +83,34 @@ class SceneObject(EntityModel):
         return self
 
 
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+ImageMime = Literal["image/jpeg", "image/png", "image/webp"]
+UploadSource = Literal[MediaSource.CAMERA, MediaSource.USER_UPLOAD]
+
+
 class CreateUploadUrlRequest(ApiModel):
     file_name: Annotated[str, Field(min_length=1, max_length=255)]
-    media_type: MediaType
-    mime_type: NonEmptyText
+    file_size: Annotated[int, Field(strict=True, gt=0, le=MAX_IMAGE_BYTES)]
+    mime_type: ImageMime
+    source: UploadSource
 
 
 class CreateUploadUrlResponse(ApiModel):
+    asset_id: UUID
     upload_url: NonEmptyText
     storage_key: NonEmptyText
     expires_in_seconds: Annotated[int, Field(gt=0)]
 
 
 class ConfirmMediaUploadRequest(ApiModel):
+    asset_id: UUID
     storage_key: NonEmptyText
-    media_type: MediaType
-    source: MediaSource
-    mime_type: NonEmptyText
-    width: Annotated[int, Field(gt=0)] | None = None
-    height: Annotated[int, Field(gt=0)] | None = None
-    duration_ms: Annotated[int, Field(gt=0)] | None = None
-    captured_at: AwareDatetime | None = None
+    source: UploadSource
+
+
+class MediaAssetResponse(MediaAsset):
+    signed_url: str
+    expires_in_seconds: int = 3600
 
 
 class SceneObjectReviewItem(ApiModel):

@@ -6,20 +6,22 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from app.schemas.base import ApiModel
-from app.schemas.sessions import StoredDemoSession
 
 
 class ScenarioProgress(ApiModel):
     scene_id: str
+    session_id: UUID
+    media_asset_id: UUID
+    title: str
     status: Literal["in-progress", "completed", "mastered"]
-    spoken_items: Annotated[int, Field(ge=0)]
-    total_items: Annotated[int, Field(gt=0)]
+    completed_task_count: Annotated[int, Field(ge=0)]
+    total_task_count: Annotated[int, Field(gt=0)]
     level: str
 
     @model_validator(mode="after")
     def validate_counts(self) -> "ScenarioProgress":
-        if self.spoken_items > self.total_items:
-            raise ValueError("spoken items cannot exceed total items")
+        if self.completed_task_count > self.total_task_count:
+            raise ValueError("completed tasks cannot exceed total tasks")
         return self
 
 
@@ -37,6 +39,5 @@ class ProgressResponse(ApiModel):
 
 
 class StoredProgress(ProgressResponse):
-    practice_sessions: list[StoredDemoSession] = Field(default_factory=list)
     language_code: str = "es"
     user_id: UUID

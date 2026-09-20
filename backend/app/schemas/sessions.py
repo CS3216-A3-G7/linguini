@@ -9,8 +9,9 @@ from pydantic import AwareDatetime, Field, model_validator
 
 from app.schemas.base import ApiModel, EntityModel
 from app.schemas.enums import SessionStatus
-from app.schemas.media import SceneObject
+from app.schemas.media import MediaAsset, SceneObject
 from app.schemas.tasks import SessionProgress, SessionTaskPublic
+from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
 
 
 class Session(EntityModel):
@@ -50,8 +51,34 @@ class GenerateSessionPlanRequest(ApiModel):
     ispy_round_count: Annotated[int, Field(ge=1, le=20)] = 5
 
 
+class AddedPracticeObject(ApiModel):
+    id: UUID
+    label: Annotated[str, Field(min_length=1, max_length=200)]
+    x: Annotated[float, Field(ge=0, le=0.99)]
+    y: Annotated[float, Field(ge=0, le=0.99)]
+
+
+class ReviewPracticeRequest(ApiModel):
+    accepted_object_ids: Annotated[list[UUID], Field(max_length=50)]
+    added_objects: Annotated[list[AddedPracticeObject], Field(max_length=20)] = Field(
+        default_factory=list
+    )
+
+    @model_validator(mode="after")
+    def unique_selection(self):
+        ids = self.accepted_object_ids + [item.id for item in self.added_objects]
+        if not ids or len(ids) != len(set(ids)):
+            raise ValueError("Choose at least one object, with no duplicate IDs.")
+        return self
+
+
 class SessionDetailResponse(ApiModel):
-    demo_state: DemoPracticeState | None = None
+    analysis_mode: Literal["placeholder"] | None = None
+    media_asset: MediaAsset
+    scene_id: str | None = None
+    title: str
+    vocabulary: list[VocabularyItem] = Field(default_factory=list)
+    translations: list[VocabularyTranslation] = Field(default_factory=list)
     session: Session
     scene_objects: list[SceneObject] = Field(default_factory=list)
     tasks: list[SessionTaskPublic] = Field(default_factory=list)
@@ -63,32 +90,6 @@ class SessionSummaryResponse(ApiModel):
     session: Session
     progress: SessionProgress
     learned_vocabulary_ids: list[UUID] = Field(default_factory=list)
-
-
-class DemoPracticeState(ApiModel):
-    answers: dict[str, str] = Field(default_factory=dict)
-    clues: dict[str, str] = Field(default_factory=dict)
-    scene_id: str
-    completed_task_ids: list[str] = Field(default_factory=list)
-    scored_round_ids: list[str] = Field(default_factory=list)
-    analysis_scored: bool = False
-    rounds_played: int = 0
-    correct_rounds: int = 0
-    session_xp: int = 0
-    mic_ready: bool = False
-
-
-class StoredDemoSession(ApiModel):
-    session: Session
-    state: DemoPracticeState
-    idempotency_key: str | None = None
-
-
-class DemoPracticeEventRequest(ApiModel):
-    kind: Literal["analysis", "task", "round", "clue"]
-    item_id: str | None = None
-    answer_id: str | None = None
-    text: Annotated[str, Field(max_length=1000)] | None = None
-
-
-SessionDetailResponse.model_rebuild()
+    xp_earned: Annotated[int, Field(ge=0)] = 0
+    ispy_correct_count: Annotated[int, Field(ge=0)] = 0
+    ispy_attempt_count: Annotated[int, Field(ge=0)] = 0

@@ -176,16 +176,17 @@ def test_wrong_session_object_and_owned_audio_constraints(context):
     other = SessionTask(
         **(task.model_dump(by_alias=False) | {"id": uuid4(), "session_id": uuid4()})
     )
-    with pytest.raises(IntegrityError), engine.begin() as connection:
-        # Isolate the composite constraint using another existing session row.
+    with pytest.raises(IntegrityError) as failure, engine.begin() as connection:
+        # A terminal row avoids violating the one-active-session constraint first.
         copied = dict(
             connection.execute(select(sessions).where(sessions.c.id == task.session_id))
             .mappings()
             .one()
         )
-        copied.update(id=other.session_id, status="created", idempotency_key=None)
+        copied.update(id=other.session_id, status="failed", idempotency_key=None)
         connection.execute(insert(sessions).values(**copied))
         connection.execute(insert(session_tasks).values(**entity_values(other)))
+    assert failure.value.orig.diag.constraint_name == "session_tasks_scene_object_session_fkey"
     with engine.begin() as connection:
         connection.execute(delete(media_assets).where(media_assets.c.id == shared.id))
 

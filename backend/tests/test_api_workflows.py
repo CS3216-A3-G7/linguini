@@ -66,7 +66,15 @@ def test_missing_user_and_scene_errors(database, monkeypatch):
 def test_server_rejects_forged_awards_and_unknown_events(database):
     _, _, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
-    endpoint = f"/api/v1/sessions/{sid}/demo-events"
-    assert client.post(endpoint, json={"kind": "analysis", "xp": 9999}).status_code == 422
-    assert client.post(endpoint, json={"kind": "task", "itemId": "unknown"}).status_code == 409
+    detail = client.post(f"/api/v1/sessions/{sid}/analyze").json()
+    detail = client.put(
+        f"/api/v1/sessions/{sid}/review",
+        json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
+    ).json()
+    task_id = detail["tasks"][1]["id"]
+    response = client.post(
+        f"/api/v1/tasks/{task_id}/attempts",
+        json={"inputMode": "text", "text": "answer", "score": 1, "xp": 9999},
+    )
+    assert response.status_code == 422
     assert client.get("/api/v1/me/progress").json()["xp"] == 0

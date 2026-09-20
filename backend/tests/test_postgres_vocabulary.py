@@ -414,7 +414,8 @@ def test_encounter_parent_links_and_counter_rollback(
                 connection.execute(delete(users).where(users.c.id == other.id))
 
 
-def test_encounter_links_protect_history_and_owner_deletion(database, encounter_task):
+@pytest.mark.parametrize("parent", ["session", "task", "user"])
+def test_encounter_links_cascade_deletion(database, encounter_task, parent):
     from app.repositories.postgres.practice import sessions
     from app.repositories.postgres.tasks import session_tasks
 
@@ -429,9 +430,6 @@ def test_encounter_links_protect_history_and_owner_deletion(database, encounter_
             outcome="completed",
         )
     )
-    for table, parent_id in [(sessions, event.session_id), (session_tasks, event.session_task_id)]:
-        with pytest.raises(IntegrityError), engine.begin() as connection:
-            connection.execute(delete(table).where(table.c.id == parent_id))
     for field in ["session_id", "session_task_id"]:
         with pytest.raises(IntegrityError), engine.begin() as connection:
             connection.execute(
@@ -440,7 +438,8 @@ def test_encounter_links_protect_history_and_owner_deletion(database, encounter_
                 .values(**{field: uuid4()})
             )
     with engine.begin() as connection:
-        connection.execute(delete(users).where(users.c.id == owner.id))
+        table, parent_id = {"session": (sessions, event.session_id), "task": (session_tasks, event.session_task_id), "user": (users, owner.id)}[parent]
+        connection.execute(delete(table).where(table.c.id == parent_id))
     with engine.connect() as connection:
         assert (
             connection.execute(
@@ -448,3 +447,12 @@ def test_encounter_links_protect_history_and_owner_deletion(database, encounter_
             ).first()
             is None
         )
+
+        if parent != "user":
+            progress = connection.execute(select(user_vocabulary_progress).where(
+                user_vocabulary_progress.c.user_id == owner.id,
+                user_vocabulary_progress.c.vocabulary_item_id == ids[0],
+            )).mappings().one()
+            assert progress["exposure_count"] == progress["correct_attempt_count"] == 0
+            assert progress["first_learned_at"] is None
+            assert connection.execute(select(vocabulary_items.c.id).where(vocabulary_items.c.id == ids[0])).first()

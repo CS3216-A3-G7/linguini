@@ -98,6 +98,9 @@ def database(monkeypatch):
 
 
 def test_owned_and_shared_lookup(database, monkeypatch):
+    from app.services.image_storage import ImageStorage
+
+    monkeypatch.setattr(ImageStorage, "read_url", lambda self, key: "https://example.com/signed")
     engine, owner, ids = database
     repository = PostgresMediaAssetRepository(engine)
     own = asset(source="camera", owner_user_id=owner.id, width=100)
@@ -115,7 +118,11 @@ def test_owned_and_shared_lookup(database, monkeypatch):
         assert repository.create(row) == row
     with TestClient(create_app()) as client:
         for row in [own, shared, audio]:
-            assert client.get(f"/api/v1/media/{row.id}").json() == row.model_dump(mode="json")
+            assert client.get(f"/api/v1/media/{row.id}").json() == {
+                **row.model_dump(mode="json"),
+                "signedUrl": "https://example.com/signed",
+                "expiresInSeconds": 3600,
+            }
         assert client.get(f"/api/v1/media/{internal.id}").status_code == 404
         # Another existing application user cannot read owned metadata.
         other = User(display_name="Other", auth_provider_id=f"test-{uuid4()}")

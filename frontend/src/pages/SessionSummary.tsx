@@ -1,90 +1,64 @@
+import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { Button, Card, Mascot, Noodle, StatusPill, TopBar, XpPill } from "../components/ui";
+import { Button, Card, Noodle, StatusPill, XpPill } from "../components/ui";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
+import { createPractice, getPracticeSummary } from "../lib/api";
+import { useApiData } from "../lib/useApiData";
 
 export function SessionSummary() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, startSession, completeSession, practiceSaving } = useAppState();
-  const finished = scene.tasks.every((task) => session.completedTaskIds.includes(task.id))
-    && scene.rounds.every((round) => session.scoredRoundIds.includes(`round:${round.id}`))
-    && scene.prompts.every((prompt) => session.scoredRoundIds.includes(`clue:${prompt.id}`));
-  useEffect(() => {
-    if (finished && session.status === "inProgress") void completeSession();
-  }, [finished, session.status, completeSession]);
-
-  const revisit = scene.items.slice(0, 3);
-
-  return (
-    <div className="stack">
-      <TopBar title="Session summary" onBack={() => navigate("/home")} />
-      <p className="small muted">{session.status === "completed" ? "Session and XP saved." : "XP is saved after each action."}</p>
-      {!finished ? <Button onClick={() => navigate(`/practice/${scene.id}/learn`)}>Continue unfinished practice</Button> : null}
-      <div className="center-text stack-2" style={{ alignItems: "center" }}>
-        <Mascot size={120} />
-        <h1>Good job!</h1>
-        <Noodle />
-        <p className="muted">You practised {scene.title.toLowerCase()} out loud today.</p>
-      </div>
-
-      <div className="stat-grid">
-        <div className="stat">
-          <div className="stat__value">{session.sessionXp}</div>
-          <span className="small muted">XP earned</span>
-        </div>
-        <div className="stat">
-          <div className="stat__value">
-            {session.correctRounds}/{session.roundsPlayed}
-          </div>
-          <span className="small muted">I-Spy correct</span>
-        </div>
-        <div className="stat">
-          <div className="stat__value">{scene.items.length}</div>
-          <span className="small muted">Items found</span>
-        </div>
-      </div>
-
-      <Card>
-        <div className="stack-2">
-          <div className="spread">
-            <h2>Words to revisit</h2>
-            <XpPill xp={session.sessionXp} />
-          </div>
-          {revisit.map((item) => (
-            <div key={item.id} className="spread">
-              <div>
-                <strong>{item.word}</strong>
-                <p className="small muted">{item.translation}</p>
-              </div>
-              <StatusPill status="learning" />
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <div className="stack-2">
-        <Button block onClick={() => navigate("/journal/new")}>
-          Write today&apos;s journal entry
-        </Button>
-        <Button variant="secondary" block onClick={() => navigate("/vocabulary")}>
-          Review difficult words
-        </Button>
-        <Button
-          variant="secondary"
-          block
-          disabled={practiceSaving}
-          onClick={async () => {
-            if (await startSession(scene.id)) navigate(`/practice/${scene.id}/analysis`);
-          }}
-        >
-          Practise again
-        </Button>
-        <Button variant="quiet" block onClick={() => navigate("/home")}>
-          Back home
-        </Button>
-      </div>
+  const { session, activeProfile, vocabulary } = useAppState();
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const requestKey = useRef(crypto.randomUUID());
+  const load = useCallback(() => getPracticeSummary(scene.sessionId!), [scene.sessionId]);
+  const { data, error, loading } = useApiData(load);
+  const completed = session?.session.status === "completed";
+  const revisit = scene.items.filter(item => data?.learnedVocabularyIds.includes(
+    session?.sceneObjects.find(object => object.id === item.id)?.vocabularyItemId ?? ""
+  )).slice(0, 3);
+  const busy = useRef(false);
+  const practiseAgain = async () => {
+    if (starting || busy.current || !activeProfile) return;
+    busy.current = true;
+    setStarting(true); setStartError(null);
+    try {
+      const next = await createPractice(activeProfile.id, scene.mediaAssetId, requestKey.current);
+      navigate("/practice/sessions/" + next.session.id + "/analysis");
+    } catch (error) { setStartError(error instanceof Error ? error.message : "Unable to start practice."); }
+    finally { busy.current = false; setStarting(false); }
+  };
+  return <div className="stack">
+    <p className="small muted">{completed ? "Session and XP saved." : "XP is saved after each action."}</p>
+    {session?.session.status === "inProgress" ? <Button onClick={() => navigate("/practice/sessions/" + scene.sessionId + "/learn")}>Continue unfinished practice</Button> : null}
+    <div className="center-text stack-2" style={{ alignItems: "center" }}>
+      <img className="mascot" src="/linguini-logo.png" width={120} height={120} alt="Linguini mascot" /><h1>{completed ? "Good job!" : "Your session"}</h1><Noodle className="noodle-divider summary__noodle" />
+      <p className="muted">You practised {scene.title.toLowerCase()}.</p>
     </div>
-  );
+    {loading ? <p role="status">Loading your results...</p> : null}
+    {error || startError ? <p role="alert">{error || startError}</p> : null}
+    {data ? <>
+      <div className="stat-grid">
+        <div className="stat"><div className="stat__value">{data.xpEarned}</div><span className="stat__label">XP earned</span></div>
+        <div className="stat"><div className="stat__value">{data.ispyCorrectCount}/{data.ispyAttemptCount}</div><span className="stat__label">I-Spy correct</span></div>
+        <div className="stat"><div className="stat__value">{data.learnedVocabularyIds.length}</div><span className="stat__label">Words learned</span></div>
+      </div>
+      <Card><div className="stack-2">
+        <div className="spread"><h2>Words to revisit</h2><XpPill xp={data.xpEarned} /></div>
+        {revisit.map(item => {
+          const vocabularyId = session?.sceneObjects.find(object => object.id === item.id)?.vocabularyItemId;
+          return <div key={item.id} className="spread"><div><strong>{item.word}</strong><p className="small muted">{item.translation}</p></div><StatusPill status={vocabulary.find(word => word.id === vocabularyId)?.status ?? "learning"} /></div>;
+        })}
+        {revisit.length === 0 ? <p className="small muted">No vocabulary practised in this session.</p> : null}
+      </div></Card>
+    </> : null}
+    <div className="stack-2">
+      <Button block onClick={() => navigate("/journal/new")}>Write today&apos;s journal entry</Button>
+      <Button variant="secondary" block onClick={() => navigate("/vocabulary")}>Review difficult words</Button>
+      <Button variant="secondary" block disabled={starting || !activeProfile} onClick={() => void practiseAgain()}>Practise again</Button>
+      <Button variant="quiet" block onClick={() => navigate("/home")}>Back home</Button>
+    </div>
+  </div>;
 }
