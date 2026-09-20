@@ -23,6 +23,11 @@ nullable foreign key produces `|o` on the child side, for example
 
 ## Diagram
 
+The diagram is wider than the page; scroll it sideways to follow the right-hand
+tables.
+
+<div class="erd-scroll" markdown>
+
 ```mermaid
 erDiagram
     users {
@@ -223,6 +228,8 @@ erDiagram
     journal_revisions ||--o{ journal_suggestions : "is base of"
     journal_revisions ||--o{ journal_word_mentions : mentions
 ```
+
+</div>
 
 ## Composite and owner-aware foreign keys
 
