@@ -8,7 +8,7 @@ import pytest
 from encounter_factory import create_encounter_task
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from sqlalchemy import delete, insert, select, text, update
+from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from app.database import create_database_engine
@@ -21,6 +21,9 @@ from app.repositories.postgres.media_assets import (
     PostgresMediaAssetRepository,
     media_assets,
 )
+from app.repositories.postgres.practice import sessions
+from app.repositories.postgres.scenes import preloaded_scenes
+from app.repositories.postgres.tasks import session_tasks
 from app.repositories.postgres.users import users
 from app.repositories.postgres.vocabulary import (
     PostgresVocabularyRepository,
@@ -30,11 +33,15 @@ from app.repositories.postgres.vocabulary import (
     vocabulary_items,
     vocabulary_translations,
 )
+from app.repositories.postgres.xp import xp_events
+from app.schemas.base import utc_now
+from app.schemas.enums import VocabularyEncounterOutcome
 from app.schemas.media import MediaAsset
 from app.schemas.users import LanguageProfile, User
 from app.schemas.vocabulary import (
     UserVocabularyProgress,
     VocabularyEncounter,
+    VocabularyItem,
     VocabularyTranslation,
 )
 
@@ -92,7 +99,7 @@ def database(monkeypatch):
             )
             connection.execute(
                 insert(user_vocabulary_progress).values(
-                    **progress.model_dump(by_alias=False), scene_id="calle-mayor", topic="City"
+                    **progress.model_dump(by_alias=False)
                 )
             )
     repository = PostgresVocabularyRepository(engine)
@@ -118,7 +125,8 @@ def test_api_pagination_translation_and_isolation(database, monkeypatch):
         ).json()
         assert len(second["items"]) == 1 and second["nextCursor"] is None
         assert len({row["vocabulary"]["id"] for row in page["items"] + second["items"]}) == 3
-        assert all(row["sceneId"] and row["topic"] for row in page["items"])
+        # sceneId/topic derive from the latest encounter; seed words have none yet.
+        assert all(row["sceneId"] is None and row["topic"] is None for row in page["items"])
         assert client.get("/api/v1/me/vocabulary?cursor=invalid").status_code == 400
         other = User(display_name="Other", auth_provider_id=f"test-{uuid4()}")
         with engine.begin() as connection:
@@ -473,3 +481,253 @@ def test_encounter_links_cascade_deletion(database, encounter_task, parent):
             assert connection.execute(
                 select(vocabulary_items.c.id).where(vocabulary_items.c.id == ids[0])
             ).first()
+
+
+def progress_row(engine, user_id, item_id):
+    with engine.connect() as connection:
+        return (
+            connection.execute(
+                select(user_vocabulary_progress).where(
+                    user_vocabulary_progress.c.user_id == user_id,
+                    user_vocabulary_progress.c.vocabulary_item_id == item_id,
+                )
+            )
+            .mappings()
+            .one()
+        )
+
+
+def test_status_ladder_mastery_and_replay(database, encounter_task):
+    engine, owner, ids, _, repository = database
+
+    def encounter(item_id, encounter_type, outcome, event_id=None):
+        return VocabularyEncounter(
+            id=event_id or uuid4(),
+            user_id=owner.id,
+            vocabulary_item_id=item_id,
+            session_id=encounter_task.session_id,
+            session_task_id=encounter_task.id,
+            encounter_type=encounter_type,
+            outcome=outcome,
+        )
+
+    introduced = encounter(ids[0], "introduced", "completed")
+    assert repository.record_encounter(introduced).id == introduced.id
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["status"] == "new" and row["mastery_score"] == 0
+    assert row["exposure_count"] == 1 and row["last_practised_at"] is None
+
+    practised = encounter(ids[0], "practised", "correct")
+    repository.record_encounter(practised)
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["status"] == "learning" and row["mastery_score"] == Decimal("0.5")
+    assert row["exposure_count"] == 2 and row["correct_attempt_count"] == 1
+    assert row["last_practised_at"] == practised.occurred_at
+
+    # Replays of the same event id never move counters again.
+    assert repository.record_encounter(practised).id == practised.id
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["exposure_count"] == 2 and row["correct_attempt_count"] == 1
+    with pytest.raises(VocabularyEncounterConflictError):
+        repository.record_encounter(
+            practised.model_copy(update={"outcome": VocabularyEncounterOutcome.INCORRECT})
+        )
+
+    profile = PostgresLanguageProfileRepository(engine).list_for_user(owner.id)[0]
+    resolved = repository.record_journal_usage(
+        user_id=owner.id,
+        language_profile_id=profile.id,
+        journal_id=uuid4(),
+        words=["CALLE", "not-a-real-word"],
+        occurred_at=utc_now(),
+    )
+    assert resolved == [ids[0]]
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["status"] == "mastered" and row["mastery_score"] == 1
+
+    # Journal evidence is not an encounter and never counts as exposure.
+    assert row["exposure_count"] == 2 and row["correct_attempt_count"] == 1
+
+    # A later practice encounter cannot downgrade mastered, and nothing emits familiar.
+    repository.record_encounter(encounter(ids[0], "practised", "incorrect"))
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["status"] == "mastered" and row["mastery_score"] == 1
+    assert row["exposure_count"] == 3
+    with engine.connect() as connection:
+        statuses = (
+            connection.execute(
+                select(user_vocabulary_progress.c.status).where(
+                    user_vocabulary_progress.c.user_id == owner.id
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert "familiar" not in statuses
+
+
+def test_journal_usage_scoping_and_xp_once(database, encounter_task):
+    engine, owner, ids, _, repository = database
+    profile = PostgresLanguageProfileRepository(engine).list_for_user(owner.id)[0]
+    other = User(display_name="Other", auth_provider_id=f"test-{uuid4()}")
+    german = VocabularyItem(
+        language_code="de", lemma="calle", display_text="calle", part_of_speech="noun"
+    )
+    other_progress = UserVocabularyProgress(user_id=other.id, vocabulary_item_id=ids[1])
+    with engine.begin() as connection:
+        connection.execute(insert(users).values(**other.model_dump(by_alias=False)))
+        connection.execute(insert(vocabulary_items).values(**german.model_dump(by_alias=False)))
+        connection.execute(
+            insert(user_vocabulary_progress).values(**other_progress.model_dump(by_alias=False))
+        )
+    try:
+        journal_id = uuid4()
+        resolved = repository.record_journal_usage(
+            user_id=owner.id,
+            language_profile_id=profile.id,
+            journal_id=journal_id,
+            words=["autobus", "calle", "missing"],
+            occurred_at=utc_now(),
+        )
+        # 'calle' also names a German item, but only the owner's own
+        # target-language progress rows are evidence; 'missing' is ignored.
+        assert set(resolved) == {ids[0], ids[1]}
+        for item_id in (ids[0], ids[1]):
+            row = progress_row(engine, owner.id, item_id)
+            assert row["status"] == "mastered" and row["mastery_score"] == 1
+            assert row["last_practised_at"] is not None
+        # Another user's progress on the same word is untouched.
+        assert progress_row(engine, other.id, ids[1])["status"] == "new"
+        # The German item never received a progress row for the owner.
+        with engine.connect() as connection:
+            assert (
+                connection.execute(
+                    select(user_vocabulary_progress).where(
+                        user_vocabulary_progress.c.user_id == owner.id,
+                        user_vocabulary_progress.c.vocabulary_item_id == german.id,
+                    )
+                ).first()
+                is None
+            )
+
+        # A profile owned by someone else resolves nothing and awards nothing.
+        assert (
+            repository.record_journal_usage(
+                user_id=owner.id,
+                language_profile_id=uuid4(),
+                journal_id=uuid4(),
+                words=["autobus"],
+                occurred_at=utc_now(),
+            )
+            == []
+        )
+
+        def journal_events():
+            with engine.connect() as connection:
+                return connection.execute(
+                    select(func.count())
+                    .select_from(xp_events)
+                    .where(
+                        xp_events.c.user_id == owner.id,
+                        xp_events.c.idempotency_key == f"journal:{journal_id}",
+                    )
+                ).scalar_one()
+
+        assert journal_events() == 1
+        repository.record_journal_usage(
+            user_id=owner.id,
+            language_profile_id=profile.id,
+            journal_id=journal_id,
+            words=["autobus"],
+            occurred_at=utc_now(),
+        )
+        assert journal_events() == 1
+    finally:
+        with engine.begin() as connection:
+            connection.execute(delete(users).where(users.c.id == other.id))
+            connection.execute(
+                delete(vocabulary_items).where(vocabulary_items.c.id == german.id)
+            )
+
+
+def test_scene_and_topic_derived_from_latest_encounter(database, encounter_task):
+    engine, owner, ids, _, repository = database
+    repository.record_encounter(
+        VocabularyEncounter(
+            user_id=owner.id,
+            vocabulary_item_id=ids[0],
+            session_id=encounter_task.session_id,
+            session_task_id=encounter_task.id,
+            encounter_type="practised",
+            outcome="correct",
+        )
+    )
+    with engine.connect() as connection:
+        slug, title = connection.execute(
+            select(preloaded_scenes.c.slug, preloaded_scenes.c.title)
+            .select_from(preloaded_scenes)
+            .join(
+                sessions,
+                sessions.c.scene_media_asset_id == preloaded_scenes.c.media_asset_id,
+            )
+            .where(sessions.c.id == encounter_task.session_id)
+        ).one()
+    items = {row.vocabulary.id: row for row in repository.list_vocabulary(owner.id)}
+    assert items[ids[0]].scene_id == slug and items[ids[0]].topic == title
+    # No encounters yet and an uploaded scene both produce None.
+    assert items[ids[1]].scene_id is None and items[ids[1]].topic is None
+
+    asset = MediaAsset(
+        owner_user_id=owner.id,
+        source="userUpload",
+        media_type="image",
+        storage_key=f"test/{uuid4()}.jpg",
+        mime_type="image/jpeg",
+    )
+    upload_session = uuid4()
+    upload_task = uuid4()
+    with engine.begin() as connection:
+        connection.execute(
+            insert(media_assets).values(**asset.model_dump(by_alias=False))
+        )
+        connection.execute(
+            insert(sessions).values(
+                id=upload_session,
+                user_id=owner.id,
+                language_profile_id=connection.execute(
+                    select(sessions.c.language_profile_id).where(
+                        sessions.c.id == encounter_task.session_id
+                    )
+                ).scalar_one(),
+                scene_media_asset_id=asset.id,
+                status="completed",
+                completed_at=utc_now(),
+            )
+        )
+        connection.execute(
+            insert(session_tasks).values(
+                id=upload_task,
+                session_id=upload_session,
+                phase="learning",
+                kind="reflection",
+                order_index=0,
+                public_content={"kind": "reflection", "prompt": "Write"},
+            )
+        )
+        connection.execute(
+            insert(vocabulary_encounters).values(
+                **VocabularyEncounter(
+                    user_id=owner.id,
+                    vocabulary_item_id=ids[2],
+                    session_id=upload_session,
+                    session_task_id=upload_task,
+                    encounter_type="practised",
+                    outcome="correct",
+                ).model_dump(by_alias=False)
+            )
+        )
+    items = {row.vocabulary.id: row for row in repository.list_vocabulary(owner.id)}
+    assert items[ids[2]].scene_id is None and items[ids[2]].topic is None
+    with engine.begin() as connection:
+        connection.execute(delete(sessions).where(sessions.c.id == upload_session))
+        connection.execute(delete(media_assets).where(media_assets.c.id == asset.id))
