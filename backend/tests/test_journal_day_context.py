@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.repositories.journals import JournalConflictError
+from app.repositories.journals import FutureJournalDateError
 from app.repositories.media_assets import SessionImage
 from app.schemas.base import utc_now
 from app.schemas.journals import Journal, JournalDetailResponse, UpsertTodayJournalRequest
@@ -112,7 +112,7 @@ def test_day_context_deduplicates_repeated_asset_across_sessions():
 def test_day_context_rejects_future_dates():
     service, _, _ = _service([], media=MagicMock())
     tomorrow = datetime.now(ZoneInfo(TIMEZONE)).date() + timedelta(days=1)
-    with pytest.raises(JournalConflictError):
+    with pytest.raises(FutureJournalDateError):
         service.day_context(tomorrow)
 
 
@@ -138,5 +138,28 @@ def test_upsert_rejects_future_dates():
     service, _, profile = _service([], media=MagicMock())
     tomorrow = date.today() + timedelta(days=7)
     request = UpsertTodayJournalRequest(language_profile_id=profile.id, content="Future.")
-    with pytest.raises(JournalConflictError):
+    with pytest.raises(FutureJournalDateError):
         service.upsert(request, tomorrow)
+
+
+def test_future_date_error_maps_to_dedicated_409_code():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.api.learning_errors import register_learning_errors
+
+    app = FastAPI()
+    register_learning_errors(app)
+
+    @app.get("/journal/{local_date}/context")
+    def context(local_date: date):
+        raise FutureJournalDateError("Cannot create a journal entry for a future date.")
+
+    response = TestClient(app).get("/journal/2999-01-01/context")
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": {
+            "code": "journal_future_date",
+            "message": "Cannot create a journal entry for a future date.",
+        }
+    }

@@ -2,7 +2,12 @@ from datetime import date, datetime, time, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from app.repositories.journals import JournalConflictError, JournalNotFoundError, JournalRepository
+from app.repositories.journals import (
+    FutureJournalDateError,
+    JournalConflictError,
+    JournalNotFoundError,
+    JournalRepository,
+)
 from app.repositories.media_assets import MediaAssetRepository, SessionImage
 from app.schemas.base import utc_now
 from app.schemas.enums import JournalStatus, JournalSuggestionStatus, MediaSource, MediaType
@@ -122,7 +127,7 @@ class JournalService:
         today = datetime.now(tz).date()
         day = day or today
         if day > today:
-            raise JournalConflictError("Cannot create a journal entry for a future date.")
+            raise FutureJournalDateError("Cannot create a journal entry for a future date.")
         entry = next((row for row in self.list_entries() if row.journal.local_date == day), None)
         eligible_photos: list[JournalPhotoOption] = []
         if self.media is not None:
@@ -201,7 +206,7 @@ class JournalService:
         today = datetime.now(ZoneInfo(user.timezone)).date()
         day = day or today
         if day > today:
-            raise JournalConflictError("Cannot create a journal entry for a future date.")
+            raise FutureJournalDateError("Cannot create a journal entry for a future date.")
         if request.media_asset_id is not None:
             self._check_media(request.media_asset_id, user.id, MediaType.IMAGE)
         if not any(
