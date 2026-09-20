@@ -13,14 +13,10 @@ const items = [
 
 export function AppShell() {
   const { pathname } = useLocation();
-  const isDetailPage =
-    pathname === "/journal/new" ||
-    /^\/journal\/[^/]+$/.test(pathname) ||
-    pathname === "/profile/edit";
+  const isJournalPage = /^\/journal\/(new(\/[^/]+)?|[^/]+)$/.test(pathname);
+  const isDetailPage = isJournalPage || pathname === "/profile/edit";
   const usesWideCanvas =
-    ["/home", "/practice", "/vocabulary", "/journal"].includes(pathname) ||
-    pathname === "/journal/new" ||
-    /^\/journal\/[^/]+$/.test(pathname);
+    ["/home", "/practice", "/vocabulary", "/journal"].includes(pathname) || isJournalPage;
 
   return (
     <div className="shell shell--app">
