@@ -20,11 +20,11 @@ function SessionLoader({ id }: { id: string }) {
   const [preview, setPreview] = useState<Scene | null>(null);
   const [detail, setDetail] = useState<PracticeDetail | null>(null);
   const location = useLocation();
-  // The guard protects arrival only: the pathname is captured at mount and the
-  // verdict is decided once, so in-app moves between this session's stages are
-  // left to each page's own Navigate fallbacks.
-  const entryPath = useRef(location.pathname);
-  const entryAllowed = useRef<boolean | null>(null);
+  // The guard validates every navigation against the latest canonical
+  // destination, but a page whose session advanced underneath it is not
+  // re-validated while the pathname stays the same — Back/Forward and every
+  // in-app move change the pathname, so they are always checked.
+  const checked = useRef<{ path: string; allowed: boolean } | null>(null);
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
     const initial = await getPractice(id);
     const media = await getMedia(initial.mediaAsset.id);
@@ -53,10 +53,10 @@ function SessionLoader({ id }: { id: string }) {
     ? practiceScene(session, { id: data.mediaAssetId, signedUrl: data.imageUrl ?? "" }, learner.language)
     : data;
   const authoritative = session?.session.id === id ? session : detail;
-  if (entryAllowed.current === null && authoritative) {
-    entryAllowed.current = isSessionRouteAllowed(authoritative, entryPath.current);
+  if (authoritative && checked.current?.path !== location.pathname) {
+    checked.current = { path: location.pathname, allowed: isSessionRouteAllowed(authoritative, location.pathname) };
   }
-  if (entryAllowed.current === false) {
+  if (checked.current && !checked.current.allowed) {
     const dest = sessionDestination(authoritative!);
     return <Navigate to={dest.path} replace state={dest.notice ? { practiceNotice: dest.notice } : undefined} />;
   }
