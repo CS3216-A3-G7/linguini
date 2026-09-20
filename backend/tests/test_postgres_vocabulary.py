@@ -368,9 +368,35 @@ def test_encounter_parent_links_and_counter_rollback(
     elif invalid == "missing_task":
         event.session_task_id = uuid4()
     elif invalid == "other_session":
-        profile = PostgresLanguageProfileRepository(engine).list_for_user(owner.id)[0]
-        with TestClient(create_app()) as client:
-            event.session_task_id = create_encounter_task(engine, client, profile).id
+        from app.repositories.postgres.practice import sessions
+        from app.repositories.postgres.tasks import entity_values, session_tasks
+        from app.schemas.tasks import SessionTask
+
+        with engine.begin() as connection:
+            copied = dict(
+                connection.execute(
+                    select(sessions).where(sessions.c.id == encounter_task.session_id)
+                )
+                .mappings()
+                .one()
+            )
+            # Terminal status avoids the one-active-session index; only the
+            # (task, session) pairing needs to be invalid here.
+            copied.update(id=uuid4(), status="failed", idempotency_key=None)
+            connection.execute(insert(sessions).values(**copied))
+            other_task = SessionTask(
+                session_id=copied["id"],
+                phase="learning",
+                kind="grammarPractice",
+                order_index=0,
+                public_content={
+                    "kind": "grammarPractice",
+                    "prompt": "Choose",
+                    "options": ["uno", "dos"],
+                },
+            )
+            connection.execute(insert(session_tasks).values(**entity_values(other_task)))
+        event.session_task_id = other_task.id
     else:
         # A valid progress pair ensures the new owner FK, rather than the old progress FK,
         # is what rejects the reference to someone else's existing session and task.
