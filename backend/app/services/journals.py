@@ -3,7 +3,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from app.repositories.journals import JournalConflictError, JournalNotFoundError, JournalRepository
-from app.repositories.media_assets import MediaAssetRepository
+from app.repositories.media_assets import MediaAssetRepository, SessionImage
 from app.schemas.base import utc_now
 from app.schemas.enums import JournalStatus, JournalSuggestionStatus, MediaSource, MediaType
 from app.schemas.journals import (
@@ -128,13 +128,10 @@ class JournalService:
         if self.media is not None:
             start = datetime.combine(day, time.min, tzinfo=tz)
             end = start + timedelta(days=1)
-            images = self.media.list_completed_session_images(user.id, start, end)
-            seen: set[UUID] = set()
-            images = [
-                image
-                for image in images
-                if not (image.asset.id in seen or seen.add(image.asset.id))
-            ]
+            unique: dict[UUID, SessionImage] = {}
+            for image in self.media.list_completed_session_images(user.id, start, end):
+                unique.setdefault(image.asset.id, image)
+            images = list(unique.values())
             keys = [image.asset.storage_key for image in images]
             urls = (
                 self.private_media_urls.resolve(keys)
