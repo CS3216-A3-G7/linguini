@@ -2,6 +2,8 @@ import { practiceScene } from "../lib/practiceScene";
 import { useCallback, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { getMedia, getPractice } from "../lib/api";
+import type { PracticeDetail } from "../lib/api";
+import { isSessionRouteAllowed, sessionDestination } from "../lib/sessionRoute";
 import { useApiData } from "../lib/useApiData";
 import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
@@ -15,13 +17,15 @@ export function SessionRoute() {
 function SessionLoader({ id }: { id: string }) {
   const { loadSession, learner, session } = useAppState();
   const [preview, setPreview] = useState<Scene | null>(null);
+  const [detail, setDetail] = useState<PracticeDetail | null>(null);
   const location = useLocation();
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
     const initial = await getPractice(id);
     const media = await getMedia(initial.mediaAsset.id);
     if (!signal?.aborted) setPreview(practiceScene(initial, media, learner.language));
-    const detail = await loadSession(id);
-    return practiceScene(detail, media, learner.language);
+    const loaded = await loadSession(id);
+    setDetail(loaded);
+    return practiceScene(loaded, media, learner.language);
   }, [id, loadSession, learner.language]);
   const { data, loading, error } = useApiData(load);
   if (loading) return preview ? <div className="stack analysis-page">
@@ -35,8 +39,10 @@ function SessionLoader({ id }: { id: string }) {
   const current = session?.session.id === id
     ? practiceScene(session, { id: data.mediaAssetId, signedUrl: data.imageUrl ?? "" }, learner.language)
     : data;
-  if (session?.session.id === id && ["created", "analyzingScene", "awaitingObjectReview"].includes(session.session.status) && !["completed", "abandoned", "failed"].includes(session.session.status) && !location.pathname.endsWith("/analysis")) {
-    return <Navigate to={`/practice/sessions/${id}/analysis`} replace />;
+  const authoritative = session?.session.id === id ? session : detail;
+  if (authoritative && !isSessionRouteAllowed(authoritative, location.pathname)) {
+    const dest = sessionDestination(authoritative);
+    return <Navigate to={dest.path} replace state={dest.notice ? { practiceNotice: dest.notice } : undefined} />;
   }
   return <Outlet context={current} />;
 }
