@@ -184,21 +184,25 @@ class PostgresWorkflowRepository:
             return self._detail(c, self._session(c, session_id, profile_id))
 
     def active(self, profile_id):
-        with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
-            row = (
-                c.execute(
-                    select(sessions)
-                    .where(
-                        sessions.c.user_id == self.user_id,
-                        sessions.c.language_profile_id == profile_id,
-                        sessions.c.status.not_in(TERMINAL),
+        try:
+            with self.transaction() as c:
+                self._reap(c, profile_id)
+                row = (
+                    c.execute(
+                        select(sessions)
+                        .where(
+                            sessions.c.user_id == self.user_id,
+                            sessions.c.language_profile_id == profile_id,
+                            sessions.c.status.not_in(TERMINAL),
+                        )
+                        .order_by(sessions.c.created_at.desc())
                     )
-                    .order_by(sessions.c.created_at.desc())
+                    .mappings()
+                    .first()
                 )
-                .mappings()
-                .first()
-            )
-            return self._detail(c, parse_session(row)) if row else None
+                return self._detail(c, parse_session(row)) if row else None
+        except PracticeNotFoundError:
+            return None
 
     def create(self, request):
         with self.transaction() as c:

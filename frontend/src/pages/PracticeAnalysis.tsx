@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
 import { ArrowRightIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
+import { LeaveSession } from "../components/LeaveSession";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { checkPracticeWord } from "../lib/api";
@@ -98,5 +99,6 @@ export function PracticeAnalysis() {
     <Button block disabled={checking || practiceSaving || !!pending || (!kept.length && !added.length)} onClick={() => void proceed()}>
       {practiceSaving ? "Saving your words..." : "Continue"} <ArrowRightIcon />
     </Button>
+    <LeaveSession sessionId={session.session.id} warning={locked ? "Words you have already practised stay in your word bank, but this scene's remaining tasks are dropped." : "The words you picked for this scene will not be saved."} />
   </div>;
 }

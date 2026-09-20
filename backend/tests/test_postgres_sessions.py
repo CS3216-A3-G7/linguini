@@ -360,6 +360,17 @@ def test_reap_expires_stale_sessions_but_keeps_real_work(database):
     assert conflict.json()["detail"]["activeSessionId"] == third
 
 
+def test_active_lookup_reaps_expired_analysis(database):
+    engine, _, profile, client = database
+    sid = create_run(client, profile)["session"]["id"]
+    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == sid
+    age_session(engine, UUID(sid), "analyzingScene", utc_now() - timedelta(minutes=30))
+    assert client.get("/api/v1/sessions/active").json() is None
+    with engine.connect() as c:
+        row = c.execute(select(sessions).where(sessions.c.id == UUID(sid))).mappings().one()
+    assert row["status"] == "failed" and row["failure_code"] == "analysis_timeout"
+
+
 def test_all_task_kinds_complete_with_server_evaluation(database):
     engine, owner, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
