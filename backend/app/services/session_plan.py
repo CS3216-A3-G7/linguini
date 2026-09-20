@@ -121,10 +121,7 @@ def build_objects(connection, session, asset, profile, scene):
             obj = SceneObject(
                 id=uuid5(session.id, "curated:" + entry["id"]),
                 session_id=session.id,
-                media_asset_id=asset.id,
-                detected_label=entry["translation"],
-                confirmed_label=entry["word"],
-                selection_status="accepted",
+                label=entry["translation"],
                 vocabulary_item_id=word.id,
                 bounding_box={
                     "x": min(float(entry["x"]) / 100, 0.95),
@@ -153,8 +150,7 @@ def build_objects(connection, session, asset, profile, scene):
                 translation,
                 example=text,
             )
-            obj.selection_status = "accepted"
-            obj.confirmed_label = text
+
             obj.vocabulary_item_id = word.id
             objects.append(obj)
             words.append(word)

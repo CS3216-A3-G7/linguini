@@ -119,31 +119,53 @@ model VocabularyItem {
   @@map("vocabulary_items")
 }
 
-model Session {
-  id                 String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String @map("user_id") @db.Uuid
-  languageProfileId  String @map("language_profile_id") @db.Uuid
-  languageProfile    LanguageProfile @relation(fields: [languageProfileId, userId], references: [id, userId], onDelete: Cascade, onUpdate: Cascade, map: "sessions_profile_owner_fkey")
-  sceneMediaAssetId  String @map("scene_media_asset_id") @db.Uuid
-  sceneMediaAsset    MediaAsset @relation(fields: [sceneMediaAssetId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  status             String @default("created") @db.VarChar(20)
-  startedAt          DateTime? @map("started_at") @db.Timestamptz(6)
-  completedAt        DateTime? @map("completed_at") @db.Timestamptz(6)
-  abandonedAt        DateTime? @map("abandoned_at") @db.Timestamptz(6)
-  analysisDraft      Json? @map("analysis_draft") @db.JsonB
-  planVersion        String? @map("plan_version") @db.VarChar(100)
-  failureCode        String? @map("failure_code") @db.VarChar(100)
-  idempotencyKey     String? @map("idempotency_key") @db.VarChar(200)
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  sceneObjects       SceneObject[]
-  tasks              SessionTask[]
-  vocabularyEncounters VocabularyEncounter[]
+enum SessionFailureCode {
+  imageUploadFailed
+  sceneAnalysisFailed
+  noValidObjects
+  vocabularyMappingFailed
+  taskGenerationFailed
 
-  aiRuns             AiGenerationRun[]
+  @@map("session_failure_code")
+}
+
+enum SessionStatus {
+  created
+  analyzingScene
+  awaitingObjectReview
+  generatingTasks
+  ready
+  inProgress
+  completed
+  abandoned
+  failed
+
+  @@map("session_status")
+}
+
+// SQL owns one_active_session_per_profile, a partial unique index.
+model Session {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  languageProfileId String @map("language_profile_id") @db.Uuid
+  languageProfile LanguageProfile @relation(fields: [languageProfileId, userId], references: [id, userId], onDelete: Cascade, onUpdate: Cascade, map: "sessions_profile_owner_fkey")
+  sceneMediaAssetId String @map("scene_media_asset_id") @db.Uuid
+  sceneMediaAsset MediaAsset @relation(fields: [sceneMediaAssetId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  status SessionStatus @default(created) @map("session_status")
+  sessionTitle String? @map("session_title") @db.Text
+  sessionSummary String? @map("session_summary") @db.Text
+  analysisDraft Json? @map("analysis_draft") @db.JsonB
+  startedAt DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  abandonedAt DateTime? @map("abandoned_at") @db.Timestamptz(6)
+  failureCode SessionFailureCode? @map("failure_code")
+  idempotencyKey String? @map("idempotency_key") @db.VarChar(200)
+  sceneObjects SceneObject[]
+  tasks SessionTask[]
+  vocabularyEncounters VocabularyEncounter[]
+  aiRuns AiGenerationRun[]
 
   @@unique([id, userId])
-  @@unique([id, sceneMediaAssetId])
   @@unique([userId, languageProfileId, idempotencyKey])
   @@index([languageProfileId, userId])
   @@index([sceneMediaAssetId])
@@ -151,29 +173,39 @@ model Session {
 }
 
 model SceneObject {
-  id                 String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sessionId          String @map("session_id") @db.Uuid
-  mediaAssetId       String @map("media_asset_id") @db.Uuid
-  session            Session @relation(fields: [sessionId, mediaAssetId], references: [id, sceneMediaAssetId], onDelete: Cascade, onUpdate: Cascade, map: "scene_objects_session_media_fkey")
-  detectedLabel      String @map("detected_label") @db.Text
-  confirmedLabel     String? @map("confirmed_label") @db.VarChar(200)
-  selectionStatus    String @default("suggested") @map("selection_status") @db.VarChar(9)
-  x                  Decimal @db.Decimal(10, 9)
-  y                  Decimal @db.Decimal(10, 9)
-  width              Decimal @db.Decimal(10, 9)
-  height             Decimal @db.Decimal(10, 9)
-  confidence         Decimal? @db.Decimal(6, 5)
-  vocabularyItemId   String? @map("vocabulary_item_id") @db.Uuid
-  vocabularyItem     VocabularyItem? @relation(fields: [vocabularyItemId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-
-  tasks              SessionTask[]
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String @map("session_id") @db.Uuid
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "scene_objects_session_fkey")
+  label String @db.Text
+  boundingBox Json? @map("bounding_box") @db.JsonB
+  attributes Json? @db.JsonB
+  confidenceScore Decimal? @map("confidence_score") @db.Decimal(6, 5)
+  sourceObjectKey String? @map("source_object_key") @db.Text
+  vocabularyItemId String? @map("vocabulary_item_id") @db.Uuid
+  vocabularyItem VocabularyItem? @relation(fields: [vocabularyItemId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tasks SessionTask[]
+  subjectRelations SceneObjectRelation[] @relation("RelationSubject")
+  referenceRelations SceneObjectRelation[] @relation("RelationReference")
 
   @@unique([id, sessionId])
-  @@index([sessionId, mediaAssetId])
+  @@index([sessionId])
   @@index([vocabularyItemId])
   @@map("scene_objects")
+}
+
+// SQL additionally ensures both endpoints belong to the same session.
+model SceneObjectRelation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectSceneObjectId String @map("subject_scene_object_id") @db.Uuid
+  subjectSceneObject SceneObject @relation("RelationSubject", fields: [subjectSceneObjectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  relation String @db.Text
+  referenceSceneObjectId String @map("reference_scene_object_id") @db.Uuid
+  referenceSceneObject SceneObject @relation("RelationReference", fields: [referenceSceneObjectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sourceRelationKey String? @map("source_relation_key") @db.Text
+
+  @@index([subjectSceneObjectId])
+  @@index([referenceSceneObjectId])
+  @@map("scene_object_relations")
 }
 
 // SQL additionally enforces a case-insensitive unique source language per item.

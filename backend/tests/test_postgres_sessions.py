@@ -128,9 +128,7 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
     detail = analyze(client, sid)
     assert len(detail["tasks"]) == len(TaskKind)
     assert {t["kind"] for t in detail["tasks"]} == {k.value for k in TaskKind}
-    assert all(
-        o["selectionStatus"] == "accepted" and o["vocabularyItemId"] for o in detail["sceneObjects"]
-    )
+    assert all(o["vocabularyItemId"] for o in detail["sceneObjects"])
     assert "answerKey" not in str(detail) and "demoState" not in detail
     assert client.get("/api/v1/me/progress").json()["xp"] == 0
     assert client.post(endpoint + "/complete").status_code == 409
@@ -249,17 +247,22 @@ def test_task_updates_roll_back_with_encounter_failure(database, monkeypatch):
     assert client.get(f"/api/v1/sessions/{sid}").json()["tasks"][1]["status"] == "pending"
 
 
-def test_active_session_replacement_and_owner_scope(database, monkeypatch):
+def test_active_session_conflict_and_owner_scope(database, monkeypatch):
     engine, owner, profile, client = database
     first = create_run(client, profile)["session"]["id"]
-    replacement = create_run(client, profile, "replacement-key")["session"]["id"]
-    assert client.get(f"/api/v1/sessions/{first}").json()["session"]["status"] == "abandoned"
-    assert client.post(f"/api/v1/sessions/{first}/analyze").status_code == 409
-    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == replacement
+    replacement = client.post(
+        "/api/v1/sessions",
+        json={
+            "languageProfileId": str(profile.id),
+            "mediaAssetId": client.get("/api/v1/preloaded-scenes").json()[0]["mediaAsset"]["id"],
+            "idempotencyKey": "replacement-key",
+        },
+    )
+    assert replacement.status_code == 409
+    assert client.get(f"/api/v1/sessions/{first}").json()["session"]["status"] == "created"
+    assert client.get("/api/v1/sessions/active").json()["session"]["id"] == first
     with pytest.raises(IntegrityError), engine.begin() as c:
-        c.execute(
-            update(sessions).where(sessions.c.id == UUID(replacement)).values(status="completed")
-        )
+        c.execute(update(sessions).where(sessions.c.id == UUID(first)).values(status="completed"))
     monkeypatch.setenv("DEMO_USER_ID", str(uuid4()))
     assert client.get(f"/api/v1/sessions/{replacement}").status_code == 404
 
@@ -364,26 +367,39 @@ def test_review_rejects_adds_and_rebuilds_without_duplicate_objects(database):
         "addedObjects": [
             {
                 "id": str(uuid4()),
-                "label": detail["sceneObjects"][1]["detectedLabel"],
+                "label": detail["sceneObjects"][1]["label"],
                 "x": 0.3,
                 "y": 0.4,
             }
         ],
     }
+    payload["relations"] = [
+        {
+            "id": str(uuid4()),
+            "subjectSceneObjectId": kept,
+            "relation": "beside",
+            "referenceSceneObjectId": payload["addedObjects"][0]["id"],
+            "sourceRelationKey": "client-cannot-claim-ai-provenance",
+        }
+    ]
     response = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
     assert response.status_code == 200, response.text
     saved = response.json()
-    selected = [obj for obj in saved["sceneObjects"] if obj["selectionStatus"] != "rejected"]
+    selected = saved["sceneObjects"]
     assert len(selected) == 2
-    assert any(
-        obj["detectedLabel"] == detail["sceneObjects"][1]["detectedLabel"] for obj in selected
-    )
+    relation = saved["sceneObjectRelations"][0]
+    assert relation["sourceRelationKey"] is None
+    assert relation["subjectSceneObjectId"] == kept
+    assert relation["referenceSceneObjectId"] in {obj["id"] for obj in selected}
+    assert relation["referenceSceneObjectId"] != payload["addedObjects"][0]["id"]
+    assert any(obj["label"] == detail["sceneObjects"][1]["label"] for obj in selected)
     assert all(task["sceneObjectId"] in {obj["id"] for obj in selected} for task in saved["tasks"])
     introductions = [task for task in saved["tasks"] if task["kind"] == "vocabularyIntroduction"]
     assert len(introductions) == 2
     retry = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
     assert retry.status_code == 200, retry.text
     assert len(retry.json()["sceneObjects"]) == len(saved["sceneObjects"])
+    assert retry.json()["sceneObjectRelations"] == saved["sceneObjectRelations"]
     task_id = introductions[0]["id"]
     assert client.post(f"/api/v1/tasks/{task_id}/complete", json={}).status_code == 200
     assert client.put(f"/api/v1/sessions/{sid}/review", json=payload).status_code == 409

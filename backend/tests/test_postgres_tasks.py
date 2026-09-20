@@ -128,8 +128,7 @@ def test_wrong_session_object_and_owned_audio_constraints(context):
     engine, owner, client, repository, task, run = context
     item = SceneObject(
         session_id=run["id"],
-        media_asset_id=run["sceneMediaAssetId"],
-        detected_label="cup",
+        label="cup",
         bounding_box={"x": 0, "y": 0, "width": 1, "height": 1},
     )
     PostgresSceneObjectRepository(engine).create(item)
@@ -183,6 +182,8 @@ def test_wrong_session_object_and_owned_audio_constraints(context):
             .mappings()
             .one()
         )
+        # Mapping iteration uses database column names; writes use SQLAlchemy keys.
+        copied.pop("session_status")
         copied.update(id=other.session_id, status="failed", idempotency_key=None)
         connection.execute(insert(sessions).values(**copied))
         connection.execute(insert(session_tasks).values(**entity_values(other)))

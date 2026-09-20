@@ -15,16 +15,16 @@ export interface UploadedImage {
 export async function uploadImage(file: File, source: "camera" | "userUpload", onPhase: (phase: string) => void): Promise<UploadedImage> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Choose a JPEG, PNG or WebP image.");
   if (!file.size || file.size > 10 * 1024 * 1024) throw new Error("Choose an image between 1 byte and 10 MB.");
-  onPhase("Preparing upload…");
+  onPhase("Preparing uploadâ€¦");
   const upload = await write<{ assetId: string; storageKey: string; uploadUrl: string }>("/api/v1/media/upload-url", "POST", {
     fileName: file.name, fileSize: file.size, mimeType: file.type, source,
   });
-  onPhase("Uploading image…");
+  onPhase("Uploading imageâ€¦");
   const response = await fetch(upload.uploadUrl, {
     method: "PUT", headers: { "Content-Type": file.type, "x-upsert": "false" }, body: file,
   });
   if (!response.ok) throw new Error("Image upload failed. Please try again.");
-  onPhase("Checking image…");
+  onPhase("Checking imageâ€¦");
   // Confirmation is idempotent; retry once if the server committed but its response was lost.
   const confirm = () => write<UploadedImage>("/api/v1/media/confirm-upload", "POST", {
     assetId: upload.assetId, storageKey: upload.storageKey, source,
@@ -244,19 +244,24 @@ export interface SessionProgress {
   completedTaskCount: number; skippedTaskCount: number; terminalTaskCount: number; totalTaskCount: number;
 }
 export interface PracticeDetail {
-  session: { id: string; status: string; sceneMediaAssetId: string; planVersion: string | null };
+  session: { id: string; status: string; sceneMediaAssetId: string; sessionTitle: string | null; sessionSummary: string | null; failureCode: "imageUploadFailed" | "sceneAnalysisFailed" | "noValidObjects" | "vocabularyMappingFailed" | "taskGenerationFailed" | null };
   mediaAsset: { id: string; source: "preloaded" | "camera" | "userUpload" };
   sceneId: string | null; title: string;
   analysisMode: "placeholder" | null;
   sceneObjects: SceneObject[];
+  sceneObjectRelations: SceneObjectRelation[];
   vocabulary: { id: string; displayText: string; partOfSpeech: WordClass; gender: string | null; exampleSentence: string | null; languageCode: string }[];
   translations: { vocabularyItemId: string; translatedText: string }[];
   tasks: SessionTask[]; nextTaskId: string | null; progress: SessionProgress;
 }
 export interface SceneObject {
-  id: string; detectedLabel: string; confirmedLabel: string | null; vocabularyItemId: string | null;
-  selectionStatus: "suggested" | "accepted" | "rejected" | "corrected";
-  boundingBox: { x: number | string; y: number | string; width: number | string; height: number | string };
+  id: string; sessionId: string; label: string; vocabularyItemId: string | null;
+  boundingBox: { x: number | string; y: number | string; width: number | string; height: number | string } | null;
+  attributes: Record<string, unknown> | null; confidenceScore: number | string | null; sourceObjectKey: string | null;
+}
+export interface SceneObjectRelation {
+  id: string; subjectSceneObjectId: string; relation: string;
+  referenceSceneObjectId: string; sourceRelationKey: string | null;
 }
 export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string };
 export interface TaskActionResult {
@@ -267,6 +272,7 @@ export const getMedia = (id: string) => request<UploadedImage>(`/api/v1/media/${
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
 export interface PracticeReview {
   acceptedObjectIds: string[];
+  relations: SceneObjectRelation[];
   addedObjects: { id: string; label: string; x: number; y: number }[];
 }
 export const reviewPractice = (id: string, review: PracticeReview) => write<PracticeDetail>(`/api/v1/sessions/${id}/review`, "PUT", review);

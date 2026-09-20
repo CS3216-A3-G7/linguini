@@ -10,8 +10,9 @@ from sqlalchemy import (
     func,
     select,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ENUM, JSONB
 
+from app.schemas.enums import SessionFailureCode, SessionStatus
 from app.schemas.progress import StoredProgress
 
 sessions = Table(
@@ -21,16 +22,35 @@ sessions = Table(
     Column("user_id", Uuid, nullable=False),
     Column("language_profile_id", Uuid, nullable=False),
     Column("scene_media_asset_id", Uuid, nullable=False),
-    Column("status", String(20), nullable=False),
+    Column(
+        "session_status",
+        ENUM(
+            SessionStatus,
+            name="session_status",
+            schema="public",
+            values_callable=lambda statuses: [status.value for status in statuses],
+            create_type=False,
+        ),
+        key="status",
+        nullable=False,
+    ),
     Column("started_at", DateTime(timezone=True)),
     Column("completed_at", DateTime(timezone=True)),
     Column("abandoned_at", DateTime(timezone=True)),
-    Column("analysis_draft", JSONB),
-    Column("plan_version", String(100)),
-    Column("failure_code", String(100)),
+    Column("analysis_draft", JSONB(none_as_null=True)),
+    Column("session_title", String),
+    Column("session_summary", String),
+    Column(
+        "failure_code",
+        ENUM(
+            SessionFailureCode,
+            name="session_failure_code",
+            schema="public",
+            values_callable=lambda codes: [code.value for code in codes],
+            create_type=False,
+        ),
+    ),
     Column("idempotency_key", String(200)),
-    Column("created_at", DateTime(timezone=True), nullable=False),
-    Column("updated_at", DateTime(timezone=True), nullable=False),
     schema="public",
 )
 
@@ -74,10 +94,9 @@ class SessionBackedLearningRepository:
                 )
                 .where(
                     sessions.c.user_id == user_id,
-                    sessions.c.plan_version.is_not(None),
                     sessions.c.status.in_(["inProgress", "completed"]),
                 )
-                .order_by(sessions.c.created_at)
+                .order_by(sessions.c.started_at)
             )
             if language_code:
                 query = query.where(

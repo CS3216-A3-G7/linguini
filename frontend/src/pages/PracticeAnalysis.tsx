@@ -15,6 +15,10 @@ export function PracticeAnalysis() {
   const { session, saveReview, practiceSaving, practiceError } = useAppState();
   const [removed, setRemoved] = useState<string[]>([]);
   const [added, setAdded] = useState<PracticeReview["addedObjects"]>([]);
+  const [relations, setRelations] = useState<PracticeReview["relations"]>(() => session?.sceneObjectRelations ?? []);
+  const [subject, setSubject] = useState("");
+  const [relationText, setRelationText] = useState("");
+  const [reference, setReference] = useState("");
   const [label, setLabel] = useState("");
   const [checking, setChecking] = useState(false);
   const [pending, setPending] = useState<{ label: string } | null>(null);
@@ -29,6 +33,18 @@ export function PracticeAnalysis() {
   const custom: LanguageItem[] = added.map((item, index) => ({ id: `custom-${item.id}`, word: item.label,
     translation: item.label, wordClass: "noun", gender: null, marker: scene.items.length + index + 1,
     x: item.x * 100, y: item.y * 100, example: "", exampleTranslation: "" }));
+  const relationObjects = [...kept.map(item => ({ id: item.id, label: item.translation })), ...added];
+  const selectedIds = new Set(relationObjects.map(item => item.id));
+  const visibleRelations = relations.filter(row => selectedIds.has(row.subjectSceneObjectId) && selectedIds.has(row.referenceSceneObjectId));
+  const addRelation = () => {
+    const text = relationText.trim();
+    if (!text || subject === reference || !selectedIds.has(subject) || !selectedIds.has(reference)) return;
+    if (visibleRelations.some(row => row.subjectSceneObjectId === subject && row.referenceSceneObjectId === reference && row.relation.toLowerCase() === text.toLowerCase())) {
+      setError("That relation is already in your list."); return;
+    }
+    setRelations(current => [...current, { id: crypto.randomUUID(), subjectSceneObjectId: subject, relation: text, referenceSceneObjectId: reference, sourceRelationKey: null }]);
+    setRelationText(""); setError(null);
+  };
   const startAdding = async () => {
     const word = label.trim();
     if (!word || pending || practiceSaving || checking) return;
@@ -50,7 +66,7 @@ export function PracticeAnalysis() {
   };
   const proceed = async () => {
     if (pending || practiceSaving || (!kept.length && !added.length)) return;
-    if (locked || await saveReview({ acceptedObjectIds: kept.map(item => item.id), addedObjects: added })) navigate(`${base}/mic-test`);
+    if (locked || await saveReview({ acceptedObjectIds: kept.map(item => item.id), addedObjects: added, relations: visibleRelations })) navigate(`${base}/mic-test`);
   };
   return <div className="stack analysis-page">
     <h1>Scene analysis</h1>
@@ -91,6 +107,39 @@ export function PracticeAnalysis() {
             <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={checking || practiceSaving || !!pending} onChange={event => setLabel(event.target.value)} />
             <Button variant="secondary" type="submit" disabled={checking || !label.trim() || !!pending || practiceSaving || added.length >= 20}>{checking ? "Checking word..." : "Choose location"}</Button>
           </div>
+        </form> : null}
+      </Card>
+    </section>
+    <section className="analysis-results" aria-labelledby="analysis-relations-title">
+      <h2 id="analysis-relations-title">How objects relate</h2>
+      <p className="muted">Keep or add connections you can see, such as a cup on a table. Removing a word also removes its connections.</p>
+      <Card plain className="analysis-word-card">
+        <div className="analysis-word-list">
+          {visibleRelations.map((row, index) => <div className="analysis-relation-row" key={row.id}>
+            <span className="analysis-word-row__marker analysis-relation-row__marker">{index + 1}</span>
+            <div className="analysis-relation-row__flow">
+              <strong>{relationObjects.find(item => item.id === row.subjectSceneObjectId)?.label}</strong>
+              <span className="analysis-relation-row__relation">{row.relation}</span>
+              <strong>{relationObjects.find(item => item.id === row.referenceSceneObjectId)?.label}</strong>
+            </div>
+            {!locked ? <button type="button" className="analysis-word-row__remove" disabled={practiceSaving} aria-label={`Remove relation ${row.relation}`} onClick={() => setRelations(current => current.filter(item => item.id !== row.id))}><CloseIcon size={18} /></button> : null}
+          </div>)}
+          {!visibleRelations.length ? <p className="small muted">No connections selected. You can continue without adding any.</p> : null}
+        </div>
+        {!locked ? <form className="stack" onSubmit={event => { event.preventDefault(); addRelation(); }}>
+          <label className="field__label" htmlFor="relation-subject">Object</label>
+          <select className="input" id="relation-subject" value={subject} disabled={practiceSaving} onChange={event => setSubject(event.target.value)}>
+            <option value="">Choose an object</option>
+            {relationObjects.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+          <label className="field__label" htmlFor="relation-text">Connection</label>
+          <input className="input" id="relation-text" value={relationText} maxLength={200} placeholder="e.g. on, beside, under" disabled={practiceSaving} onChange={event => setRelationText(event.target.value)} />
+          <label className="field__label" htmlFor="relation-reference">Related object</label>
+          <select className="input" id="relation-reference" value={reference} disabled={practiceSaving} onChange={event => setReference(event.target.value)}>
+            <option value="">Choose another object</option>
+            {relationObjects.filter(item => item.id !== subject).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+          <Button type="submit" variant="secondary" disabled={practiceSaving || !relationText.trim() || subject === reference || !selectedIds.has(subject) || !selectedIds.has(reference) || visibleRelations.length >= 100}>Add connection</Button>
         </form> : null}
       </Card>
     </section>

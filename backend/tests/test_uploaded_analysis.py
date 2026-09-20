@@ -77,7 +77,7 @@ def test_every_task_kind_is_persistable_skippable_and_private(uploaded):
     objects, tasks = make_plan(uploaded)
     assert {t.kind for t in tasks} == set(TaskKind)
     assert len(tasks) == len(TaskKind)
-    assert all(o.selection_status == "accepted" and o.vocabulary_item_id for o in objects)
+    assert all(o.vocabulary_item_id for o in objects)
     assert all(t.is_skippable and t.scene_object_id in {o.id for o in objects} for t in tasks)
     for task in tasks:
         public = SessionTaskPublic.from_internal(task).model_dump(mode="json")
@@ -89,7 +89,7 @@ def test_every_task_kind_is_persistable_skippable_and_private(uploaded):
 def test_upload_placeholders_cover_supported_languages(language):
     objects, tasks = make_plan(language=language)
     assert len(objects) == 3
-    assert all("?" not in o.confirmed_label for o in objects)
+    assert all("?" not in o.label for o in objects)
     assert tasks[0].public_content.target_text == UPLOAD_WORDS[language][1][0]
 
 
