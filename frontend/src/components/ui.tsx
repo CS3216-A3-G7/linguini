@@ -133,12 +133,12 @@ export function Wordmark({ size = 26 }: { size?: number }) {
 }
 
 /** Centered Linguini wordmark in the shared brand strip at the top of every screen. */
-export function BrandBar({ back = false }: { back?: boolean }) {
+export function BrandBar({ back = false, onBack, backLabel }: { back?: boolean; onBack?: () => void; backLabel?: string }) {
   const navigate = useNavigate();
   return (
     <header className="brandbar" aria-label="Linguini">
       {back ? (
-        <IconButton className="brandbar__back" label="Go back" onClick={() => navigate(-1)}>
+        <IconButton className="brandbar__back" label={backLabel ?? "Go back"} onClick={onBack ?? (() => navigate(-1))}>
           <ChevronLeftIcon />
         </IconButton>
       ) : null}

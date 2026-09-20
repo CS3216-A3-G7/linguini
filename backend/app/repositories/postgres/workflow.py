@@ -1,6 +1,7 @@
 """Atomic normalized session workflow. Locks serialize each user's transitions."""
 
 from contextlib import contextmanager
+from datetime import timedelta
 from uuid import uuid5
 
 from sqlalchemy import case, delete, func, insert, select, update
@@ -21,11 +22,13 @@ from app.repositories.postgres.vocabulary import (
     vocabulary_translations,
 )
 from app.repositories.practice import (
+    ActiveSessionExistsError,
     PracticeConflictError,
     PracticeNotFoundError,
     PracticeStorageError,
 )
 from app.schemas.base import utc_now
+from app.schemas.enums import SessionStatus
 from app.schemas.media import MediaAsset, SceneObject
 from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
 from app.schemas.tasks import (
@@ -44,7 +47,18 @@ from app.schemas.vocabulary import (
 from app.services.session_plan import build_objects, build_tasks
 
 TERMINAL = {"completed", "abandoned", "failed"}
+ALLOWED_TRANSITIONS = {
+    "created": {"analyzingScene", "abandoned", "failed"},
+    "analyzingScene": {"awaitingObjectReview", "abandoned", "failed"},
+    "awaitingObjectReview": {"analyzingScene", "generatingTasks", "abandoned", "failed"},
+    "generatingTasks": {"awaitingObjectReview", "inProgress", "abandoned", "failed"},
+    "inProgress": {"completed", "abandoned", "failed"},
+    "completed": set(),
+    "abandoned": set(),
+    "failed": set(),
+}
 READ_TASKS = {"vocabularyIntroduction", "grammarExplanation", "syntaxExplanation"}
+ANALYSIS_TIMEOUT = timedelta(minutes=15)
 
 
 def task_progress(tasks):
@@ -91,6 +105,32 @@ class PostgresWorkflowRepository:
         if row is None:
             raise PracticeNotFoundError("Session not found.")
         return parse_session(row)
+
+    def _transition(self, c, session, target, **extra):
+        """Compare-and-set a session status; only listed edges are legal."""
+        if session.status == target:
+            return session
+        if target not in ALLOWED_TRANSITIONS[session.status]:
+            raise PracticeConflictError(
+                f"Session cannot move from {session.status!r} to {target!r}."
+            )
+        values = dict(extra, status=target)
+        if target == "inProgress":
+            values["started_at"] = session.started_at or utc_now()
+        elif target == "completed":
+            values["completed_at"] = utc_now()
+        elif target == "abandoned":
+            values["abandoned_at"] = utc_now()
+        changed = c.execute(
+            update(sessions)
+            .where(sessions.c.id == session.id, sessions.c.status == session.status)
+            .values(**values)
+        ).rowcount
+        if not changed:
+            raise PracticeConflictError(
+                "Session changed while this request was running. Retry the action."
+            )
+        return session.model_copy(update={**values, "status": SessionStatus(target)})
 
     def _tasks(self, c, session_id):
         return [
@@ -179,21 +219,25 @@ class PostgresWorkflowRepository:
             return self._detail(c, self._session(c, session_id, profile_id))
 
     def active(self, profile_id):
-        with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
-            row = (
-                c.execute(
-                    select(sessions)
-                    .where(
-                        sessions.c.user_id == self.user_id,
-                        sessions.c.language_profile_id == profile_id,
-                        sessions.c.status.not_in(TERMINAL),
+        try:
+            with self.transaction() as c:
+                self._reap(c, profile_id)
+                row = (
+                    c.execute(
+                        select(sessions)
+                        .where(
+                            sessions.c.user_id == self.user_id,
+                            sessions.c.language_profile_id == profile_id,
+                            sessions.c.status.not_in(TERMINAL),
+                        )
+                        .order_by(sessions.c.created_at.desc())
                     )
-                    .order_by(sessions.c.created_at.desc())
+                    .mappings()
+                    .first()
                 )
-                .mappings()
-                .first()
-            )
-            return self._detail(c, parse_session(row)) if row else None
+                return self._detail(c, parse_session(row)) if row else None
+        except PracticeNotFoundError:
+            return None
 
     def create(self, request):
         with self.transaction() as c:
@@ -256,15 +300,26 @@ class PostgresWorkflowRepository:
                     if existing["scene_media_asset_id"] != request.media_asset_id:
                         raise PracticeConflictError("This request key was used for another image.")
                     return self._detail(c, parse_session(existing))
-            c.execute(
-                update(sessions)
-                .where(
-                    sessions.c.user_id == self.user_id,
-                    sessions.c.language_profile_id == request.language_profile_id,
-                    sessions.c.status.not_in(TERMINAL),
+            self._reap(c, request.language_profile_id)
+            existing = (
+                c.execute(
+                    select(sessions).where(
+                        sessions.c.user_id == self.user_id,
+                        sessions.c.language_profile_id == request.language_profile_id,
+                        sessions.c.status.not_in(TERMINAL),
+                    )
                 )
-                .values(status="abandoned", abandoned_at=utc_now())
+                .mappings()
+                .one_or_none()
             )
+            if existing is not None:
+                if existing["scene_media_asset_id"] == request.media_asset_id:
+                    return self._detail(c, parse_session(existing))
+                raise ActiveSessionExistsError(
+                    "You have a practice session in progress. "
+                    "Continue it or discard it before starting a new one.",
+                    active_session_id=existing["id"],
+                )
             session = Session(
                 user_id=self.user_id,
                 language_profile_id=request.language_profile_id,
@@ -276,6 +331,22 @@ class PostgresWorkflowRepository:
                 )
             )
             return self._detail(c, session)
+
+    def _reap(self, c, profile_id):
+        """Expire stale non-terminal sessions so a crashed request cannot block a new run."""
+        scope = [
+            sessions.c.user_id == self.user_id,
+            sessions.c.language_profile_id == profile_id,
+        ]
+        c.execute(
+            update(sessions)
+            .where(
+                *scope,
+                sessions.c.status.in_(["analyzingScene", "generatingTasks"]),
+                sessions.c.updated_at < utc_now() - ANALYSIS_TIMEOUT,
+            )
+            .values(status="failed", failure_code="analysis_timeout", analysis_draft=None)
+        )
 
     def analyze(self, session_id, profile_id):
         with self.transaction() as c:
@@ -320,18 +391,18 @@ class PostgresWorkflowRepository:
             )
             if asset.source == "preloaded" and scene is None:
                 raise PracticeNotFoundError("Curated scene not found.")
+            session = self._transition(c, session, "analyzingScene")
             objects, words, translations = build_objects(c, session, asset, profile, scene)
             # Persist resumable suggestions separately; only review creates scene objects/tasks.
             for obj in objects:
                 obj.selection_status = "suggested"
-            c.execute(
-                update(sessions)
-                .where(sessions.c.id == session.id)
-                .values(
-                    analysis_draft=[obj.model_dump(mode="json", by_alias=False) for obj in objects]
-                )
+            session = self._transition(
+                c,
+                session,
+                "awaitingObjectReview",
+                analysis_draft=[obj.model_dump(mode="json", by_alias=False) for obj in objects],
             )
-            return self._detail(c, self._session(c, session.id))
+            return self._detail(c, session)
 
     def _catalog_word(self, c, profile, label):
         match = (
@@ -449,17 +520,8 @@ class PostgresWorkflowRepository:
                 .where(scene_objects.c.session_id == session_id)
                 .values(selection_status="accepted")
             )
-            c.execute(
-                update(sessions)
-                .where(sessions.c.id == session_id)
-                .values(
-                    analysis_draft=None,
-                    status="inProgress",
-                    started_at=session.started_at or utc_now(),
-                    plan_version="reviewed-v1",
-                )
-            )
-            session = self._session(c, session_id)
+            if session.status != "inProgress":
+                session = self._transition(c, session, "generatingTasks", analysis_draft=None)
             detail = self._detail(c, session)
             objects = [obj for obj in detail.scene_objects if obj.id in accepted]
             words_by_id = {word.id: word for word in detail.vocabulary}
@@ -485,6 +547,7 @@ class PostgresWorkflowRepository:
             for index, task in enumerate(rebuilt):
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
+            session = self._transition(c, session, "inProgress", plan_version="reviewed-v1")
             return self._detail(c, session)
 
     def finish(self, session_id, profile_id, abandon=False):
@@ -500,15 +563,7 @@ class PostgresWorkflowRepository:
                 not tasks or any(t.status not in {"completed", "skipped"} for t in tasks)
             ):
                 raise PracticeConflictError("Complete or skip every task first.")
-            c.execute(
-                update(sessions)
-                .where(sessions.c.id == session.id)
-                .values(
-                    status=target,
-                    **({"abandoned_at": utc_now()} if abandon else {"completed_at": utc_now()}),
-                )
-            )
-            return self._session(c, session.id)
+            return self._transition(c, session, target)
 
     def summary(self, session_id, profile_id):
         with self.engine.connect().execution_options(isolation_level="REPEATABLE READ") as c:
@@ -654,7 +709,9 @@ class PostgresWorkflowRepository:
             )
             if not retry:
                 if session.status != "inProgress" or task.status in {"completed", "skipped"}:
-                    raise PracticeConflictError("Task or session is not active.")
+                    raise PracticeConflictError(
+                        f"Task or session is not active; session is '{session.status}'."
+                    )
                 values = {}
                 if action == "start":
                     values = dict(status="inProgress", started_at=task.started_at or utc_now())

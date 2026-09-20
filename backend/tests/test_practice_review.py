@@ -183,8 +183,8 @@ def test_analysis_saves_draft_without_scene_objects_or_tasks(monkeypatch):
     writes = [
         call.args[0] for call in connection.execute.call_args_list if not call.args[0].is_select
     ]
-    assert len(writes) == 1
-    assert writes[0].table.name == "sessions"
-    draft = writes[0].compile().params["analysis_draft"]
+    assert len(writes) == 2
+    assert all(write.table.name == "sessions" for write in writes)
+    draft = writes[1].compile().params["analysis_draft"]
     assert draft[0]["id"] == str(obj.id)
     assert draft[0]["selection_status"] == "suggested"

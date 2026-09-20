@@ -50,6 +50,18 @@ export interface User {
   onboardingCompleted: boolean;
 }
 
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly activeSessionId: string | null;
+  constructor(message: string, status: number, code: string | null, activeSessionId: string | null) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.activeSessionId = activeSessionId;
+  }
+}
+
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   if (!apiBaseUrl) {
     throw new Error("Set VITE_API_BASE_URL in frontend/.env.local and restart Vite.");
@@ -65,7 +77,9 @@ async function request<T>(path: string, signal?: AbortSignal, options?: RequestI
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     const message = typeof body?.detail?.message === "string" ? body.detail.message : "Request failed.";
-    throw new Error(`${message} (HTTP ${response.status})`);
+    const code = typeof body?.detail?.code === "string" ? body.detail.code : null;
+    const activeSessionId = typeof body?.detail?.activeSessionId === "string" ? body.detail.activeSessionId : null;
+    throw new ApiError(`${message} (HTTP ${response.status})`, response.status, code, activeSessionId);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -277,6 +291,7 @@ export const createPractice = (profileId: string, assetId: string, key: string) 
 });
 export const taskAction = (id: string, action: "start" | "complete" | "skip" | "attempts", body: unknown = {}) => write<TaskActionResult>(`/api/v1/tasks/${id}/${action}`, "POST", body);
 export const completePractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/complete`, "POST", {});
+export const abandonPractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/abandon`, "POST", {});
 export const getPracticeSummary = (id: string) => request<{ progress: SessionProgress; learnedVocabularyIds: string[]; xpEarned: number; ispyCorrectCount: number; ispyAttemptCount: number }>(`/api/v1/sessions/${id}/summary`);
 
 export const checkPracticeWord = (id: string, label: string) => request<{ available: boolean }>(`/api/v1/sessions/${id}/review-word?label=${encodeURIComponent(label)}`);
