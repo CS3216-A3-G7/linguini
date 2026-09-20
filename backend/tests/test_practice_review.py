@@ -11,6 +11,43 @@ from app.repositories.practice import PracticeConflictError
 from app.schemas.sessions import ReviewPracticeRequest
 
 
+def test_processing_transition_preserves_draft_and_records_timeout_clock():
+    from datetime import datetime
+
+    from app.repositories.postgres.workflow import ALLOWED_TRANSITIONS
+    from app.schemas.base import utc_now
+    from app.schemas.enums import SessionStatus
+    from app.schemas.sessions import Session
+
+    assert set(ALLOWED_TRANSITIONS) == set(SessionStatus)
+    draft = {"objects": [{"source_object_key": "object-1"}], "relations": []}
+    session = Session(
+        user_id=uuid4(),
+        language_profile_id=uuid4(),
+        scene_media_asset_id=uuid4(),
+        status="awaitingObjectReview",
+        analysis_draft=draft,
+    )
+    connection = MagicMock()
+    connection.execute.return_value.rowcount = 1
+    repository = PostgresWorkflowRepository(None, session.user_id)
+    before = utc_now()
+    processing = repository._transition(connection, session, "generatingTasks")
+    assert processing.analysis_draft["objects"] == draft["objects"]
+    assert processing.analysis_draft["relations"] == []
+    assert (
+        before
+        <= datetime.fromisoformat(processing.analysis_draft["processingStartedAt"])
+        <= utc_now()
+    )
+    assert "processingStartedAt" not in session.analysis_draft
+    running = repository._transition(connection, processing, "inProgress")
+    assert running.started_at is not None
+    assert running.analysis_draft == processing.analysis_draft
+    with pytest.raises(PracticeConflictError):
+        repository._transition(connection, running, "analyzingScene")
+
+
 def test_review_requires_unique_nonempty_selection_and_in_bounds_positions():
     object_id = uuid4()
     for body in [
@@ -49,7 +86,7 @@ def test_review_cannot_change_terminal_sessions(status):
         yield connection
 
     repo.transaction = transaction
-    repo._session = lambda *args: SimpleNamespace(status=status, plan_version="v1")
+    repo._session = lambda *args: SimpleNamespace(status=status)
     with pytest.raises(PracticeConflictError):
         repo.review(uuid4(), uuid4(), ReviewPracticeRequest(accepted_object_ids=[uuid4()]))
     connection.execute.assert_not_called()
@@ -65,7 +102,7 @@ def test_review_cannot_replace_started_tasks(status):
         yield connection
 
     repo.transaction = transaction
-    repo._session = lambda *args: SimpleNamespace(status="inProgress", plan_version="v1")
+    repo._session = lambda *args: SimpleNamespace(status="inProgress")
     repo._tasks = lambda *args: [SimpleNamespace(status=status)]
     with pytest.raises(PracticeConflictError):
         repo.review(uuid4(), uuid4(), ReviewPracticeRequest(accepted_object_ids=[uuid4()]))
@@ -78,7 +115,7 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
     from app.schemas.media import SceneObject
     from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
 
-    session_id, profile_id, asset_id = uuid4(), uuid4(), uuid4()
+    session_id, profile_id = uuid4(), uuid4()
     words = [
         VocabularyItem(language_code="es", lemma=text, display_text=text, part_of_speech="noun")
         for text in ["silla", "mesa"]
@@ -86,10 +123,8 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
     objects = [
         SceneObject(
             session_id=session_id,
-            media_asset_id=asset_id,
-            detected_label=label,
+            label=label,
             vocabulary_item_id=word.id,
-            selection_status="accepted",
             bounding_box={"x": 0.2, "y": 0.3, "width": 0.01, "height": 0.01},
         )
         for word, label in zip(words, ["chair", "table"], strict=True)
@@ -100,7 +135,12 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
         )
         for word, label in zip(words, ["chair", "table"], strict=True)
     ]
-    detail = SimpleNamespace(scene_objects=objects, vocabulary=words, translations=translations)
+    detail = SimpleNamespace(
+        scene_objects=objects,
+        scene_object_relations=[],
+        vocabulary=words,
+        translations=translations,
+    )
     repo = PostgresWorkflowRepository(None, uuid4())
     connection = MagicMock()
     connection.execute.return_value.first.return_value = None
@@ -115,7 +155,7 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
 
     repo.transaction = transaction
     repo._session = lambda *args: SimpleNamespace(
-        id=session_id, status="inProgress", plan_version="v1", started_at=None
+        id=session_id, status="inProgress", started_at=None
     )
     repo._tasks = lambda *args: []
     repo._detail = lambda *args: detail
@@ -160,8 +200,7 @@ def test_analysis_saves_draft_without_scene_objects_or_tasks(monkeypatch):
     session = Session(user_id=owner, language_profile_id=profile, scene_media_asset_id=asset.id)
     obj = SceneObject(
         session_id=session.id,
-        media_asset_id=asset.id,
-        detected_label="chair",
+        label="chair",
         bounding_box={"x": 0.1, "y": 0.1, "width": 0.1, "height": 0.1},
     )
     repo = PostgresWorkflowRepository(None, owner)
@@ -186,5 +225,151 @@ def test_analysis_saves_draft_without_scene_objects_or_tasks(monkeypatch):
     assert len(writes) == 2
     assert all(write.table.name == "sessions" for write in writes)
     draft = writes[1].compile().params["analysis_draft"]
-    assert draft[0]["id"] == str(obj.id)
-    assert draft[0]["selection_status"] == "suggested"
+    assert draft["objects"][0]["id"] == str(obj.id)
+    assert draft["relations"] == []
+    assert writes[0].compile().params["status"] == "analyzingScene"
+    assert writes[1].compile().params["status"] == "awaitingObjectReview"
+
+
+def test_relations_require_selected_distinct_endpoints_and_no_duplicates():
+    subject, reference = uuid4(), uuid4()
+    relation = {
+        "subjectSceneObjectId": str(subject),
+        "relation": "beside",
+        "referenceSceneObjectId": str(reference),
+    }
+    valid = ReviewPracticeRequest(
+        accepted_object_ids=[subject],
+        added_objects=[{"id": reference, "label": "table", "x": 0.2, "y": 0.3}],
+        relations=[relation],
+    )
+    assert valid.relations[0].source_relation_key is None
+    for relations in [
+        [relation, relation],
+        [{**relation, "referenceSceneObjectId": str(uuid4())}],
+        [{**relation, "referenceSceneObjectId": str(subject)}],
+        [{**relation, "relation": "  "}],
+    ]:
+        with pytest.raises(ValidationError):
+            ReviewPracticeRequest(accepted_object_ids=[subject, reference], relations=relations)
+
+
+def test_object_json_and_session_failure_contracts():
+    from app.repositories.postgres.scene_objects import object_values, parse_object
+    from app.schemas.media import SceneObject
+    from app.schemas.sessions import Session
+
+    obj = SceneObject(session_id=uuid4(), label="table", attributes={"color": "brown"})
+    assert parse_object(object_values(obj)) == obj
+    assert obj.bounding_box is None and obj.source_object_key is None
+    obj.bounding_box = {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4}
+    assert isinstance(object_values(obj)["bounding_box"]["x"], float)
+    session = Session(
+        user_id=uuid4(),
+        language_profile_id=uuid4(),
+        scene_media_asset_id=uuid4(),
+        status="failed",
+        failure_code="sceneAnalysisFailed",
+    )
+    assert session.model_dump(mode="json")["failureCode"] == "sceneAnalysisFailed"
+    with pytest.raises(ValidationError):
+        session.failure_code = "unrecognizedFailure"
+
+
+def test_session_status_uses_database_enum_and_preserves_application_key():
+    from sqlalchemy import insert, select, update
+    from sqlalchemy.dialects.postgresql import dialect
+
+    from app.repositories.postgres.practice import sessions
+    from app.schemas.enums import SessionStatus
+
+    column = sessions.c.status
+    assert column.name == "session_status"
+    assert column.type.name == "session_status"
+    assert column.type.enums == [status.value for status in SessionStatus]
+    assert column.type.result_processor(dialect(), None)("ready") is SessionStatus.READY
+    for statement in [
+        insert(sessions).values(id=uuid4(), status="created"),
+        update(sessions).values(status="completed"),
+    ]:
+        compiled = statement.compile(dialect=dialect())
+        assert "session_status" in str(compiled)
+        assert compiled.params["status"] in {"created", "completed"}
+    compiled = str(select(sessions.c.id).where(column == "inProgress").compile(dialect=dialect()))
+    assert "sessions.session_status =" in compiled
+
+
+def test_review_maps_manual_relation_endpoints_and_preserves_only_trusted_provenance():
+    from uuid import uuid5
+
+    from app.schemas.media import SceneObject, SceneObjectRelation
+    from app.schemas.sessions import Session
+    from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
+
+    session = Session(
+        user_id=uuid4(),
+        language_profile_id=uuid4(),
+        scene_media_asset_id=uuid4(),
+        status="awaitingObjectReview",
+    )
+    word = VocabularyItem(
+        language_code="es", lemma="mesa", display_text="mesa", part_of_speech="noun"
+    )
+    translation = VocabularyTranslation(
+        vocabulary_item_id=word.id, source_language_code="en", translated_text="table"
+    )
+    objects = [
+        SceneObject(session_id=session.id, label=label, vocabulary_item_id=word.id)
+        for label in ["chair", "table"]
+    ]
+    original = SceneObjectRelation(
+        subject_scene_object_id=objects[0].id,
+        reference_scene_object_id=objects[1].id,
+        relation="beside",
+        source_relation_key="ai:relation:1",
+    )
+    detail = SimpleNamespace(
+        scene_objects=objects,
+        scene_object_relations=[original],
+        vocabulary=[word],
+        translations=[translation],
+    )
+    connection = MagicMock()
+    connection.execute.return_value.first.return_value = None
+    repo = PostgresWorkflowRepository(None, session.user_id)
+
+    @contextmanager
+    def transaction():
+        yield connection
+
+    repo.transaction = transaction
+    repo._session = lambda *args: session
+    repo._tasks = lambda *args: []
+    repo._detail = lambda *args: detail
+    repo._catalog_word = lambda *args: word
+    manual_id = uuid4()
+    request = ReviewPracticeRequest(
+        accepted_object_ids=[obj.id for obj in objects],
+        added_objects=[{"id": manual_id, "label": "plant", "x": 0.1, "y": 0.2}],
+        relations=[
+            original,
+            SceneObjectRelation(
+                subject_scene_object_id=manual_id,
+                reference_scene_object_id=objects[1].id,
+                relation="on",
+                source_relation_key="forged-ai-key",
+            ),
+        ],
+    )
+    repo.review(session.id, session.language_profile_id, request)
+    writes = [
+        call.args[0].compile().params
+        for call in connection.execute.call_args_list
+        if getattr(call.args[0], "is_insert", False)
+        and call.args[0].table.name == "scene_object_relations"
+    ]
+    assert len(writes) == 2
+    assert writes[0]["source_relation_key"] == "ai:relation:1"
+    assert writes[0]["id"] == original.id
+    assert writes[1]["source_relation_key"] is None
+    assert writes[1]["subject_scene_object_id"] == uuid5(session.id, "manual:" + str(manual_id))

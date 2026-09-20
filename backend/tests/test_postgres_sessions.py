@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, func, insert, select, text, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.database import create_database_engine
@@ -131,9 +131,7 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
     detail = analyze(client, sid)
     assert len(detail["tasks"]) == len(TaskKind)
     assert {t["kind"] for t in detail["tasks"]} == {k.value for k in TaskKind}
-    assert all(
-        o["selectionStatus"] == "accepted" and o["vocabularyItemId"] for o in detail["sceneObjects"]
-    )
+    assert all(o["vocabularyItemId"] for o in detail["sceneObjects"])
     assert "answerKey" not in str(detail) and "demoState" not in detail
     assert client.get("/api/v1/me/progress").json()["xp"] == 0
     assert client.post(endpoint + "/complete").status_code == 409
@@ -276,17 +274,16 @@ def create_with_asset(client, profile, asset_id, key):
     )
 
 
-def age_session(engine, session_id, status, updated_at):
-    # The sessions_updated_at trigger overwrites updated_at on every UPDATE, so
-    # it must be disabled to backdate a row for the timeout rules.
+def age_session(engine, session_id, status, processing_started_at):
     with engine.begin() as c:
-        c.execute(text("ALTER TABLE sessions DISABLE TRIGGER sessions_updated_at"))
         c.execute(
             update(sessions)
             .where(sessions.c.id == session_id)
-            .values(status=status, updated_at=updated_at)
+            .values(
+                status=status,
+                analysis_draft={"processingStartedAt": processing_started_at.isoformat()},
+            )
         )
-        c.execute(text("ALTER TABLE sessions ENABLE TRIGGER sessions_updated_at"))
 
 
 def test_active_session_replacement_and_owner_scope(database, monkeypatch):
@@ -344,7 +341,9 @@ def test_active_session_replacement_and_owner_scope(database, monkeypatch):
     assert client.get("/api/v1/sessions/active").json()["session"]["id"] == third["session"]["id"]
     with pytest.raises(IntegrityError), engine.begin() as c:
         c.execute(
-            update(sessions).where(sessions.c.id == UUID(replacement)).values(status="completed")
+            update(sessions)
+            .where(sessions.c.id == UUID(third["session"]["id"]))
+            .values(status="completed")
         )
     monkeypatch.setenv("DEMO_USER_ID", str(uuid4()))
     assert client.get(f"/api/v1/sessions/{replacement}").status_code == 404
@@ -361,7 +360,7 @@ def test_reap_fails_stuck_analysis(database):
     assert created.json()["session"]["id"] != first
     with engine.connect() as c:
         old = c.execute(select(sessions).where(sessions.c.id == UUID(first))).mappings().one()
-    assert old["status"] == "failed" and old["failure_code"] == "analysis_timeout"
+    assert old["status"] == "failed" and old["failure_code"] == "sceneAnalysisFailed"
 
 
 def test_active_lookup_reaps_expired_analysis(database):
@@ -372,7 +371,7 @@ def test_active_lookup_reaps_expired_analysis(database):
     assert client.get("/api/v1/sessions/active").json() is None
     with engine.connect() as c:
         row = c.execute(select(sessions).where(sessions.c.id == UUID(sid))).mappings().one()
-    assert row["status"] == "failed" and row["failure_code"] == "analysis_timeout"
+    assert row["status"] == "failed" and row["failure_code"] == "sceneAnalysisFailed"
 
 
 def test_all_task_kinds_complete_with_server_evaluation(database):
@@ -475,26 +474,39 @@ def test_review_rejects_adds_and_rebuilds_without_duplicate_objects(database):
         "addedObjects": [
             {
                 "id": str(uuid4()),
-                "label": detail["sceneObjects"][1]["detectedLabel"],
+                "label": detail["sceneObjects"][1]["label"],
                 "x": 0.3,
                 "y": 0.4,
             }
         ],
     }
+    payload["relations"] = [
+        {
+            "id": str(uuid4()),
+            "subjectSceneObjectId": kept,
+            "relation": "beside",
+            "referenceSceneObjectId": payload["addedObjects"][0]["id"],
+            "sourceRelationKey": "client-cannot-claim-ai-provenance",
+        }
+    ]
     response = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
     assert response.status_code == 200, response.text
     saved = response.json()
-    selected = [obj for obj in saved["sceneObjects"] if obj["selectionStatus"] != "rejected"]
+    selected = saved["sceneObjects"]
     assert len(selected) == 2
-    assert any(
-        obj["detectedLabel"] == detail["sceneObjects"][1]["detectedLabel"] for obj in selected
-    )
+    relation = saved["sceneObjectRelations"][0]
+    assert relation["sourceRelationKey"] is None
+    assert relation["subjectSceneObjectId"] == kept
+    assert relation["referenceSceneObjectId"] in {obj["id"] for obj in selected}
+    assert relation["referenceSceneObjectId"] != payload["addedObjects"][0]["id"]
+    assert any(obj["label"] == detail["sceneObjects"][1]["label"] for obj in selected)
     assert all(task["sceneObjectId"] in {obj["id"] for obj in selected} for task in saved["tasks"])
     introductions = [task for task in saved["tasks"] if task["kind"] == "vocabularyIntroduction"]
     assert len(introductions) == 2
     retry = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
     assert retry.status_code == 200, retry.text
     assert len(retry.json()["sceneObjects"]) == len(saved["sceneObjects"])
+    assert retry.json()["sceneObjectRelations"] == saved["sceneObjectRelations"]
     task_id = introductions[0]["id"]
     assert client.post(f"/api/v1/tasks/{task_id}/complete", json={}).status_code == 200
     assert client.put(f"/api/v1/sessions/{sid}/review", json=payload).status_code == 409

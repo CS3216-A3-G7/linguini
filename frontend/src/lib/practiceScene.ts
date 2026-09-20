@@ -8,13 +8,13 @@ export function practiceScene(detail: PracticeDetail, media: Pick<UploadedImage,
       mediaAssetId: media.id, imageUrl: media.signedUrl, title: detail.title,
       languageCode: detail.vocabulary[0]?.languageCode ?? "", language,
       blurb: "",
-      items: detail.sceneObjects.filter(object => object.selectionStatus !== "rejected").map((object, i) => {
+      items: detail.sceneObjects.map((object, i) => {
         const word = detail.vocabulary.find(w => w.id === object.vocabularyItemId);
         const translation = detail.translations.find(t => t.vocabularyItemId === object.vocabularyItemId);
-        return { id: object.id, word: word?.displayText ?? object.confirmedLabel ?? object.detectedLabel,
-          translation: translation?.translatedText ?? object.detectedLabel, wordClass: word?.partOfSpeech ?? "noun",
+        return { id: object.id, word: word?.displayText ?? object.label,
+          translation: translation?.translatedText ?? object.label, wordClass: word?.partOfSpeech ?? "noun",
           gender: word?.gender === "la" || word?.gender === "el" ? word.gender : null,
-          marker: i + 1, x: Number(object.boundingBox.x) * 100, y: Number(object.boundingBox.y) * 100,
+          marker: i + 1, x: Number(object.boundingBox?.x ?? 0.5) * 100, y: Number(object.boundingBox?.y ?? 0.5) * 100,
           example: word?.exampleSentence ?? word?.displayText ?? "", exampleTranslation: "" };
       }),
     };

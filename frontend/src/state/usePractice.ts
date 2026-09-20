@@ -15,7 +15,7 @@ export function usePractice(_userId: string, profileId: string, updateProgress: 
   const loadSession = useCallback(async (id: string) => {
     const version = ++loadVersion.current;
     let data = await getPractice(id);
-    if (!data.session.planVersion && !["completed", "abandoned", "failed"].includes(data.session.status)) data = await analyzePractice(id);
+    if (["created", "analyzingScene", "awaitingObjectReview"].includes(data.session.status) && !["completed", "abandoned", "failed"].includes(data.session.status)) data = await analyzePractice(id);
     if (version === loadVersion.current) setSession(data);
     return data;
   }, []);

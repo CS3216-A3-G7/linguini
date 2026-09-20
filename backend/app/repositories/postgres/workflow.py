@@ -4,14 +4,19 @@ from contextlib import contextmanager
 from datetime import timedelta
 from uuid import uuid5
 
-from sqlalchemy import case, delete, func, insert, select, update
+from sqlalchemy import DateTime, case, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as upsert
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.repositories.postgres.language_profiles import language_profiles
 from app.repositories.postgres.media_assets import media_assets
 from app.repositories.postgres.practice import sessions
-from app.repositories.postgres.scene_objects import object_values, parse_object, scene_objects
+from app.repositories.postgres.scene_objects import (
+    object_values,
+    parse_object,
+    scene_object_relations,
+    scene_objects,
+)
 from app.repositories.postgres.scenes import preloaded_scenes
 from app.repositories.postgres.tasks import entity_values, session_tasks, task_attempts
 from app.repositories.postgres.users import users
@@ -29,7 +34,7 @@ from app.repositories.practice import (
 )
 from app.schemas.base import utc_now
 from app.schemas.enums import SessionStatus
-from app.schemas.media import MediaAsset, SceneObject
+from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
 from app.schemas.tasks import (
     SessionProgress,
@@ -51,7 +56,8 @@ ALLOWED_TRANSITIONS = {
     "created": {"analyzingScene", "abandoned", "failed"},
     "analyzingScene": {"awaitingObjectReview", "abandoned", "failed"},
     "awaitingObjectReview": {"analyzingScene", "generatingTasks", "abandoned", "failed"},
-    "generatingTasks": {"awaitingObjectReview", "inProgress", "abandoned", "failed"},
+    "generatingTasks": {"awaitingObjectReview", "ready", "inProgress", "abandoned", "failed"},
+    "ready": {"inProgress", "abandoned", "failed"},
     "inProgress": {"completed", "abandoned", "failed"},
     "completed": set(),
     "abandoned": set(),
@@ -115,6 +121,12 @@ class PostgresWorkflowRepository:
                 f"Session cannot move from {session.status!r} to {target!r}."
             )
         values = dict(extra, status=target)
+        if target in {"analyzingScene", "generatingTasks"}:
+            # The session model has no updated_at; keep the processing clock in its draft.
+            values["analysis_draft"] = {
+                **(extra.get("analysis_draft", session.analysis_draft) or {}),
+                "processingStartedAt": utc_now().isoformat(),
+            }
         if target == "inProgress":
             values["started_at"] = session.started_at or utc_now()
         elif target == "completed":
@@ -168,14 +180,28 @@ class PostgresWorkflowRepository:
             for r in c.execute(
                 select(scene_objects)
                 .where(scene_objects.c.session_id == session.id)
-                .order_by(scene_objects.c.created_at, scene_objects.c.id)
+                .order_by(scene_objects.c.id)
             ).mappings()
         ]
         draft = c.execute(
             select(sessions.c.analysis_draft).where(sessions.c.id == session.id)
         ).scalar_one_or_none()
-        if draft:
-            objects = [SceneObject.model_validate(obj) for obj in draft]
+        relations = [
+            SceneObjectRelation.model_validate(dict(row))
+            for row in c.execute(
+                select(scene_object_relations)
+                .join(
+                    scene_objects,
+                    scene_objects.c.id == scene_object_relations.c.subject_scene_object_id,
+                )
+                .where(scene_objects.c.session_id == session.id)
+            ).mappings()
+        ]
+        if draft and session.status in {"created", "analyzingScene", "awaitingObjectReview"}:
+            objects = [SceneObject.model_validate(obj) for obj in draft.get("objects", [])]
+            relations = [
+                SceneObjectRelation.model_validate(row) for row in draft.get("relations", [])
+            ]
         ids = [o.vocabulary_item_id for o in objects if o.vocabulary_item_id]
         words = [
             VocabularyItem.model_validate(dict(r))
@@ -202,9 +228,10 @@ class PostgresWorkflowRepository:
             session=session,
             media_asset=asset,
             scene_id=scene["slug"] if scene else None,
-            title=scene["title"] if scene else "Your uploaded photo",
+            title=session.session_title or (scene["title"] if scene else "Your uploaded photo"),
             analysis_mode=None if asset.source == "preloaded" else "placeholder",
             scene_objects=objects,
+            scene_object_relations=relations,
             vocabulary=words,
             translations=translations,
             tasks=[SessionTaskPublic.from_internal(t) for t in tasks],
@@ -230,7 +257,7 @@ class PostgresWorkflowRepository:
                             sessions.c.language_profile_id == profile_id,
                             sessions.c.status.not_in(TERMINAL),
                         )
-                        .order_by(sessions.c.created_at.desc())
+                        .order_by(sessions.c.started_at.desc().nulls_last(), sessions.c.id)
                     )
                     .mappings()
                     .first()
@@ -324,12 +351,9 @@ class PostgresWorkflowRepository:
                 user_id=self.user_id,
                 language_profile_id=request.language_profile_id,
                 scene_media_asset_id=request.media_asset_id,
+                idempotency_key=request.idempotency_key,
             )
-            c.execute(
-                insert(sessions).values(
-                    **session.model_dump(by_alias=False), idempotency_key=request.idempotency_key
-                )
-            )
+            c.execute(insert(sessions).values(**session.model_dump(by_alias=False)))
             return self._detail(c, session)
 
     def _reap(self, c, profile_id):
@@ -338,15 +362,22 @@ class PostgresWorkflowRepository:
             sessions.c.user_id == self.user_id,
             sessions.c.language_profile_id == profile_id,
         ]
-        c.execute(
-            update(sessions)
-            .where(
-                *scope,
-                sessions.c.status.in_(["analyzingScene", "generatingTasks"]),
-                sessions.c.updated_at < utc_now() - ANALYSIS_TIMEOUT,
+        for status, failure_code in (
+            ("analyzingScene", "sceneAnalysisFailed"),
+            ("generatingTasks", "taskGenerationFailed"),
+        ):
+            c.execute(
+                update(sessions)
+                .where(
+                    *scope,
+                    sessions.c.status == status,
+                    sessions.c.analysis_draft["processingStartedAt"].astext.cast(
+                        DateTime(timezone=True)
+                    )
+                    < utc_now() - ANALYSIS_TIMEOUT,
+                )
+                .values(status="failed", failure_code=failure_code)
             )
-            .values(status="failed", failure_code="analysis_timeout", analysis_draft=None)
-        )
 
     def analyze(self, session_id, profile_id):
         with self.transaction() as c:
@@ -354,7 +385,7 @@ class PostgresWorkflowRepository:
             if session.status in TERMINAL:
                 raise PracticeConflictError("Cannot analyze a terminal session.")
             if (
-                session.plan_version
+                session.status in {"ready", "inProgress"}
                 or c.execute(
                     select(sessions.c.analysis_draft).where(sessions.c.id == session.id)
                 ).scalar_one_or_none()
@@ -394,13 +425,15 @@ class PostgresWorkflowRepository:
             session = self._transition(c, session, "analyzingScene")
             objects, words, translations = build_objects(c, session, asset, profile, scene)
             # Persist resumable suggestions separately; only review creates scene objects/tasks.
-            for obj in objects:
-                obj.selection_status = "suggested"
             session = self._transition(
                 c,
                 session,
                 "awaitingObjectReview",
-                analysis_draft=[obj.model_dump(mode="json", by_alias=False) for obj in objects],
+                session_title=scene["title"] if scene else "Your uploaded photo",
+                analysis_draft={
+                    "objects": [obj.model_dump(mode="json", by_alias=False) for obj in objects],
+                    "relations": [],
+                },
             )
             return self._detail(c, session)
 
@@ -486,10 +519,7 @@ class PostgresWorkflowRepository:
                 obj = SceneObject(
                     id=object_id,
                     session_id=session_id,
-                    media_asset_id=session.scene_media_asset_id,
-                    detected_label=added.label,
-                    confirmed_label=word.display_text,
-                    selection_status="corrected",
+                    label=added.label,
                     vocabulary_item_id=word.id,
                     bounding_box={"x": added.x, "y": added.y, "width": 0.01, "height": 0.01},
                 )
@@ -499,11 +529,7 @@ class PostgresWorkflowRepository:
                     .values(**values)
                     .on_conflict_do_update(
                         index_elements=["id"],
-                        set_={
-                            key: value
-                            for key, value in values.items()
-                            if key not in {"id", "created_at"}
-                        },
+                        set_={key: value for key, value in values.items() if key != "id"},
                     )
                 )
             accepted = set(request.accepted_object_ids) | {
@@ -516,12 +542,47 @@ class PostgresWorkflowRepository:
                 )
             )
             c.execute(
-                update(scene_objects)
-                .where(scene_objects.c.session_id == session_id)
-                .values(selection_status="accepted")
+                delete(scene_object_relations).where(
+                    scene_object_relations.c.subject_scene_object_id.in_(
+                        select(scene_objects.c.id).where(scene_objects.c.session_id == session_id)
+                    )
+                )
             )
-            if session.status != "inProgress":
-                session = self._transition(c, session, "generatingTasks", analysis_draft=None)
+            manual_ids = {
+                item.id: uuid5(session_id, "manual:" + str(item.id))
+                for item in request.added_objects
+            }
+            original_relations = {row.id: row for row in detail.scene_object_relations}
+            for relation in request.relations:
+                original = original_relations.get(relation.id)
+                # Provenance is preserved only for unchanged server-generated suggestions.
+                source_key = (
+                    original.source_relation_key
+                    if original
+                    and (
+                        original.subject_scene_object_id == relation.subject_scene_object_id
+                        and original.reference_scene_object_id == relation.reference_scene_object_id
+                        and original.relation == relation.relation
+                    )
+                    else None
+                )
+                c.execute(
+                    insert(scene_object_relations).values(
+                        id=relation.id
+                        if original
+                        else uuid5(session_id, "relation:" + str(relation.id)),
+                        subject_scene_object_id=manual_ids.get(
+                            relation.subject_scene_object_id, relation.subject_scene_object_id
+                        ),
+                        reference_scene_object_id=manual_ids.get(
+                            relation.reference_scene_object_id, relation.reference_scene_object_id
+                        ),
+                        relation=relation.relation,
+                        source_relation_key=source_key,
+                    )
+                )
+            if session.status not in {"ready", "inProgress"}:
+                session = self._transition(c, session, "generatingTasks")
             detail = self._detail(c, session)
             objects = [obj for obj in detail.scene_objects if obj.id in accepted]
             words_by_id = {word.id: word for word in detail.vocabulary}
@@ -547,7 +608,7 @@ class PostgresWorkflowRepository:
             for index, task in enumerate(rebuilt):
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
-            session = self._transition(c, session, "inProgress", plan_version="reviewed-v1")
+            session = self._transition(c, session, "inProgress")
             return self._detail(c, session)
 
     def finish(self, session_id, profile_id, abandon=False):

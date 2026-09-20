@@ -35,7 +35,7 @@ function SessionLoader({ id }: { id: string }) {
   const current = session?.session.id === id
     ? practiceScene(session, { id: data.mediaAssetId, signedUrl: data.imageUrl ?? "" }, learner.language)
     : data;
-  if (session?.session.id === id && !session.session.planVersion && !["completed", "abandoned", "failed"].includes(session.session.status) && !location.pathname.endsWith("/analysis")) {
+  if (session?.session.id === id && ["created", "analyzingScene", "awaitingObjectReview"].includes(session.session.status) && !["completed", "abandoned", "failed"].includes(session.session.status) && !location.pathname.endsWith("/analysis")) {
     return <Navigate to={`/practice/sessions/${id}/analysis`} replace />;
   }
   return <Outlet context={current} />;

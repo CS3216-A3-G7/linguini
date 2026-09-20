@@ -30,13 +30,6 @@ class MediaSource(StrEnum):
     GENERATED = "generated"
 
 
-class SceneObjectSelectionStatus(StrEnum):
-    SUGGESTED = "suggested"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
-    CORRECTED = "corrected"
-
-
 class PartOfSpeech(StrEnum):
     NOUN = "noun"
     VERB = "verb"
@@ -76,10 +69,19 @@ class SessionStatus(StrEnum):
     ANALYZING_SCENE = "analyzingScene"
     AWAITING_OBJECT_REVIEW = "awaitingObjectReview"
     GENERATING_TASKS = "generatingTasks"
+    READY = "ready"
     IN_PROGRESS = "inProgress"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
     FAILED = "failed"
+
+
+class SessionFailureCode(StrEnum):
+    IMAGE_UPLOAD_FAILED = "imageUploadFailed"
+    SCENE_ANALYSIS_FAILED = "sceneAnalysisFailed"
+    NO_VALID_OBJECTS = "noValidObjects"
+    VOCABULARY_MAPPING_FAILED = "vocabularyMappingFailed"
+    TASK_GENERATION_FAILED = "taskGenerationFailed"
 
 
 class TaskPhase(StrEnum):

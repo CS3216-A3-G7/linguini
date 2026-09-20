@@ -579,6 +579,41 @@
   overflow-wrap: anywhere;
 }
 
+.analysis-relation-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  border-bottom: 1px solid var(--line);
+}
+
+.analysis-relation-row__marker {
+  background: var(--pasta);
+  color: #5b3a00;
+}
+
+.analysis-relation-row__flow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.analysis-relation-row__relation {
+  flex: 0 1 auto;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--sage);
+  color: var(--teal-dark);
+  font-size: var(--text-small);
+  font-weight: 800;
+  text-align: center;
+}
+
 .analysis-word-row__marker {
   display: inline-flex;
   align-items: center;
