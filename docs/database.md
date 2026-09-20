@@ -32,48 +32,10 @@ Storage key; Supabase Storage holds the object when media storage is configured.
 Preloaded scene content stores catalog metadata and JSONB content for the
 curated scene.
 
-## Partial relationship proof
+## Relationships
 
-A complete ERD will be added as the schema grows. The following is deliberately
-only a partial excerpt covering users, language profiles, sessions, and tasks.
-It uses the actual primary and foreign-key columns from the Prisma schema and
-also proves that Mermaid `erDiagram` blocks render in the documentation:
-
-```mermaid
-erDiagram
-    USERS {
-        uuid id PK
-        text auth_provider_id UK
-    }
-    LANGUAGE_PROFILES {
-        uuid id PK
-        uuid user_id FK
-        varchar source_language_code
-        varchar target_language_code
-    }
-    SESSIONS {
-        uuid id PK
-        uuid user_id FK
-        uuid language_profile_id FK
-        varchar status
-    }
-    SESSION_TASKS {
-        uuid id PK
-        uuid session_id FK
-        int order_index
-        varchar status
-    }
-
-    USERS ||--o{ LANGUAGE_PROFILES : owns
-    USERS ||--o{ SESSIONS : owns
-    LANGUAGE_PROFILES ||--o{ SESSIONS : configures
-    SESSIONS ||--o{ SESSION_TASKS : contains
-```
-
-`sessions` references a language profile through the composite owner-aware
-relationship `(language_profile_id, user_id)`, while `session_tasks` references
-its session through `session_id`. The schema also enforces unique task order
-within a session.
+The full ERD, including cardinality notation, lives on the
+[Entity relationship diagram](erd.md) page.
 
 ## Migrations
 

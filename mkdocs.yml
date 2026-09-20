@@ -38,3 +38,4 @@ nav:
   - Local development: local-development.md
   - Testing: testing.md
   - Database: database.md
+  - ERD: erd.md
