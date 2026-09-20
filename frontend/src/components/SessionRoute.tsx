@@ -1,5 +1,5 @@
 import { practiceScene } from "../lib/practiceScene";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getMedia, getPractice } from "../lib/api";
@@ -20,6 +20,11 @@ function SessionLoader({ id }: { id: string }) {
   const [preview, setPreview] = useState<Scene | null>(null);
   const [detail, setDetail] = useState<PracticeDetail | null>(null);
   const location = useLocation();
+  // The guard protects arrival only: the pathname is captured at mount and the
+  // verdict is decided once, so in-app moves between this session's stages are
+  // left to each page's own Navigate fallbacks.
+  const entryPath = useRef(location.pathname);
+  const entryAllowed = useRef<boolean | null>(null);
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
     const initial = await getPractice(id);
     const media = await getMedia(initial.mediaAsset.id);
@@ -48,8 +53,11 @@ function SessionLoader({ id }: { id: string }) {
     ? practiceScene(session, { id: data.mediaAssetId, signedUrl: data.imageUrl ?? "" }, learner.language)
     : data;
   const authoritative = session?.session.id === id ? session : detail;
-  if (authoritative && !isSessionRouteAllowed(authoritative, location.pathname)) {
-    const dest = sessionDestination(authoritative);
+  if (entryAllowed.current === null && authoritative) {
+    entryAllowed.current = isSessionRouteAllowed(authoritative, entryPath.current);
+  }
+  if (entryAllowed.current === false) {
+    const dest = sessionDestination(authoritative!);
     return <Navigate to={dest.path} replace state={dest.notice ? { practiceNotice: dest.notice } : undefined} />;
   }
   return <Outlet context={current} />;
