@@ -2995,23 +2995,32 @@
   }
 
   .shell--focus > .shell__content--desktop-wide {
-    max-width: 1080px;
+    max-width: 1120px;
   }
 
   .analysis-layout {
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
-    align-items: start;
+    align-items: stretch;
     column-gap: var(--space-8);
   }
 
-  .analysis-stage-column {
-    position: sticky;
-    top: var(--space-5);
+  .analysis-results {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .analysis-word-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .analysis-word-list {
-    max-height: min(36vh, 300px);
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
@@ -3029,5 +3038,17 @@
   .analysis-word-list::-webkit-scrollbar-thumb {
     background: var(--line);
     border-radius: var(--radius-pill);
+  }
+
+  .analysis-continue {
+    margin-top: auto;
+  }
+
+  @media (min-height: 800px) {
+    .analysis-layout {
+      height: calc(100vh - 220px);
+      grid-template-rows: minmax(0, 1fr);
+      align-content: center;
+    }
   }
 }
