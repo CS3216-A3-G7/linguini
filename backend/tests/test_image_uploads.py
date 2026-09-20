@@ -41,12 +41,12 @@ def setup():
     return service, user, repo, storage, rows
 
 
-def request_for(user, **kwargs):
+def request_for(user, source="camera", **kwargs):
     asset_id = uuid4()
     return ConfirmMediaUploadRequest(
         asset_id=asset_id,
         storage_key=f"users/{user.id}/images/{asset_id}.jpg",
-        source="camera",
+        source=source,
         **kwargs,
     )
 
@@ -85,10 +85,24 @@ def test_confirm_derives_metadata_and_is_idempotent(setup, format, mime):
     assert first.id == second.id == request.asset_id
     assert (first.mime_type, first.width, first.height) == (mime, 23, 17)
     assert first.owner_user_id == user.id
+    assert first.source == "camera"
+    assert first.captured_at is not None
     assert first.expires_in_seconds == 3600
     repo.create.assert_called_once()
     storage.download.assert_called_once()
     storage.delete.assert_not_called()
+
+
+def test_gallery_upload_has_no_capture_timestamp(setup):
+    service, user, _, storage, _ = setup
+    request = request_for(user, source="userUpload")
+    storage.download.return_value = image_bytes()
+
+    asset = service.confirm_upload(request)
+
+    assert asset.owner_user_id == user.id
+    assert asset.source == "userUpload"
+    assert asset.captured_at is None
 
 
 @pytest.mark.parametrize(

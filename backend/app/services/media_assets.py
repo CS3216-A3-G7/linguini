@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from PIL import Image, UnidentifiedImageError
 
 from app.repositories.media_assets import MediaAssetConflictError, MediaAssetRepository
+from app.schemas.base import utc_now
 from app.schemas.enums import MediaSource
 from app.schemas.media import (
     MAX_IMAGE_BYTES,
@@ -111,6 +112,7 @@ class MediaAssetService:
             mime_type=mime,
             width=width,
             height=height,
+            captured_at=utc_now() if request.source is MediaSource.CAMERA else None,
         )
         try:
             asset = self.repository.create(asset)
