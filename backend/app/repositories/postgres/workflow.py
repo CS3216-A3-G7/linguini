@@ -49,7 +49,8 @@ from app.schemas.vocabulary import (
     VocabularyItem,
     VocabularyTranslation,
 )
-from app.services.session_plan import build_objects, build_tasks
+from app.services.scene_analysis import DeterministicSceneAnalyzer, SceneAnalysisError
+from app.services.session_plan import build_tasks
 
 TERMINAL = {"completed", "abandoned", "failed"}
 ALLOWED_TRANSITIONS = {
@@ -83,8 +84,9 @@ def parse_session(row):
 
 
 class PostgresWorkflowRepository:
-    def __init__(self, engine, user_id):
+    def __init__(self, engine, user_id, analyzer=None):
         self.engine, self.user_id = engine, user_id
+        self.analyzer = analyzer or DeterministicSceneAnalyzer(engine)
 
     @contextmanager
     def transaction(self):
@@ -384,12 +386,10 @@ class PostgresWorkflowRepository:
             session = self._session(c, session_id, profile_id)
             if session.status in TERMINAL:
                 raise PracticeConflictError("Cannot analyze a terminal session.")
-            if (
-                session.status in {"ready", "inProgress"}
-                or c.execute(
-                    select(sessions.c.analysis_draft).where(sessions.c.id == session.id)
-                ).scalar_one_or_none()
-            ):
+            if session.status in {"ready", "inProgress"}:
+                raise PracticeConflictError("Session analysis is already finished.")
+            if session.status != "created":
+                # analyzingScene/awaitingObjectReview/generatingTasks: never re-run the model.
                 return self._detail(c, session)
             asset = MediaAsset.model_validate(
                 dict(
@@ -422,20 +422,39 @@ class PostgresWorkflowRepository:
             )
             if asset.source == "preloaded" and scene is None:
                 raise PracticeNotFoundError("Curated scene not found.")
-            session = self._transition(c, session, "analyzingScene")
-            objects, words, translations = build_objects(c, session, asset, profile, scene)
-            # Persist resumable suggestions separately; only review creates scene objects/tasks.
-            session = self._transition(
+            claimed = self._transition(c, session, "analyzingScene")
+        try:
+            result = self.analyzer.analyze(
+                claimed, asset, dict(profile), dict(scene) if scene else None
+            )
+        except Exception as exc:
+            with self.transaction() as c:
+                current = self._session(c, session_id)
+                if current.status == "analyzingScene":
+                    self._transition(c, current, "failed", failure_code="sceneAnalysisFailed")
+            if isinstance(exc, PracticeConflictError | PracticeNotFoundError):
+                raise
+            raise SceneAnalysisError("Scene analysis failed.") from exc
+        with self.transaction() as c:
+            current = self._session(c, session_id, profile_id)
+            if current.status != "analyzingScene":
+                return self._detail(c, current)
+            current = self._transition(
                 c,
-                session,
+                current,
                 "awaitingObjectReview",
-                session_title=scene["title"] if scene else "Your uploaded photo",
+                session_title=result.title,
+                session_summary=result.summary,
                 analysis_draft={
-                    "objects": [obj.model_dump(mode="json", by_alias=False) for obj in objects],
-                    "relations": [],
+                    "objects": [
+                        obj.model_dump(mode="json", by_alias=False) for obj in result.objects
+                    ],
+                    "relations": [
+                        row.model_dump(mode="json", by_alias=False) for row in result.relations
+                    ],
                 },
             )
-            return self._detail(c, session)
+            return self._detail(c, current)
 
     def _catalog_word(self, c, profile, label):
         match = (

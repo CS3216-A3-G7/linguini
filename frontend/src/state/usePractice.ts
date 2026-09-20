@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { analyzePractice, completePractice, createPractice, getPractice, getProgress, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
+import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getProgress, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, ProgressResponse, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
@@ -15,7 +15,19 @@ export function usePractice(_userId: string, profileId: string, updateProgress: 
   const loadSession = useCallback(async (id: string) => {
     const version = ++loadVersion.current;
     let data = await getPractice(id);
-    if (["created", "analyzingScene", "awaitingObjectReview"].includes(data.session.status) && !["completed", "abandoned", "failed"].includes(data.session.status)) data = await analyzePractice(id);
+    if (data.session.status === "created") {
+      try { data = await analyzePractice(id); }
+      catch (error) {
+        // Another request may have claimed the session; fall back to polling.
+        if (!(error instanceof ApiError && error.status === 409)) throw error;
+        data = await getPractice(id);
+      }
+    }
+    for (let attempt = 0; attempt < 20 && ["analyzingScene", "generatingTasks"].includes(data.session.status); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (version !== loadVersion.current) break;
+      data = await getPractice(id);
+    }
     if (version === loadVersion.current) setSession(data);
     return data;
   }, []);

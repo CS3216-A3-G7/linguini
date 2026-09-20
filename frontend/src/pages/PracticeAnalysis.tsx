@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
 import { ArrowRightIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
@@ -27,8 +27,13 @@ export function PracticeAnalysis() {
   const photoRef = useRef<HTMLDivElement>(null);
   const base = `/practice/sessions/${scene.sessionId}`;
   if (!session) return null;
-  if (session.session.status === "completed") return <Navigate to={`${base}/summary`} replace />;
-  if (["abandoned", "failed"].includes(session.session.status)) return <Navigate to={`${base}/learn`} replace />;
+  if (["created", "analyzingScene", "generatingTasks"].includes(session.session.status)) return <div className="stack analysis-page">
+    <h1>Scene analysis</h1>
+    <section className="analysis-loading" aria-live="polite" aria-busy="true">
+      <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={scene} items={[]} /><span className="analysis-scan__line" /></div>
+      <div className="analysis-loading__copy"><h2>{session.session.status === "generatingTasks" ? "Preparing your practice..." : "Finding objects in your image..."}</h2><p className="muted">This will only take a moment.</p></div>
+    </section>
+  </div>;
   const locked = session.tasks.some(task => task.status !== "pending");
   const kept = scene.items.filter(item => !removed.includes(item.id));
   const custom: LanguageItem[] = added.map((item, index) => ({ id: `custom-${item.id}`, word: item.label,

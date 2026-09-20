@@ -4,6 +4,7 @@ import { Button, Card, Noodle, StatusPill, XpPill } from "../components/ui";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { createPractice, getPracticeSummary } from "../lib/api";
+import { sessionDestination } from "../lib/sessionRoute";
 import { useApiData } from "../lib/useApiData";
 
 export function SessionSummary() {
@@ -26,13 +27,13 @@ export function SessionSummary() {
     setStarting(true); setStartError(null);
     try {
       const next = await createPractice(activeProfile.id, scene.mediaAssetId, requestKey.current);
-      navigate("/practice/sessions/" + next.session.id + "/analysis");
+      navigate(sessionDestination(next).path);
     } catch (error) { setStartError(error instanceof Error ? error.message : "Unable to start practice."); }
     finally { busy.current = false; setStarting(false); }
   };
   return <div className="stack">
     <p className="small muted">{completed ? "Session and XP saved." : "XP is saved after each action."}</p>
-    {session?.session.status === "inProgress" ? <Button onClick={() => navigate("/practice/sessions/" + scene.sessionId + "/learn")}>Continue unfinished practice</Button> : null}
+    {session?.session.status === "inProgress" ? <Button onClick={() => navigate(sessionDestination(session).path)}>Continue unfinished practice</Button> : null}
     <div className="center-text stack-2" style={{ alignItems: "center" }}>
       <img className="mascot" src="/linguini-logo.png" width={120} height={120} alt="Linguini mascot" /><h1>{completed ? "Good job!" : "Your session"}</h1><Noodle className="noodle-divider summary__noodle" />
       <p className="muted">You practised {scene.title.toLowerCase()}.</p>
