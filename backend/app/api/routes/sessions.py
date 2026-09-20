@@ -1,12 +1,13 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.dependencies import get_practice_service
 from app.schemas.sessions import (
     CreateSessionRequest,
     GenerateSessionPlanRequest,
+    ReviewPracticeRequest,
     Session,
     SessionDetailResponse,
     SessionSummaryResponse,
@@ -61,6 +62,13 @@ def list_session_tasks(session_id: UUID, service: PracticeServiceDep) -> list[Se
     return service.get(session_id).tasks
 
 
+@router.put("/{session_id}/review", response_model=SessionDetailResponse)
+def review_session(
+    session_id: UUID, request: ReviewPracticeRequest, service: PracticeServiceDep
+) -> SessionDetailResponse:
+    return service.review(session_id, request)
+
+
 @router.get("/{session_id}/summary", response_model=SessionSummaryResponse)
 def get_session_summary(session_id: UUID, service: PracticeServiceDep) -> SessionSummaryResponse:
     return service.summary(session_id)
@@ -74,3 +82,10 @@ def complete_session(session_id: UUID, service: PracticeServiceDep) -> Session:
 @router.post("/{session_id}/abandon", response_model=Session)
 def abandon_session(session_id: UUID, service: PracticeServiceDep) -> Session:
     return service.abandon(session_id)
+
+
+@router.get("/{session_id}/review-word")
+def check_review_word(
+    session_id: UUID, service: PracticeServiceDep, label: str = Query(min_length=1, max_length=200)
+):
+    return service.check_word(session_id, label)

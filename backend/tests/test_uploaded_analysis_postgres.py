@@ -1,11 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from test_postgres_sessions import database as database
 
 from app.repositories.postgres.media_assets import PostgresMediaAssetRepository, media_assets
 from app.repositories.postgres.practice import sessions
+from app.repositories.postgres.scene_objects import scene_objects
+from app.repositories.postgres.tasks import session_tasks
 from app.schemas.media import MediaAsset
 
 
@@ -37,18 +39,34 @@ def test_analysis_persistence_concurrency_and_review(database):
         detail = client.get(f"/api/v1/sessions/{sid}").json()
         assert len(detail["sceneObjects"]) == 3
         oid = detail["sceneObjects"][0]["id"]
+        assert not detail["tasks"]
+        with engine.connect() as c:
+            assert not c.execute(
+                select(scene_objects).where(scene_objects.c.session_id == UUID(sid))
+            ).first()
+            assert not c.execute(
+                select(session_tasks).where(session_tasks.c.session_id == UUID(sid))
+            ).first()
         assert (
-            client.patch(
-                f"/api/v1/sessions/{sid}/scene-objects",
-                json={"objects": [{"sceneObjectId": oid, "selectionStatus": "rejected"}]},
-            ).status_code
-            == 200
+            client.get(f"/api/v1/sessions/{sid}").json()["sceneObjects"] == detail["sceneObjects"]
         )
+        unknown = {
+            "acceptedObjectIds": [oid],
+            "addedObjects": [
+                {"id": str(uuid4()), "label": "missing-catalog-word", "x": 0.3, "y": 0.4}
+            ],
+        }
+        assert client.put(f"/api/v1/sessions/{sid}/review", json=unknown).status_code == 409
+        with engine.connect() as c:
+            assert not c.execute(
+                select(scene_objects).where(scene_objects.c.session_id == UUID(sid))
+            ).first()
+        accepted = [o["id"] for o in detail["sceneObjects"] if o["id"] != oid]
+        saved = client.put(f"/api/v1/sessions/{sid}/review", json={"acceptedObjectIds": accepted})
+        assert saved.status_code == 200, saved.text
         retry = client.post(f"/api/v1/sessions/{sid}/analyze").json()
-        assert (
-            next(o for o in retry["sceneObjects"] if o["id"] == oid)["selectionStatus"]
-            == "rejected"
-        )
+        assert {o["id"] for o in retry["sceneObjects"]} == set(accepted)
+        assert retry["tasks"]
         assert client.post(f"/api/v1/sessions/{sid}/abandon").status_code == 200
         assert client.post(f"/api/v1/sessions/{sid}/analyze").status_code == 409
         assert UUID(sid)

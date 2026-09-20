@@ -56,3 +56,17 @@ test("a missing vocabulary join falls back to the object's label without inventi
   assert.equal(scene.items[0].word, "label fallback");
   assert.equal(scene.items[0].translation, "chair");
 });
+
+
+test("reviewed scenes exclude rejected objects and retain translations and marker positions", () => {
+  const reviewed: PracticeDetail = { ...detail, sceneObjects: [
+    { ...detail.sceneObjects[0], id: "rejected", selectionStatus: "rejected" },
+    { ...detail.sceneObjects[0], id: "kept", selectionStatus: "accepted" },
+  ] };
+  const scene = practiceScene(reviewed, media, "Spanish");
+  assert.equal(scene.items.length, 1);
+  assert.equal(scene.items[0].id, "kept");
+  assert.equal(scene.items[0].translation, "chair");
+  assert.equal(scene.items[0].word, "silla");
+  assert.deepEqual([scene.items[0].x, scene.items[0].y], [15, 25]);
+});

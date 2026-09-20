@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from uuid import uuid5
 
-from sqlalchemy import case, func, insert, select, update
+from sqlalchemy import case, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as upsert
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -26,7 +26,7 @@ from app.repositories.practice import (
     PracticeStorageError,
 )
 from app.schemas.base import utc_now
-from app.schemas.media import MediaAsset
+from app.schemas.media import MediaAsset, SceneObject
 from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
 from app.schemas.tasks import (
     SessionProgress,
@@ -131,6 +131,11 @@ class PostgresWorkflowRepository:
                 .order_by(scene_objects.c.created_at, scene_objects.c.id)
             ).mappings()
         ]
+        draft = c.execute(
+            select(sessions.c.analysis_draft).where(sessions.c.id == session.id)
+        ).scalar_one_or_none()
+        if draft:
+            objects = [SceneObject.model_validate(obj) for obj in draft]
         ids = [o.vocabulary_item_id for o in objects if o.vocabulary_item_id]
         words = [
             VocabularyItem.model_validate(dict(r))
@@ -275,10 +280,15 @@ class PostgresWorkflowRepository:
     def analyze(self, session_id, profile_id):
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
-            if session.plan_version:
-                return self._detail(c, session)
             if session.status in TERMINAL:
                 raise PracticeConflictError("Cannot analyze a terminal session.")
+            if (
+                session.plan_version
+                or c.execute(
+                    select(sessions.c.analysis_draft).where(sessions.c.id == session.id)
+                ).scalar_one_or_none()
+            ):
+                return self._detail(c, session)
             asset = MediaAsset.model_validate(
                 dict(
                     c.execute(
@@ -311,24 +321,171 @@ class PostgresWorkflowRepository:
             if asset.source == "preloaded" and scene is None:
                 raise PracticeNotFoundError("Curated scene not found.")
             objects, words, translations = build_objects(c, session, asset, profile, scene)
+            # Persist resumable suggestions separately; only review creates scene objects/tasks.
             for obj in objects:
-                c.execute(insert(scene_objects).values(**object_values(obj)))
-            for task in build_tasks(
-                session.id, objects, words, translations, asset.source != "preloaded"
-            ):
-                c.execute(insert(session_tasks).values(**entity_values(task)))
+                obj.selection_status = "suggested"
             c.execute(
                 update(sessions)
                 .where(sessions.c.id == session.id)
                 .values(
-                    status="inProgress",
-                    started_at=utc_now(),
-                    plan_version="placeholder-upload-v1"
-                    if asset.source != "preloaded"
-                    else "placeholder-preloaded-v1",
+                    analysis_draft=[obj.model_dump(mode="json", by_alias=False) for obj in objects]
                 )
             )
             return self._detail(c, self._session(c, session.id))
+
+    def _catalog_word(self, c, profile, label):
+        match = (
+            c.execute(
+                select(vocabulary_items, vocabulary_translations.c.translated_text)
+                .join(
+                    vocabulary_translations,
+                    vocabulary_translations.c.vocabulary_item_id == vocabulary_items.c.id,
+                )
+                .where(
+                    func.lower(vocabulary_items.c.language_code)
+                    == profile["target_language_code"].lower(),
+                    func.lower(vocabulary_translations.c.source_language_code)
+                    == profile["source_language_code"].lower(),
+                    func.lower(vocabulary_translations.c.translated_text) == label.strip().lower(),
+                )
+                .order_by(vocabulary_items.c.id)
+                .limit(1)
+            )
+            .mappings()
+            .first()
+        )
+        if not match:
+            raise PracticeConflictError(
+                f'"{label}" is not in the vocabulary for your learning language yet. '
+                "Please choose another word."
+            )
+        return VocabularyItem.model_validate(
+            {key: match[key] for key in VocabularyItem.model_fields}
+        )
+
+    def check_word(self, session_id, profile_id, label):
+        with self.engine.connect() as c:
+            self._session(c, session_id, profile_id)
+            profile = (
+                c.execute(select(language_profiles).where(language_profiles.c.id == profile_id))
+                .mappings()
+                .one()
+            )
+            self._catalog_word(c, profile, label)
+            return {"available": True}
+
+    def review(self, session_id, profile_id, request):
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.status in TERMINAL:
+                raise PracticeConflictError("This session cannot be edited.")
+            tasks = self._tasks(c, session_id)
+            if (
+                any(task.status != "pending" for task in tasks)
+                or c.execute(
+                    select(task_attempts.c.id)
+                    .join(session_tasks, session_tasks.c.id == task_attempts.c.session_task_id)
+                    .where(session_tasks.c.session_id == session_id)
+                    .limit(1)
+                ).first()
+            ):
+                raise PracticeConflictError(
+                    "Practice has started. Start a new session to change its words."
+                )
+            detail = self._detail(c, session)
+            existing = {obj.id: obj for obj in detail.scene_objects}
+            if any(object_id not in existing for object_id in request.accepted_object_ids):
+                raise PracticeConflictError("An object does not belong to this session.")
+            profile = (
+                c.execute(select(language_profiles).where(language_profiles.c.id == profile_id))
+                .mappings()
+                .one()
+            )
+            for object_id in request.accepted_object_ids:
+                obj = existing[object_id]
+                c.execute(
+                    upsert(scene_objects)
+                    .values(**object_values(obj))
+                    .on_conflict_do_nothing(index_elements=["id"])
+                )
+            for added in request.added_objects:
+                # Scope client-generated IDs to this session; retries keep the same object.
+                object_id = uuid5(session_id, "manual:" + str(added.id))
+                word = self._catalog_word(c, profile, added.label)
+                obj = SceneObject(
+                    id=object_id,
+                    session_id=session_id,
+                    media_asset_id=session.scene_media_asset_id,
+                    detected_label=added.label,
+                    confirmed_label=word.display_text,
+                    selection_status="corrected",
+                    vocabulary_item_id=word.id,
+                    bounding_box={"x": added.x, "y": added.y, "width": 0.01, "height": 0.01},
+                )
+                values = object_values(obj)
+                c.execute(
+                    upsert(scene_objects)
+                    .values(**values)
+                    .on_conflict_do_update(
+                        index_elements=["id"],
+                        set_={
+                            key: value
+                            for key, value in values.items()
+                            if key not in {"id", "created_at"}
+                        },
+                    )
+                )
+            accepted = set(request.accepted_object_ids) | {
+                uuid5(session_id, "manual:" + str(added.id)) for added in request.added_objects
+            }
+            c.execute(delete(session_tasks).where(session_tasks.c.session_id == session_id))
+            c.execute(
+                delete(scene_objects).where(
+                    scene_objects.c.session_id == session_id, scene_objects.c.id.not_in(accepted)
+                )
+            )
+            c.execute(
+                update(scene_objects)
+                .where(scene_objects.c.session_id == session_id)
+                .values(selection_status="accepted")
+            )
+            c.execute(
+                update(sessions)
+                .where(sessions.c.id == session_id)
+                .values(
+                    analysis_draft=None,
+                    status="inProgress",
+                    started_at=session.started_at or utc_now(),
+                    plan_version="reviewed-v1",
+                )
+            )
+            session = self._session(c, session_id)
+            detail = self._detail(c, session)
+            objects = [obj for obj in detail.scene_objects if obj.id in accepted]
+            words_by_id = {word.id: word for word in detail.vocabulary}
+            translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
+            if any(
+                obj.vocabulary_item_id not in words_by_id
+                or obj.vocabulary_item_id not in translations_by_id
+                for obj in objects
+            ):
+                raise PracticeConflictError("Every selected object needs a word and translation.")
+            words = [words_by_id[obj.vocabulary_item_id] for obj in objects]
+            translations = [translations_by_id[obj.vocabulary_item_id] for obj in objects]
+            rebuilt = build_tasks(session_id, objects, words, translations, False)
+            # Every kept object gets vocabulary and pronunciation practice, not just the first.
+            extra = []
+            for obj, word, translation in zip(
+                objects[1:], words[1:], translations[1:], strict=True
+            ):
+                for task in build_tasks(session_id, [obj], [word], [translation], False)[:2]:
+                    task.id = uuid5(obj.id, "review:" + task.kind.value)
+                    extra.append(task)
+            rebuilt = rebuilt[:2] + extra + rebuilt[2:]
+            for index, task in enumerate(rebuilt):
+                task.order_index = index
+                c.execute(insert(session_tasks).values(**entity_values(task)))
+            return self._detail(c, session)
 
     def finish(self, session_id, profile_id, abandon=False):
         with self.transaction() as c:

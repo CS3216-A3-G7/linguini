@@ -51,6 +51,27 @@ class GenerateSessionPlanRequest(ApiModel):
     ispy_round_count: Annotated[int, Field(ge=1, le=20)] = 5
 
 
+class AddedPracticeObject(ApiModel):
+    id: UUID
+    label: Annotated[str, Field(min_length=1, max_length=200)]
+    x: Annotated[float, Field(ge=0, le=0.99)]
+    y: Annotated[float, Field(ge=0, le=0.99)]
+
+
+class ReviewPracticeRequest(ApiModel):
+    accepted_object_ids: Annotated[list[UUID], Field(max_length=50)]
+    added_objects: Annotated[list[AddedPracticeObject], Field(max_length=20)] = Field(
+        default_factory=list
+    )
+
+    @model_validator(mode="after")
+    def unique_selection(self):
+        ids = self.accepted_object_ids + [item.id for item in self.added_objects]
+        if not ids or len(ids) != len(set(ids)):
+            raise ValueError("Choose at least one object, with no duplicate IDs.")
+        return self
+
+
 class SessionDetailResponse(ApiModel):
     analysis_mode: Literal["placeholder"] | None = None
     media_asset: MediaAsset

@@ -130,6 +130,7 @@ model Session {
   startedAt          DateTime? @map("started_at") @db.Timestamptz(6)
   completedAt        DateTime? @map("completed_at") @db.Timestamptz(6)
   abandonedAt        DateTime? @map("abandoned_at") @db.Timestamptz(6)
+  analysisDraft      Json? @map("analysis_draft") @db.JsonB
   planVersion        String? @map("plan_version") @db.VarChar(100)
   failureCode        String? @map("failure_code") @db.VarChar(100)
   idempotencyKey     String? @map("idempotency_key") @db.VarChar(200)
@@ -219,9 +220,9 @@ model VocabularyEncounter {
   vocabularyItemId String @map("vocabulary_item_id") @db.Uuid
   progress         UserVocabularyProgress @relation(fields: [userId, vocabularyItemId], references: [userId, vocabularyItemId], onDelete: Cascade, onUpdate: Cascade)
   sessionId        String @map("session_id") @db.Uuid
-  session          Session @relation(fields: [sessionId, userId], references: [id, userId], onDelete: NoAction, onUpdate: NoAction, map: "vocabulary_encounters_session_owner_fkey")
+  session          Session @relation(fields: [sessionId, userId], references: [id, userId], onDelete: Cascade, onUpdate: NoAction, map: "vocabulary_encounters_session_owner_fkey")
   sessionTaskId    String @map("session_task_id") @db.Uuid
-  sessionTask      SessionTask @relation(fields: [sessionTaskId, sessionId], references: [id, sessionId], onDelete: NoAction, onUpdate: NoAction, map: "vocabulary_encounters_task_session_fkey")
+  sessionTask      SessionTask @relation(fields: [sessionTaskId, sessionId], references: [id, sessionId], onDelete: Cascade, onUpdate: NoAction, map: "vocabulary_encounters_task_session_fkey")
   encounterType    String @map("encounter_type") @db.VarChar(10)
   outcome          String @db.VarChar(9)
   occurredAt       DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
@@ -404,7 +405,7 @@ model JournalWordMention {
   matchedText       String @map("matched_text") @db.Text
   matchMethod       String @map("match_method") @db.VarChar(13)
   sourceEncounterId String? @map("source_encounter_id") @db.Uuid
-  sourceEncounter   VocabularyEncounter? @relation(fields: [sourceEncounterId], references: [id], onDelete: NoAction, onUpdate: Cascade)
+  sourceEncounter   VocabularyEncounter? @relation(fields: [sourceEncounterId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 

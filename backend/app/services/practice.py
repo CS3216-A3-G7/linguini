@@ -31,6 +31,12 @@ class PracticeService:
     def complete(self, session_id):
         return self.repository.finish(session_id, self._profile().id)
 
+    def check_word(self, session_id, label):
+        return self.repository.check_word(session_id, self._profile().id, label)
+
+    def review(self, session_id, request):
+        return self.repository.review(session_id, self._profile().id, request)
+
     def abandon(self, session_id):
         return self.repository.finish(session_id, self._profile().id, abandon=True)
 

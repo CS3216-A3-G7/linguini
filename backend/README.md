@@ -86,9 +86,17 @@ SessionTasks -> attempts/completion/skipping -> progress`. The source is read fr
 
 1. Create a session using `POST /api/v1/sessions` with `mediaAssetId`, the active
    `languageProfileId`, and an optional retry `idempotencyKey`.
-2. `POST /api/v1/sessions/{id}/analyze` atomically creates accepted objects, vocabulary
-   links and eight persisted tasks (one of each `TaskKind`). `generate-plan` is an
-   idempotent alias for this placeholder implementation.
+2. `POST /api/v1/sessions/{id}/analyze` saves resumable object suggestions in
+   `sessions.analysis_draft`. It creates no `scene_objects` or lesson tasks yet;
+   `generate-plan` is an alias for this draft step. `GET` returns draft suggestions
+   in `sceneObjects` until review is confirmed.
+   `GET /api/v1/sessions/{id}/review-word?label=chair` checks an English label
+   against vocabulary for the active learning language.
+   `PUT /api/v1/sessions/{id}/review` accepts `acceptedObjectIds` and `addedObjects`
+   (`id`, English `label`, normalized `x`/`y`). It atomically saves only selected
+   objects, clears the draft and builds tasks. Unknown added words are rejected;
+   task activity locks further editing. Apply the session-analysis-draft migration
+   with `npm run db:deploy` before running this version of the API.
 3. Preloaded images use curated catalog objects. Uploaded photos use chair, table,
    and plant samples with fixed positions, explicitly labeled in the UI. No pixels
    are inspected. Vocabulary covers all six UI target languages with English as

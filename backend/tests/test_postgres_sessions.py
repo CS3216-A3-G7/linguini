@@ -79,9 +79,16 @@ def create_run(client, profile, key="session-key-1"):
     return response.json()
 
 
-def analyze(client, sid):
+def analyze(client, sid, confirm=True):
     response = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert response.status_code == 200, response.text
+    detail = response.json()
+    if confirm and not detail["tasks"]:
+        response = client.put(
+            f"/api/v1/sessions/{sid}/review",
+            json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
+        )
+        assert response.status_code == 200, response.text
     return response.json()
 
 
@@ -115,9 +122,10 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
     endpoint = f"/api/v1/sessions/{sid}"
     assert run["tasks"] == []
     with ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(lambda _: analyze(client, sid), range(4)))
-    detail = results[0]
-    assert all([t["id"] for t in r["tasks"]] == [t["id"] for t in detail["tasks"]] for r in results)
+        results = list(pool.map(lambda _: analyze(client, sid, confirm=False), range(4)))
+    assert all(not result["tasks"] for result in results)
+    assert all(result["sceneObjects"] == results[0]["sceneObjects"] for result in results)
+    detail = analyze(client, sid)
     assert len(detail["tasks"]) == len(TaskKind)
     assert {t["kind"] for t in detail["tasks"]} == {k.value for k in TaskKind}
     assert all(
@@ -343,3 +351,43 @@ def test_other_user_cannot_access_sessions_or_tasks(database, monkeypatch):
     finally:
         with engine.begin() as c:
             c.execute(delete(users).where(users.c.id == stranger.id))
+
+
+def test_review_rejects_adds_and_rebuilds_without_duplicate_objects(database):
+    _, _, profile, client = database
+    run = create_run(client, profile, "review-session-key")
+    sid = run["session"]["id"]
+    detail = analyze(client, sid, confirm=False)
+    kept = detail["sceneObjects"][0]["id"]
+    payload = {
+        "acceptedObjectIds": [kept],
+        "addedObjects": [
+            {
+                "id": str(uuid4()),
+                "label": detail["sceneObjects"][1]["detectedLabel"],
+                "x": 0.3,
+                "y": 0.4,
+            }
+        ],
+    }
+    response = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
+    assert response.status_code == 200, response.text
+    saved = response.json()
+    selected = [obj for obj in saved["sceneObjects"] if obj["selectionStatus"] != "rejected"]
+    assert len(selected) == 2
+    assert any(
+        obj["detectedLabel"] == detail["sceneObjects"][1]["detectedLabel"] for obj in selected
+    )
+    assert all(task["sceneObjectId"] in {obj["id"] for obj in selected} for task in saved["tasks"])
+    introductions = [task for task in saved["tasks"] if task["kind"] == "vocabularyIntroduction"]
+    assert len(introductions) == 2
+    retry = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
+    assert retry.status_code == 200, retry.text
+    assert len(retry.json()["sceneObjects"]) == len(saved["sceneObjects"])
+    task_id = introductions[0]["id"]
+    assert client.post(f"/api/v1/tasks/{task_id}/complete", json={}).status_code == 200
+    assert client.put(f"/api/v1/sessions/{sid}/review", json=payload).status_code == 409
+    persisted = client.get(f"/api/v1/sessions/{sid}").json()
+    assert (
+        next(task for task in persisted["tasks"] if task["id"] == task_id)["status"] == "completed"
+    )

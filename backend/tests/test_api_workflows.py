@@ -67,6 +67,10 @@ def test_server_rejects_forged_awards_and_unknown_events(database):
     _, _, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
     detail = client.post(f"/api/v1/sessions/{sid}/analyze").json()
+    detail = client.put(
+        f"/api/v1/sessions/{sid}/review",
+        json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
+    ).json()
     task_id = detail["tasks"][1]["id"]
     response = client.post(
         f"/api/v1/tasks/{task_id}/attempts",

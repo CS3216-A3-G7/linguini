@@ -10,6 +10,7 @@ from sqlalchemy import (
     func,
     select,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.schemas.progress import StoredProgress
 
@@ -24,6 +25,7 @@ sessions = Table(
     Column("started_at", DateTime(timezone=True)),
     Column("completed_at", DateTime(timezone=True)),
     Column("abandoned_at", DateTime(timezone=True)),
+    Column("analysis_draft", JSONB),
     Column("plan_version", String(100)),
     Column("failure_code", String(100)),
     Column("idempotency_key", String(200)),

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { analyzePractice, completePractice, createPractice, getPractice, getProgress, getSceneDetail, taskAction } from "../lib/api";
+import { analyzePractice, completePractice, createPractice, getPractice, getProgress, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
+import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, ProgressResponse, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
 
@@ -49,5 +50,17 @@ export function usePractice(_userId: string, profileId: string, updateProgress: 
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to complete session."); return false; }
     finally { busy.current = false; setSaving(false); }
   }, [session, updateProgress]);
-  return { session, practiceSaving, practiceError, startSession, loadSession, actOnTask, completeSession, micReady, setMicReady };
+  const saveReview = useCallback(async (review: PracticeReview) => {
+    if (!session || busy.current) return false;
+    busy.current = true; setSaving(true); setError(null);
+    try {
+      const detail = await reviewPractice(session.session.id, review);
+      setSession(current => current?.session.id === detail.session.id ? detail : current);
+      return true;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to save your words.");
+      return false;
+    } finally { busy.current = false; setSaving(false); }
+  }, [session]);
+  return { session, practiceSaving, practiceError, startSession, loadSession, actOnTask, completeSession, saveReview, micReady, setMicReady };
 }
