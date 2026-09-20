@@ -438,7 +438,11 @@ def test_encounter_links_cascade_deletion(database, encounter_task, parent):
                 .values(**{field: uuid4()})
             )
     with engine.begin() as connection:
-        table, parent_id = {"session": (sessions, event.session_id), "task": (session_tasks, event.session_task_id), "user": (users, owner.id)}[parent]
+        table, parent_id = {
+            "session": (sessions, event.session_id),
+            "task": (session_tasks, event.session_task_id),
+            "user": (users, owner.id),
+        }[parent]
         connection.execute(delete(table).where(table.c.id == parent_id))
     with engine.connect() as connection:
         assert (
@@ -455,4 +459,6 @@ def test_encounter_links_cascade_deletion(database, encounter_task, parent):
             )).mappings().one()
             assert progress["exposure_count"] == progress["correct_attempt_count"] == 0
             assert progress["first_learned_at"] is None
-            assert connection.execute(select(vocabulary_items.c.id).where(vocabulary_items.c.id == ids[0])).first()
+            assert connection.execute(
+                select(vocabulary_items.c.id).where(vocabulary_items.c.id == ids[0])
+            ).first()

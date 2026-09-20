@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Annotated, Any, Generic, TypeAlias, TypeVar
+from typing import Annotated, Any, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints
@@ -14,10 +14,10 @@ from pydantic.alias_generators import to_camel
 def utc_now() -> datetime:
     """Return a timezone-aware UTC timestamp."""
 
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-LanguageCode: TypeAlias = Annotated[
+type LanguageCode = Annotated[
     str,
     StringConstraints(
         strip_whitespace=True,
@@ -26,11 +26,11 @@ LanguageCode: TypeAlias = Annotated[
         pattern=r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
     ),
 ]
-NonEmptyText: TypeAlias = Annotated[
+type NonEmptyText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1)
 ]
-JsonObject: TypeAlias = dict[str, Any]
-UnitScore: TypeAlias = Annotated[Decimal, Field(ge=0, le=1)]
+type JsonObject = dict[str, Any]
+type UnitScore = Annotated[Decimal, Field(ge=0, le=1)]
 
 
 class ApiModel(BaseModel):
@@ -70,6 +70,6 @@ class ApiErrorResponse(ApiModel):
 PageItem = TypeVar("PageItem")
 
 
-class CursorPage(ApiModel, Generic[PageItem]):
+class CursorPage[PageItem](ApiModel):
     items: list[PageItem]
     next_cursor: str | None = None
