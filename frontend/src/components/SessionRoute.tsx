@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { getMedia, getPractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
-import { isSessionRouteAllowed, sessionDestination } from "../lib/sessionRoute";
+import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
 import { useApiData } from "../lib/useApiData";
 import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
@@ -28,13 +28,14 @@ function SessionLoader({ id }: { id: string }) {
     return practiceScene(loaded, media, learner.language);
   }, [id, loadSession, learner.language]);
   const { data, loading, error } = useApiData(load);
-  if (loading) return preview ? <div className="stack analysis-page">
-    <h1>Scene analysis</h1>
+  const copy = sessionLoadingCopy(location.pathname);
+  if (loading) return copy.scan && preview ? <div className="stack analysis-page">
+    <h1>{copy.title}</h1>
     <section className="analysis-loading" aria-live="polite" aria-busy="true">
       <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={preview} items={[]} /><span className="analysis-scan__line" /></div>
-      <div className="analysis-loading__copy"><h2>Finding objects in your image...</h2><p className="muted">This will only take a moment.</p></div>
+      <div className="analysis-loading__copy"><h2>{copy.heading}</h2><p className="muted">This will only take a moment.</p></div>
     </section>
-  </div> : <LoadingScreen label="Loading your image..." />;
+  </div> : <LoadingScreen label={copy.heading} />;
   if (!data || error) return <div className="stack"><p role="alert">{error ?? "Session unavailable."}</p><button onClick={() => window.location.reload()}>Retry</button><Link to="/practice">Choose an image</Link></div>;
   const current = session?.session.id === id
     ? practiceScene(session, { id: data.mediaAssetId, signedUrl: data.imageUrl ?? "" }, learner.language)

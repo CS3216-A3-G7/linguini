@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSessionRouteAllowed, sessionDestination } from "../src/lib/sessionRoute.ts";
+import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../src/lib/sessionRoute.ts";
 import type { PracticeDetail, SessionStatus, SessionTask, TaskContent } from "../src/lib/api.ts";
 
 const contents: Record<string, TaskContent> = {
@@ -67,6 +67,25 @@ test("the route guard allows only the steps valid for each status", () => {
   }
   assert.equal(isSessionRouteAllowed(detail("completed"), "/practice/sessions/s1/summary"), true);
   assert.equal(isSessionRouteAllowed(detail("completed"), "/practice/sessions/s1/learn"), false);
+});
+
+test("loading copy matches the destination segment", () => {
+  const base = "/practice/sessions/s1";
+  assert.deepEqual(sessionLoadingCopy(`${base}/analysis`), { title: "Scene analysis", heading: "Finding objects in your image...", scan: true });
+  assert.deepEqual(sessionLoadingCopy(`${base}/mic-test`), { title: "Mic check", heading: "Getting your microphone ready...", scan: false });
+  assert.deepEqual(sessionLoadingCopy(`${base}/learn`), { title: "Learning", heading: "Loading your words...", scan: false });
+  assert.deepEqual(sessionLoadingCopy(`${base}/ispy-1`), { title: "I-Spy", heading: "Setting up your I-Spy clue...", scan: false });
+  assert.deepEqual(sessionLoadingCopy(`${base}/ispy-2`), { title: "I-Spy", heading: "Setting up your turn to describe...", scan: false });
+  assert.deepEqual(sessionLoadingCopy(`${base}/summary`), { title: "Practice summary", heading: "Gathering your results...", scan: false });
+  assert.deepEqual(
+    sessionLoadingCopy(`${base}/learn/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d`),
+    { title: "Learning", heading: "Loading your words...", scan: false },
+  );
+  assert.deepEqual(sessionLoadingCopy(base), { title: "Practice", heading: "Loading your practice...", scan: false });
+  assert.deepEqual(sessionLoadingCopy("/home"), { title: "Practice", heading: "Loading your practice...", scan: false });
+  for (const path of [`${base}/mic-test`, `${base}/learn`, `${base}/ispy-1`, `${base}/ispy-2`, `${base}/summary`, base, "/home"]) {
+    assert.equal(sessionLoadingCopy(path).scan, false);
+  }
 });
 
 test("failed sessions carry a notice per failure code", () => {

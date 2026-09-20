@@ -45,6 +45,12 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
   }
 }
 
+function sessionStep(detail: PracticeDetail, pathname: string): string | null {
+  const base = `/practice/sessions/${detail.session.id}/`;
+  if (!pathname.startsWith(base)) return null;
+  return pathname.slice(base.length).split("/")[0] || null;
+}
+
 const allowedSubPaths: Record<string, string[]> = {
   created: ["analysis"],
   analyzingScene: ["analysis"],
@@ -58,8 +64,26 @@ const allowedSubPaths: Record<string, string[]> = {
 };
 
 export function isSessionRouteAllowed(detail: PracticeDetail, pathname: string): boolean {
-  const base = `/practice/sessions/${detail.session.id}/`;
-  if (!pathname.startsWith(base)) return false;
-  const step = pathname.slice(base.length).split("/")[0];
-  return allowedSubPaths[detail.session.status]?.includes(step) ?? false;
+  const step = sessionStep(detail, pathname);
+  return step !== null && (allowedSubPaths[detail.session.status]?.includes(step) ?? false);
+}
+
+export interface SessionLoadingCopy {
+  title: string;
+  heading: string;
+  scan: boolean;
+}
+
+const loadingCopy: Record<string, SessionLoadingCopy> = {
+  analysis: { title: "Scene analysis", heading: "Finding objects in your image...", scan: true },
+  "mic-test": { title: "Mic check", heading: "Getting your microphone ready...", scan: false },
+  learn: { title: "Learning", heading: "Loading your words...", scan: false },
+  "ispy-1": { title: "I-Spy", heading: "Setting up your I-Spy clue...", scan: false },
+  "ispy-2": { title: "I-Spy", heading: "Setting up your turn to describe...", scan: false },
+  summary: { title: "Practice summary", heading: "Gathering your results...", scan: false },
+};
+
+export function sessionLoadingCopy(pathname: string): SessionLoadingCopy {
+  const step = pathname.split("/practice/sessions/")[1]?.split("/").slice(1)[0] ?? null;
+  return (step && loadingCopy[step]) || { title: "Practice", heading: "Loading your practice...", scan: false };
 }
