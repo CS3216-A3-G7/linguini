@@ -1,11 +1,12 @@
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button, Card, Noodle, StatusPill, XpPill } from "../components/ui";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { createPractice, getPracticeSummary } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
-import { useApiData } from "../lib/useApiData";
+import { queryError, queryKeys } from "../lib/queryKeys";
 
 export function SessionSummary() {
   const navigate = useNavigate();
@@ -14,8 +15,11 @@ export function SessionSummary() {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const requestKey = useRef(crypto.randomUUID());
-  const load = useCallback(() => getPracticeSummary(scene.sessionId!), [scene.sessionId]);
-  const { data, error, loading } = useApiData(load);
+  const { data, error: queryErrorValue, isPending: loading } = useQuery({
+    queryKey: queryKeys.sessionSummary(scene.sessionId!),
+    queryFn: () => getPracticeSummary(scene.sessionId!),
+  });
+  const error = queryError(queryErrorValue);
   const completed = session?.session.status === "completed";
   const revisit = scene.items.filter(item => data?.learnedVocabularyIds.includes(
     session?.sceneObjects.find(object => object.id === item.id)?.vocabularyItemId ?? ""

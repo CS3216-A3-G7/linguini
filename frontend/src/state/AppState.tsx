@@ -1,13 +1,14 @@
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { VocabStatus } from "../data/types";
 import { AppStateContext } from "./context";
 import { useAccount } from "./useAccount";
 import { usePractice } from "./usePractice";
-import { getProgress, getVocabulary, getScenes, getJournals, saveJournal } from "../lib/api";
+import { getJournals, getProgress, getScenes, getVocabulary, saveJournal } from "../lib/api";
 import type { JournalDraft } from "../lib/api";
-import { useApiData } from "../lib/useApiData";
+import { queryError, queryKeys } from "../lib/queryKeys";
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const account = useAccount();
@@ -18,27 +19,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 }
 
 function LoadedAppState({ account, children }: { account: ReturnType<typeof useAccount>; children: ReactNode }) {
-  const scenes = useApiData(getScenes);
-  const vocabulary = useApiData(getVocabulary);
-  const progress = useApiData(getProgress);
-  const journal = useApiData(getJournals);
-  const setVocabulary = vocabulary.setData;
-  const setJournal = journal.setData;
-  const setProgress = progress.setData;
+  const queryClient = useQueryClient();
+  const profileId = account.activeProfile?.id ?? "";
+  const scenes = useQuery({ queryKey: queryKeys.scenes, queryFn: ({ signal }) => getScenes(signal) });
+  const vocabulary = useQuery({ queryKey: queryKeys.vocabulary(profileId), queryFn: ({ signal }) => getVocabulary(signal) });
+  const progress = useQuery({ queryKey: queryKeys.progress(profileId), queryFn: ({ signal }) => getProgress(signal) });
+  const journal = useQuery({ queryKey: queryKeys.journals(profileId), queryFn: ({ signal }) => getJournals(signal) });
 
-  const updateLearning = useCallback((data: Parameters<typeof setProgress>[0]) => {
-    setProgress(data);
-    void getVocabulary().then(setVocabulary).catch(() => { /* Reload can retry vocabulary. */ });
-  }, [setProgress, setVocabulary]);
+  const onLearningChanged = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.progress(profileId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.vocabulary(profileId) });
+  }, [queryClient, profileId]);
 
-  const practice = usePractice(account.user?.id ?? "", account.activeProfile?.id ?? "", updateLearning);
+  const practice = usePractice(account.user?.id ?? "", profileId, onLearningChanged);
   const [journalSaving, setJournalSaving] = useState(false);
   const [journalSaveError, setJournalSaveError] = useState<string | null>(null);
   const saving = useRef(false);
 
   const setVocabStatus = useCallback((id: string, status: VocabStatus) => {
-    setVocabulary((rows) => rows?.map((row) => row.id === id ? { ...row, status } : row) ?? null);
-  }, [setVocabulary]);
+    queryClient.setQueryData(queryKeys.vocabulary(profileId),
+      (rows: typeof vocabulary.data) => rows?.map((row) => row.id === id ? { ...row, status } : row));
+  }, [queryClient, profileId, vocabulary.data]);
 
   const saveJournalEntry = useCallback(async (draft: JournalDraft, id?: string, date?: string) => {
     if (saving.current) return null;
@@ -48,21 +49,22 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
     try {
       if (!account.activeProfile && !id) throw new Error("Choose a language first.");
       const entry = await saveJournal(draft, account.activeProfile?.id ?? "", id, date);
-      setJournal((rows) => [entry, ...(rows ?? []).filter((row) => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)));
+      queryClient.setQueryData(queryKeys.journals(profileId),
+        (rows: typeof journal.data) => [entry, ...(rows ?? []).filter((row) => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)));
       return entry;
     } catch (error) {
       setJournalSaveError(`${error instanceof Error ? error.message : "Unable to save journal."} Your text is still here; retry saving.`);
       return null;
     } finally { saving.current = false; setJournalSaving(false); }
-  }, [account.activeProfile, setJournal]);
+  }, [account.activeProfile, profileId, queryClient]);
 
   return <AppStateContext.Provider value={{
     ...account, ...practice,
-    scenes: scenes.data ?? [], scenesLoading: scenes.loading, scenesError: scenes.error,
-    vocabulary: vocabulary.data ?? [], vocabularyLoading: vocabulary.loading, vocabularyError: vocabulary.error, setVocabStatus,
-    progress: progress.data, progressLoading: progress.loading, progressError: progress.error,
+    scenes: scenes.data ?? [], scenesLoading: scenes.isPending, scenesError: queryError(scenes.error),
+    vocabulary: vocabulary.data ?? [], vocabularyLoading: vocabulary.isPending, vocabularyError: queryError(vocabulary.error), setVocabStatus,
+    progress: progress.data ?? null, progressLoading: progress.isPending, progressError: queryError(progress.error),
     xp: progress.data?.xp ?? 0,
-    journal: journal.data ?? [], journalLoading: journal.loading, journalError: journal.error,
+    journal: journal.data ?? [], journalLoading: journal.isPending, journalError: queryError(journal.error),
     journalSaving, journalSaveError, saveJournalEntry,
   }}>{children}</AppStateContext.Provider>;
 }

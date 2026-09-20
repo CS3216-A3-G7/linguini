@@ -1,5 +1,5 @@
 import { LoadingScreen } from "../components/LoadingScreen";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Feedback } from "../components/ui";
 import { UploadIcon } from "../components/icons";
@@ -8,13 +8,17 @@ import { MediaImage } from "../components/MediaImage";
 import { useAppState } from "../state/useAppState";
 import { getJournalContext } from "../lib/api";
 import type { JournalPhotoOption } from "../lib/api";
-import { useApiData } from "../lib/useApiData";
+import { queryError, queryKeys } from "../lib/queryKeys";
+import { useQuery } from "@tanstack/react-query";
 import type { JournalEntry } from "../data/types";
 
 export function JournalNew() {
   const { date } = useParams<{ date?: string }>();
-  const load = useCallback((signal?: AbortSignal) => getJournalContext(date, signal), [date]);
-  const { data, loading, error } = useApiData(load);
+  const { data, isPending: loading, error: queryErrorValue } = useQuery({
+    queryKey: queryKeys.journalDayContext(date ?? "today"),
+    queryFn: ({ signal }) => getJournalContext(date, signal),
+  });
+  const error = queryError(queryErrorValue);
   if (loading) return <LoadingScreen label="Loading journal…" />;
   if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
   return <JournalForm key={data.entry?.id ?? `new-${data.date}`} entry={data.entry} date={data.date} photoOptions={data.photoOptions} />;

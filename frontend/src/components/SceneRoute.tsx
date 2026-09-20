@@ -1,9 +1,10 @@
 import { useCallback, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { useApiData } from "../lib/useApiData";
+import { useQuery } from "@tanstack/react-query";
 import { ApiError, getActivePractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
+import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import { LoadingScreen } from "./LoadingScreen";
 
@@ -23,7 +24,13 @@ export function SceneRoute() {
       throw reason;
     }
   }, [sceneId, startSession]);
-  const { data, error } = useApiData(load);
+  // Side-effecting session resolution: never served from or retained in cache.
+  const { data, error: queryErrorValue } = useQuery({
+    queryKey: queryKeys.sceneSession(sceneId),
+    queryFn: load,
+    staleTime: 0, gcTime: 0, retry: false, refetchOnMount: "always",
+  });
+  const error = queryError(queryErrorValue);
   if (resume) {
     const dest = sessionDestination(resume);
     return <Navigate replace to={dest.path} state={dest.notice ? { practiceNotice: dest.notice } : undefined} />;
