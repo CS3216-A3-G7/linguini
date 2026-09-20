@@ -41,6 +41,14 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     }
     return data;
   }, []);
+  const retryProcessing = useCallback(async (id: string) => {
+    setError(null);
+    try { await loadSession(id); }
+    catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to check your scene. Please retry.");
+      setStalled(true);
+    }
+  }, [loadSession]);
   const startSession = useCallback(async (sceneId: string) => {
     const scene = await getSceneDetail(sceneId);
     if (creation.current?.asset !== scene.mediaAssetId) creation.current = { asset: scene.mediaAssetId, key: crypto.randomUUID() };
@@ -84,5 +92,5 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       return false;
     } finally { busy.current = false; setSaving(false); }
   }, [session]);
-  return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, actOnTask, completeSession, saveReview, micReady, setMicReady };
+  return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, retryProcessing, actOnTask, completeSession, saveReview, micReady, setMicReady };
 }

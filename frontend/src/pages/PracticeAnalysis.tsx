@@ -14,7 +14,7 @@ import type { LanguageItem } from "../data/types";
 export function PracticeAnalysis() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, saveReview, practiceSaving, practiceError, practiceStalled, loadSession } = useAppState();
+  const { session, saveReview, practiceSaving, practiceError, practiceStalled, retryProcessing } = useAppState();
   const [removed, setRemoved] = useState<string[]>([]);
   const [added, setAdded] = useState<PracticeReview["addedObjects"]>([]);
   const [relations, setRelations] = useState<PracticeReview["relations"]>(() => session?.sceneObjectRelations ?? []);
@@ -35,7 +35,7 @@ export function PracticeAnalysis() {
   if (["created", "analyzingScene", "generatingTasks"].includes(session.session.status)) return <div className="stack analysis-page">
     <h1>Scene analysis</h1>
     {practiceStalled ? <section className="analysis-loading" aria-live="polite">
-      <div className="analysis-loading__copy"><h2>Still working on your scene...</h2><p className="muted">This is taking longer than usual. You can check again.</p><Button onClick={() => loadSession(session.session.id)}>Retry</Button></div>
+      <div className="analysis-loading__copy"><h2>Still working on your scene...</h2><p className="muted">This is taking longer than usual. You can check again.</p>{practiceError ? <p role="alert">{practiceError}</p> : null}<Button onClick={() => retryProcessing(session.session.id)}>Retry</Button></div>
     </section> : <section className="analysis-loading" aria-live="polite" aria-busy="true">
       <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={scene} items={[]} /><span className="analysis-scan__line" /></div>
       <div className="analysis-loading__copy"><h2>{session.session.status === "generatingTasks" ? "Preparing your practice..." : "Finding objects in your image..."}</h2><p className="muted">This will only take a moment.</p></div>
