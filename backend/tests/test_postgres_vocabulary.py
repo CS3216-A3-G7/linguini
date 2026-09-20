@@ -655,9 +655,7 @@ def test_journal_usage_scoping_and_xp_once(database, encounter_task):
     finally:
         with engine.begin() as connection:
             connection.execute(delete(users).where(users.c.id == other.id))
-            connection.execute(
-                delete(vocabulary_items).where(vocabulary_items.c.id == german.id)
-            )
+            connection.execute(delete(vocabulary_items).where(vocabulary_items.c.id == german.id))
 
 
 def test_scene_and_topic_derived_from_latest_encounter(database, encounter_task):
@@ -697,9 +695,7 @@ def test_scene_and_topic_derived_from_latest_encounter(database, encounter_task)
     upload_session = uuid4()
     upload_task = uuid4()
     with engine.begin() as connection:
-        connection.execute(
-            insert(media_assets).values(**asset.model_dump(by_alias=False))
-        )
+        connection.execute(insert(media_assets).values(**asset.model_dump(by_alias=False)))
         connection.execute(
             insert(sessions).values(
                 id=upload_session,
