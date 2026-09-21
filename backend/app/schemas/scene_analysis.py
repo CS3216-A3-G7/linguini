@@ -21,6 +21,11 @@ class ModelBoundingBox(ApiModel):
     height: float
 
 
+class ModelAnchorPoint(ApiModel):
+    x: float
+    y: float
+
+
 class ModelSceneObject(ApiModel):
     object_key: NonEmptyText = Field(
         validation_alias=AliasChoices("objectKey", "key"),
@@ -28,6 +33,7 @@ class ModelSceneObject(ApiModel):
     )
     label: NonEmptyText
     bounding_box: ModelBoundingBox
+    anchor_point: ModelAnchorPoint | None = None
     attributes: list[NonEmptyText] | dict[NonEmptyText, NonEmptyText] = []
     confidence_score: Annotated[
         float,

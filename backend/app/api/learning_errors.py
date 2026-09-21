@@ -30,6 +30,7 @@ from app.services.journals import (
 )
 from app.services.language_profiles import NoActiveLanguageError
 from app.services.learning import InvalidCursorError, ProgressNotFoundError
+from app.services.learning_tasks import LearningTaskGenerationError
 from app.services.media_assets import MediaAssetNotFoundError
 from app.services.media_urls import MediaUrlError
 from app.services.scene_analysis import SceneAnalysisError
@@ -92,6 +93,11 @@ def register_learning_errors(app: FastAPI) -> None:
             502,
             "scene_analysis_failed",
             "Scene analysis failed. Start a new practice session.",
+        ),
+        LearningTaskGenerationError: (
+            502,
+            "learning_task_generation_failed",
+            "We couldn't create your learning tasks. Please try again.",
         ),
         PracticeConflictError: (
             409,

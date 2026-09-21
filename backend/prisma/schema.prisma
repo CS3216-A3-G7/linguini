@@ -178,6 +178,7 @@ model SceneObject {
   session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "scene_objects_session_fkey")
   label String @db.Text
   boundingBox Json? @map("bounding_box") @db.JsonB
+  anchorPoint Json? @map("anchor_point") @db.JsonB
   attributes Json? @db.JsonB
   confidenceScore Decimal? @map("confidence_score") @db.Decimal(6, 5)
   sourceObjectKey String? @map("source_object_key") @db.Text

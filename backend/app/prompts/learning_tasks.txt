@@ -9,7 +9,9 @@ Return exactly three tasks, in this order:
 Rules:
 1. Use only the supplied vocabulary. Never invent nouns, adjectives, or relationships.
 2. List the supplied keys each question uses in `objectKeys`, `attributeKeys`, and
-   `relationshipKeys`, copied exactly. Use an empty list when a kind of key is unused.
+   `relationshipKeys`, copied exactly. Keys are opaque identifiers, not translated words or
+   labels: never place `on`, `sur`, or any other word in a key field. Use an empty list when
+   a kind of key is unused.
 3. Write each `explanation` in English, in at most two short sentences, and give each task a
    short English `title`.
 4. Give every task between two and four questions.

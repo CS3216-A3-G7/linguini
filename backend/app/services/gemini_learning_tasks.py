@@ -12,6 +12,7 @@ from app.schemas.learning_tasks import LearningTaskResult
 from app.services.learning_tasks import (
     DEFAULT_PROMPT_PATH,
     LearningTaskGenerationError,
+    normalize_learning_task_references,
     validate_learning_tasks,
 )
 
@@ -52,6 +53,7 @@ class GeminiLearningTaskGenerator:
             if not response.text:
                 raise LearningTaskGenerationError("Gemini returned no learning tasks.")
             result = LearningTaskResult.model_validate_json(response.text)
+            result = normalize_learning_task_references(payload, result)
             validate_learning_tasks(payload, result)
             return result
         except LearningTaskGenerationError:

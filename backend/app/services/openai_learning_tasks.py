@@ -11,6 +11,7 @@ from app.schemas.learning_tasks import LearningTaskResult
 from app.services.learning_tasks import (
     DEFAULT_PROMPT_PATH,
     LearningTaskGenerationError,
+    normalize_learning_task_references,
     validate_learning_tasks,
 )
 
@@ -46,6 +47,7 @@ class OpenAILearningTaskGenerator:
             result = response.output_parsed
             if result is None:
                 raise LearningTaskGenerationError("OpenAI returned no learning tasks.")
+            result = normalize_learning_task_references(payload, result)
             validate_learning_tasks(payload, result)
             return result
         except LearningTaskGenerationError:

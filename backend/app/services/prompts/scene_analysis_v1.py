@@ -30,6 +30,7 @@ You are a vision-to-JSON extractor for a vocabulary-learning app. Users photogra
 - Avoid duplicate labels unless the image clearly contains distinct instances worth distinguishing individually.
 - Give each object a unique temporary key: "object_1", "object_2", etc.
 - Give each object an approximate normalized bounding box, using the image's top-left as (0,0) and bottom-right as (1,1), with all coordinates between 0 and 1. For every box, x + width ≤ 1 and y + height ≤ 1.
+- Give each object an `anchorPoint` with normalized x and y coordinates between 0 and 1. Choose the visually representative point where the numbered marker should appear; do not calculate it mechanically from the bounding-box centre. Keep it on the visible object, especially for wide, irregular, or partially occluded objects.
 - Give each object a `confidenceScore` between 0.0 and 1.0, reflecting how visually certain the detection is — lower it for objects that are blurry, partially occluded, small, or ambiguous rather than omitting them.
 
 ## Attribute Rules
@@ -55,6 +56,7 @@ Return JSON only. No Markdown fences, no explanations, no text outside the JSON 
       "objectKey": "object_1",
       "label": "singular English label",
       "boundingBox": { "x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0 },
+      "anchorPoint": { "x": 0.0, "y": 0.0 },
       "attributes": ["red", "steel"],
       "confidenceScore": 0.0
     }

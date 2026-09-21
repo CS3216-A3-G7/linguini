@@ -34,6 +34,7 @@ class OpenAISceneObject(ApiModel):
     label: str
     confidence: float
     bounding_box: ModelBoundingBox
+    anchor_point: dict[str, float] | None = None
     attributes: list[OpenAIAttribute]
 
 
@@ -117,6 +118,7 @@ class OpenAISceneAnalyzer:
                             "label": item.label,
                             "confidence": item.confidence,
                             "boundingBox": item.bounding_box.model_dump(),
+                            "anchorPoint": item.anchor_point,
                             "attributes": {
                                 attribute.type: attribute.value
                                 for attribute in item.attributes

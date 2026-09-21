@@ -110,6 +110,7 @@ def model_result_to_domain(
             session_id=session.id,
             label=item.label,
             bounding_box=item.bounding_box.model_dump(),
+            anchor_point=item.anchor_point.model_dump() if item.anchor_point else None,
             attributes=(
                 item.attributes
                 if isinstance(item.attributes, dict)

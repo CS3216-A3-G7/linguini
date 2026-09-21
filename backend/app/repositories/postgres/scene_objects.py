@@ -26,6 +26,7 @@ scene_objects = Table(
     Column("session_id", Uuid, nullable=False),
     Column("label", Text, nullable=False),
     Column("bounding_box", JSONB(none_as_null=True)),
+    Column("anchor_point", JSONB(none_as_null=True)),
     Column("attributes", JSONB(none_as_null=True)),
     Column("confidence_score", Numeric(6, 5)),
     Column("source_object_key", Text),
@@ -51,6 +52,10 @@ def object_values(item: SceneObject) -> dict:
     if item.bounding_box:
         values["bounding_box"] = {
             key: float(value) for key, value in item.bounding_box.model_dump().items()
+        }
+    if item.anchor_point:
+        values["anchor_point"] = {
+            key: float(value) for key, value in item.anchor_point.model_dump().items()
         }
     return values
 

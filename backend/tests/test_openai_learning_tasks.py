@@ -96,6 +96,16 @@ def test_generation_rejects_keys_outside_the_supplied_scene(tmp_path):
         provider.generate(INPUT)
 
 
+def test_generation_ignores_an_unknown_relationship_metadata_key(tmp_path):
+    payload = tasks()
+    payload["tasks"][2]["questions"][0]["relationshipKeys"] = ["on"]
+    provider, _ = generator(tmp_path, LearningTaskResult.model_validate(payload))
+
+    result = provider.generate(INPUT)
+
+    assert result.tasks[2].questions[0].relationship_keys == []
+
+
 def test_generation_requires_a_translated_scene_sentence(tmp_path):
     provider, _ = generator(
         tmp_path, LearningTaskResult.model_validate(tasks(scene_translation=None))

@@ -655,12 +655,14 @@ class PostgresWorkflowRepository:
             for added in request.added_objects:
                 # Scope client-generated IDs to this session; retries keep the same object.
                 object_id = uuid5(session_id, "manual:" + str(added.id))
-                word = self._catalog_word(c, profile, added.label)
                 obj = SceneObject(
                     id=object_id,
                     session_id=session_id,
                     label=added.label,
-                    vocabulary_item_id=word.id,
+                    # User-added labels are source-language words and may not
+                    # exist in the catalogue yet. Translation below creates or
+                    # reuses the target-language vocabulary record.
+                    vocabulary_item_id=None,
                     bounding_box={"x": added.x, "y": added.y, "width": 0.01, "height": 0.01},
                     attributes=request.object_attributes.get(added.id) or None,
                 )
@@ -1013,6 +1015,27 @@ class PostgresWorkflowRepository:
                         self._encounter(c, task, task.id, "completed", introduced=True)
                 elif action == "attempt":
                     correct = evaluate(task, request)
+                    evaluation_details = None
+                    feedback_message = (
+                        "Reflection recorded."
+                        if correct is None
+                        else (
+                            "Correct."
+                            if correct
+                            else "Not quite. Review this word and try it in another session."
+                        )
+                    )
+                    if request.input_mode == "vocabularyReview":
+                        question_results = {
+                            question.question_id: request.answers.get(question.question_id)
+                            == task.answer_key.correct_option_ids.get(question.question_id)
+                            for question in task.public_content.questions
+                        }
+                        correct_count = sum(question_results.values())
+                        evaluation_details = {"questionResults": question_results}
+                        feedback_message = (
+                            f"{correct_count} of {len(question_results)} questions correct."
+                        )
                     attempt = TaskAttempt(
                         id=attempt_id,
                         session_task_id=task.id,
@@ -1021,15 +1044,8 @@ class PostgresWorkflowRepository:
                         response_payload=payload,
                         is_correct=correct,
                         score=None if correct is None else int(correct),
-                        feedback={
-                            "message": "Reflection recorded."
-                            if correct is None
-                            else (
-                                "Correct."
-                                if correct
-                                else "Not quite. Review this word and try it in another session."
-                            )
-                        },
+                        feedback={"message": feedback_message},
+                        evaluation_details=evaluation_details,
                     )
                     c.execute(insert(task_attempts).values(**entity_values(attempt)))
                     self._encounter(

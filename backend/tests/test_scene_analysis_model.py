@@ -180,6 +180,7 @@ def test_request_carries_versioned_prompt_and_strict_schema() -> None:
         "objectKey",
         "label",
         "boundingBox",
+        "anchorPoint",
         "attributes",
         "confidenceScore",
     }

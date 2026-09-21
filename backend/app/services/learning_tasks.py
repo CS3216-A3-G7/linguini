@@ -23,6 +23,25 @@ class LearningTaskGenerator(Protocol):
     def generate(self, payload: dict[str, Any]) -> LearningTaskResult: ...
 
 
+def normalize_learning_task_references(
+    payload: dict[str, Any], result: LearningTaskResult
+) -> LearningTaskResult:
+    """Discard non-semantic relationship metadata a model may echo incorrectly.
+
+    Relationship keys are opaque database IDs, unlike the translated relationship
+    words shown in a lesson. Keeping an unknown key would not change lesson text,
+    so remove it before validation while retaining strict object and attribute
+    provenance checks.
+    """
+    relationship_keys = {row["key"] for row in payload.get("relationships", [])}
+    for task in result.tasks:
+        for question in task.questions:
+            question.relationship_keys = [
+                key for key in question.relationship_keys if key in relationship_keys
+            ]
+    return result
+
+
 def validate_learning_tasks(payload: dict[str, Any], result: LearningTaskResult) -> None:
     if tuple(task.focus for task in result.tasks) != REQUIRED_TASK_FOCUS_ORDER:
         raise LearningTaskGenerationError(
