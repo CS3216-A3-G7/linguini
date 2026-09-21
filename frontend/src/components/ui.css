@@ -1402,6 +1402,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   flex: none;
+  background: var(--cream);
 }
 
 .thumb svg,

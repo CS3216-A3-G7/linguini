@@ -33,8 +33,8 @@ export function ImageUpload({ onUploaded, cameraEnabled = true, disabled = false
     <input ref={cameraInput} type="file" hidden accept="image/jpeg,image/png,image/webp" capture="environment"
       onChange={(e) => { void select(e.target.files?.[0], "camera"); e.target.value = ""; }} />
     <div className="row">
-      <Button disabled={disabled || busy || !cameraEnabled} onClick={() => cameraInput.current?.click()}><CameraIcon size={18} /> {compact ? "Click" : "Open camera"}</Button>
-      <Button variant="secondary" disabled={disabled || busy} onClick={() => fileInput.current?.click()}><UploadIcon size={18} /> Upload</Button>
+      <Button disabled={disabled || busy || !cameraEnabled} onClick={() => cameraInput.current?.click()}><CameraIcon size={18} /> {compact ? "Take photo" : "Open camera"}</Button>
+      <Button variant="secondary" disabled={disabled || busy} onClick={() => fileInput.current?.click()}><UploadIcon size={18} /> {compact ? "Gallery" : "Choose from gallery"}</Button>
     </div>
     {!compact ? <p className="small muted">JPEG, PNG or WebP, up to 10 MB</p> : null}
     {busy ? <p role="status">{phase}</p> : null}

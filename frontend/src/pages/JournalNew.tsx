@@ -6,7 +6,7 @@ import { UploadIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
 import { MediaImage } from "../components/MediaImage";
 import { useAppState } from "../state/useAppState";
-import { getJournalContext } from "../lib/api";
+import { getJournalContext, getJournalWordSuggestions } from "../lib/api";
 import type { JournalPhotoOption } from "../lib/api";
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useQuery } from "@tanstack/react-query";
@@ -26,9 +26,16 @@ export function JournalNew() {
 
 export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: JournalEntry | null; date: string; photoOptions: JournalPhotoOption[]; onSaved?: (entry: JournalEntry) => void }) {
   const navigate = useNavigate();
-  const { saveJournalEntry, journalSaving, journalSaveError, vocabulary, vocabularyError, vocabularyLoading, learner, activeProfile } = useAppState();
+  const { saveJournalEntry, journalSaving, journalSaveError, learner, activeProfile } = useAppState();
+  const { data: suggestedWords = [], isPending: vocabularyLoading, error: vocabularyQueryError } = useQuery({
+    queryKey: queryKeys.journalWords(activeProfile?.id ?? ""),
+    queryFn: ({ signal }) => getJournalWordSuggestions(signal),
+    enabled: Boolean(activeProfile),
+    staleTime: 60_000,
+  });
+  const vocabularyError = queryError(vocabularyQueryError);
   const sameLanguage = !entry || entry.languageProfileId === activeProfile?.id;
-  const journalWordSuggestions = sameLanguage ? [...new Set(vocabulary.map((item) => item.word))] : [];
+  const journalWordSuggestions = sameLanguage ? suggestedWords : [];
   const shownDate = new Date(`${date}T12:00:00`);
   const isToday = date === new Date().toLocaleDateString("en-CA");
   const [title, setTitle] = useState(entry?.title ?? "");

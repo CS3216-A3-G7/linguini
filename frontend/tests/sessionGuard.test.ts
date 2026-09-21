@@ -54,6 +54,10 @@ function detail(status: PracticeDetail["session"]["status"], tasks: SessionTask[
 const apiFixtures: Record<string, unknown> = {
   "/api/v1/me": { id: "u1", createdAt: "2026-01-01", updatedAt: "2026-01-01", authProviderId: "test", displayName: "Learner", email: null, timezone: "UTC", onboardingCompleted: true, learningGoal: "practice", microphoneEnabled: true, cameraEnabled: true },
   "/api/v1/me/language-profiles": [{ id: "p1", userId: "u1", sourceLanguageCode: "en", targetLanguageCode: "es", proficiencyLevel: "A1", isActive: true, dailyGoalMinutes: 10, preferredInputMode: "both" }],
+  "/api/v1/me/account": {
+    user: { id: "u1", createdAt: "2026-01-01", updatedAt: "2026-01-01", authProviderId: "test", displayName: "Learner", email: null, timezone: "UTC", onboardingCompleted: true, learningGoal: "practice", microphoneEnabled: true, cameraEnabled: true },
+    languageProfiles: [{ id: "p1", userId: "u1", sourceLanguageCode: "en", targetLanguageCode: "es", proficiencyLevel: "A1", isActive: true, dailyGoalMinutes: 10, preferredInputMode: "both" }],
+  },
   "/api/v1/me/vocabulary": { items: [], nextCursor: null },
   "/api/v1/me/progress": { xp: 0, scenarios: [] },
   "/api/v1/preloaded-scenes": [],
@@ -270,10 +274,12 @@ test("session entry fetches details once and avoids unrelated datasets", async (
 test("navigation loads only each page's datasets, including direct journal entry", async () => {
   requests.length = 0;
   await mount("/profile/edit");
-  assert.deepEqual(requests.sort(), ["/api/v1/me", "/api/v1/me/language-profiles"]);
+  assert.deepEqual(requests, ["/api/v1/me/account"]);
   requests.length = 0;
   await go("/home");
-  assert.deepEqual(requests.sort(), ["/api/v1/me/progress", "/api/v1/me/vocabulary"]);
+  // The home component owns one summary request; shared app state must not fetch
+  // the complete progress and vocabulary datasets for this route.
+  assert.deepEqual(requests, []);
   requests.length = 0;
   await go("/practice");
   assert.deepEqual(requests, ["/api/v1/preloaded-scenes"]);
@@ -282,6 +288,6 @@ test("navigation loads only each page's datasets, including direct journal entry
   assert.deepEqual(requests, ["/api/v1/journals"]);
   requests.length = 0;
   await mount("/journal/new");
-  assert.ok(requests.includes("/api/v1/me/vocabulary"));
+  assert.ok(!requests.includes("/api/v1/me/vocabulary"));
   assert.ok(!requests.includes("/api/v1/journals"));
 });

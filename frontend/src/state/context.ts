@@ -2,7 +2,7 @@ import { createContext } from "react";
 import type { useAccount } from "./useAccount";
 import type { usePractice } from "./usePractice";
 import type { JournalDraft } from "../lib/api";
-import type { JournalEntry, VocabRecord, VocabStatus } from "../data/types";
+import type { JournalEntry, JournalSummary, VocabRecord, VocabStatus } from "../data/types";
 import type { ProgressResponse } from "../lib/api";
 import type { SceneSummary } from "../data/types";
 
@@ -21,7 +21,7 @@ export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof u
   xp: number;
   vocabulary: VocabRecord[];
   setVocabStatus: (id: string, status: VocabStatus) => void;
-  journal: JournalEntry[];
+  journal: JournalSummary[];
   journalLoading: boolean;
   journalError: string | null;
   journalSaving: boolean;

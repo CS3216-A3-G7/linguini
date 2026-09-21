@@ -7,5 +7,5 @@ type Props = {
 };
 
 export function JournalImage({ title, className, imageUrl }: Props) {
-  return <SceneImage scene={{ imageUrl, title }} className={className} />;
+  return <SceneImage scene={{ imageUrl, title }} className={className} loading="lazy" />;
 }

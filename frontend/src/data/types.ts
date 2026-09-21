@@ -66,6 +66,16 @@ export type JournalEntry = {
   wordsUsed: string[];
 };
 
+export type JournalSummary = {
+  id: string;
+  languageProfileId: string;
+  date: string;
+  title: string;
+  wordCount: number;
+  mediaAssetId: string | null;
+  imageUrl: string | null;
+};
+
 export type LeaderboardRow = {
   rank: number;
   name: string;

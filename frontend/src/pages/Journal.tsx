@@ -32,8 +32,7 @@ function isInMonth(date: string, month: Date) {
   return entryMonth.getFullYear() === month.getFullYear() && entryMonth.getMonth() === month.getMonth();
 }
 
-function wordCount(text: string) {
-  const count = text.trim().split(/\s+/).filter(Boolean).length;
+function wordCount(count: number) {
   return `${count} ${count === 1 ? "word" : "words"}`;
 }
 
@@ -113,7 +112,7 @@ function JournalMonths({ journal }: { journal: ReturnType<typeof useAppState>["j
                 <span className="journal-list-entry__meta">
                   <span className="journal-list-entry__date">{formatDate(entry.date)}</span>
                 </span>
-                 <span className="journal-list-entry__word-count">{wordCount(entry.body)}</span>
+                 <span className="journal-list-entry__word-count">{wordCount(entry.wordCount)}</span>
               </span>
             </button>
           ))}

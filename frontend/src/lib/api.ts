@@ -1,6 +1,6 @@
 import type { LeaderboardRow, ScenarioProgress, VocabRecord, VocabStatus, WordClass } from "../data/types";
 import type { Scene, SceneSummary } from "../data/types";
-import type { JournalEntry } from "../data/types";
+import type { JournalEntry, JournalSummary } from "../data/types";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
 
@@ -100,6 +100,11 @@ export interface LanguageProfile {
   preferredInputMode: "speech" | "text" | "both";
 }
 
+export interface AccountResponse {
+  user: User;
+  languageProfiles: LanguageProfile[];
+}
+
 export type UserPatch = Partial<Pick<User, "displayName" | "timezone" | "onboardingCompleted" | "learningGoal" | "microphoneEnabled" | "cameraEnabled">>;
 export type LanguageProfilePatch = Partial<Pick<LanguageProfile, "proficiencyLevel" | "isActive" | "dailyGoalMinutes" | "preferredInputMode">>;
 
@@ -108,6 +113,7 @@ function write<T>(path: string, method: string, body: unknown): Promise<T> {
 }
 
 export const getLanguageProfiles = (signal?: AbortSignal) => request<LanguageProfile[]>("/api/v1/me/language-profiles", signal);
+export const getAccount = (signal?: AbortSignal) => request<AccountResponse>("/api/v1/me/account", signal);
 export const updateUser = (patch: UserPatch) => write<User>("/api/v1/me", "PATCH", patch);
 export const updateLanguageProfile = (id: string, patch: LanguageProfilePatch) => write<LanguageProfile>(`/api/v1/me/language-profiles/${id}`, "PATCH", patch);
 export const createLanguageProfile = (code: string, minutes = 10) => write<LanguageProfile>("/api/v1/me/language-profiles", "POST", {
@@ -119,6 +125,24 @@ export interface ProgressResponse {
   scenarios: ScenarioProgress[];
   leaderboard: LeaderboardRow[];
 }
+
+export interface HomeSummary {
+  xp: number;
+  vocabularyCount: number;
+  activeSession: null | {
+    id: string;
+    status: SessionStatus;
+    title: string;
+    mediaAssetId: string;
+    imageUrl: string | null;
+    completedTaskCount: number;
+    totalTaskCount: number;
+    destination: string;
+  };
+}
+
+export const getHomeSummary = (signal?: AbortSignal) =>
+  request<HomeSummary>("/api/v1/me/home", signal);
 
 interface DailyVocabularyItem {
   vocabulary: {
@@ -205,12 +229,26 @@ function journalEntry(detail: JournalDetail): JournalEntry {
     title: row.title, mediaAssetId: [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.mediaAssetId ?? null, imageUrl: detail.imageUrl ?? null, wordsUsed: row.selectedWords,
     body: detail.revisions.find((revision) => revision.id === row.currentRevisionId)?.content ?? "" };
 }
-export async function getJournals(signal?: AbortSignal): Promise<JournalEntry[]> {
-  return (await request<JournalDetail[]>("/api/v1/journals", signal)).map(journalEntry);
+export async function getJournals(signal?: AbortSignal): Promise<JournalSummary[]> {
+  const rows = await request<Array<{
+    id: string; languageProfileId: string; localDate: string; title: string;
+    wordCount: number; coverMediaAssetId: string | null; imageUrl: string | null;
+  }>>("/api/v1/journals", signal);
+  return rows.map((row) => ({
+    id: row.id,
+    languageProfileId: row.languageProfileId,
+    date: row.localDate,
+    title: row.title,
+    wordCount: row.wordCount,
+    mediaAssetId: row.coverMediaAssetId,
+    imageUrl: row.imageUrl,
+  }));
 }
 export async function getJournal(id: string, signal?: AbortSignal): Promise<JournalEntry> {
   return journalEntry(await request<JournalDetail>(`/api/v1/journals/${id}`, signal));
 }
+export const getJournalWordSuggestions = (signal?: AbortSignal) =>
+  request<string[]>("/api/v1/me/vocabulary/journal-words?limit=20", signal);
 export interface JournalPhotoOption {
   mediaAssetId: string;
   imageUrl: string | null;
@@ -218,8 +256,23 @@ export interface JournalPhotoOption {
   completedAt: string;
 }
 export async function getJournalContext(date?: string, signal?: AbortSignal) {
-  const context = await request<{ localDate: string; journal: JournalRecord | null; eligiblePhotos: JournalPhotoOption[] }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
-  return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null, photoOptions: context.eligiblePhotos };
+  const context = await request<{
+    localDate: string;
+    entry: null | { journal: JournalRecord; content: string; photos: { mediaAssetId: string; displayOrder: number; imageUrl: string | null }[] };
+    eligiblePhotos: JournalPhotoOption[];
+  }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
+  const entry = context.entry ? {
+    id: context.entry.journal.id,
+    languageProfileId: context.entry.journal.languageProfileId,
+    date: context.entry.journal.localDate,
+    title: context.entry.journal.title,
+    photos: context.entry.photos,
+    mediaAssetId: [...context.entry.photos].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.mediaAssetId ?? null,
+    imageUrl: [...context.entry.photos].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.imageUrl ?? null,
+    wordsUsed: context.entry.journal.selectedWords,
+    body: context.entry.content,
+  } satisfies JournalEntry : null;
+  return { date: context.localDate, entry, photoOptions: context.eligiblePhotos };
 }
 export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed"> & { photoAssetIds?: string[] };
 export async function saveJournal(draft: JournalDraft, profileId: string, id?: string, date?: string) {

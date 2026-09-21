@@ -1,13 +1,13 @@
 import { useCallback, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { languages } from "../config/languages";
-import { createLanguageProfile, getCurrentUser, getLanguageProfiles, updateLanguageProfile, updateUser } from "../lib/api";
+import { createLanguageProfile, getAccount, getLanguageProfiles, updateLanguageProfile, updateUser } from "../lib/api";
 import type { LanguageProfilePatch, UserPatch } from "../lib/api";
 import { queryError, queryKeys } from "../lib/queryKeys";
 
 async function loadAccount(signal?: AbortSignal) {
-  const [user, profiles] = await Promise.all([getCurrentUser(signal), getLanguageProfiles(signal)]);
-  return { user, profiles };
+  const account = await getAccount(signal);
+  return { user: account.user, profiles: account.languageProfiles };
 }
 
 export function useAccount() {

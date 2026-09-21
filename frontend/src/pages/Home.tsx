@@ -3,24 +3,25 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, ProgressTrail } from "../components/ui";
 import { BookIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
-import { MediaImage } from "../components/MediaImage";
-import { getActivePractice } from "../lib/api";
+import { SceneImage } from "../components/SceneImage";
+import { getActivePractice, getHomeSummary } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 
 export function Home() {
   const navigate = useNavigate();
-  const { learner, activeProfile, progress, progressLoading, progressError,
-    vocabulary, vocabularyLoading, vocabularyError } = useAppState();
+  const { learner, activeProfile } = useAppState();
   const queryClient = useQueryClient();
   const profileId = activeProfile?.id ?? "";
-  const { data: resume, error: resumeQueryError, isPending: resumeLoading } = useQuery({
-    queryKey: queryKeys.activeSession(profileId),
-    queryFn: () => getActivePractice(),
+  const { data: home, error: homeQueryError, isPending: homeLoading } = useQuery({
+    queryKey: queryKeys.home(profileId),
+    queryFn: ({ signal }) => getHomeSummary(signal),
+    staleTime: 60_000,
   });
-  const resumeError = queryError(resumeQueryError);
+  const homeError = queryError(homeQueryError);
   const [continueError, setContinueError] = useState<string | null>(null);
+  const resume = home?.activeSession ?? null;
   const hasSessionToContinue = Boolean(resume);
   const continuePractice = async () => {
     setContinueError(null);
@@ -59,7 +60,7 @@ export function Home() {
           <span>{learner.dailyMinutes ? `${learner.dailyMinutes} minutes` : "Not set"}</span>
         </div>
         <p>Learning {learner.language}</p>
-        {progress ? <p>{progress.xp} XP earned</p> : null}
+        {home ? <p>{home.xp} XP earned</p> : null}
       </section>
 
       {hasSessionToContinue ? (
@@ -79,7 +80,7 @@ export function Home() {
         </Button>
       ) : null}
 
-      {vocabulary.length > 0 ? <Button variant="quiet" className="home-action-row home-action-row--journal" onClick={() => navigate("/journal/new")}>
+      {(home?.vocabularyCount ?? 0) > 0 ? <Button variant="quiet" className="home-action-row home-action-row--journal" onClick={() => navigate("/journal/new")}>
         <span className="home-action-row__icon home-action-row__icon--teal">
           <BookIcon size={20} />
         </span>
@@ -93,20 +94,20 @@ export function Home() {
 
       <section className="home-plan" aria-labelledby="home-plan-title">
         <h2 id="home-plan-title">Today&apos;s plan</h2>
-        {progressLoading || resumeLoading ? <p role="status">Loading your practice...</p> : progressError || resumeError ? (
-          <p role="alert">{progressError ?? resumeError} Reload to retry.</p>
+        {homeLoading ? <p role="status">Loading your practice...</p> : homeError ? (
+          <p role="alert">{homeError} Reload to retry.</p>
         ) : resume ? (
           <Card className="home-featured">
-            <div className="home-featured__image"><MediaImage assetId={resume.session.sceneMediaAssetId} title={resume.title} /></div>
+            <div className="home-featured__image"><SceneImage scene={{ imageUrl: resume.imageUrl, title: resume.title }} /></div>
             <div className="home-featured__body">
               <div className="stack-2">
                 <h3>Continue learning</h3>
                 <p>{resume.title}</p>
               </div>
-              {resume.progress.totalTaskCount > 0 ? <ProgressTrail
-                value={resume.progress.completedTaskCount}
-                total={resume.progress.totalTaskCount}
-                label={`${resume.progress.completedTaskCount} of ${resume.progress.totalTaskCount} tasks complete`}
+              {resume.totalTaskCount > 0 ? <ProgressTrail
+                value={resume.completedTaskCount}
+                total={resume.totalTaskCount}
+                label={`${resume.completedTaskCount} of ${resume.totalTaskCount} tasks complete`}
               /> : null}
               {continueError ? <p role="alert">{continueError}</p> : null}
               <Button block onClick={() => void continuePractice()}>
@@ -132,9 +133,9 @@ export function Home() {
       </div>
       <section className="stack-2" aria-labelledby="home-word-bank">
         <h2 id="home-word-bank">Your word bank</h2>
-        {vocabularyLoading ? <p role="status">Loading your words...</p> : vocabularyError ? (
-          <p role="alert">{vocabularyError} Reload to retry.</p>
-        ) : <p>{vocabulary.length ? `${vocabulary.length} words collected` : "Your words will appear here as you practise."}</p>}
+        {homeLoading ? <p role="status">Loading your words...</p> : homeError ? (
+          <p role="alert">{homeError} Reload to retry.</p>
+        ) : <p>{home?.vocabularyCount ? `${home.vocabularyCount} words collected` : "Your words will appear here as you practise."}</p>}
         <Button variant="secondary" onClick={() => navigate("/vocabulary")}>
           <BookIcon size={20} /> Explore your words
         </Button>

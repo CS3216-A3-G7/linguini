@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { JournalEntry, VocabRecord, VocabStatus } from "../data/types";
+import type { JournalSummary, VocabRecord, VocabStatus } from "../data/types";
 import { AppStateContext } from "./context";
 import { useAccount } from "./useAccount";
 import { usePractice } from "./usePractice";
@@ -26,9 +26,9 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
   const pathname = location.pathname.replace(/\/+$/, "") || "/";
   // Keep shared caches, but only fetch data consumed by the current page.
   const needsScenes = pathname === "/practice" || pathname === "/vocabulary";
-  const needsProgress = ["/home", "/progress", "/profile"].includes(pathname);
+  const needsProgress = ["/progress", "/profile"].includes(pathname);
   const needsVocabulary = needsProgress || pathname === "/vocabulary"
-    || pathname.startsWith("/journal/")
+    || (pathname.startsWith("/journal/") && !pathname.startsWith("/journal/new"))
     || /^\/practice\/sessions\/[^/]+\/summary$/.test(pathname);
   const needsJournal = pathname === "/journal" || pathname === "/profile";
   const scenes = useQuery({ enabled: needsScenes, queryKey: queryKeys.scenes, queryFn: ({ signal }) => getScenes(signal) });
@@ -37,6 +37,7 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
   const journal = useQuery({ enabled: needsJournal, queryKey: queryKeys.journals(profileId), queryFn: ({ signal }) => getJournals(signal) });
 
   const onLearningChanged = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.home(profileId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.progress(profileId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.vocabulary(profileId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.activeSession(profileId) });
@@ -60,8 +61,13 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
     try {
       if (!account.activeProfile && !id) throw new Error("Choose a language first.");
       const entry = await saveJournal(draft, account.activeProfile?.id ?? "", id, date);
+      const summary: JournalSummary = {
+        id: entry.id, languageProfileId: entry.languageProfileId, date: entry.date,
+        title: entry.title, wordCount: entry.body.trim().split(/\s+/).filter(Boolean).length,
+        mediaAssetId: entry.mediaAssetId, imageUrl: entry.imageUrl,
+      };
       queryClient.setQueryData(queryKeys.journals(profileId),
-        (rows: JournalEntry[] | undefined) => rows ? [entry, ...rows.filter(row => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)) : undefined);
+        (rows: JournalSummary[] | undefined) => rows ? [summary, ...rows.filter(row => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)) : undefined);
       await queryClient.invalidateQueries({ queryKey: queryKeys.journals(profileId) });
       return entry;
     } catch (error) {
