@@ -160,3 +160,10 @@ def test_signing_failure_does_not_fall_back_to_public_url(monkeypatch, payload):
 def test_signing_requires_server_credentials():
     with pytest.raises(MediaUrlError, match="not configured"):
         PrivateMediaUrls("https://project.supabase.co", "media-assets", "").resolve(["photo.jpg"])
+
+
+def test_new_supabase_secret_is_not_sent_as_bearer():
+    resolver = PrivateMediaUrls(
+        "https://project.supabase.co", "media-assets", "sb_secret_test"
+    )
+    assert resolver._headers() == {"apikey": "sb_secret_test"}

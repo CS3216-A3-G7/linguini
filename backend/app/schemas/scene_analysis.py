@@ -37,9 +37,10 @@ class ModelSceneRelation(ApiModel):
 
 
 class SceneAnalysisModelResult(ApiModel):
-    suggested_scene_title: NonEmptyText
-    objects: list[ModelSceneObject]
-    relations: list[ModelSceneRelation] = []
+    title: NonEmptyText
+    summary: NonEmptyText
+    objects: Annotated[list[ModelSceneObject], Field(max_length=6)]
+    relations: list[ModelSceneRelation]
 
 
 class SceneAnalysisIssueCode(StrEnum):

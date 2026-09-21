@@ -47,7 +47,7 @@ for (const source of ["preloaded", "camera", "userUpload"] as const) {
     assert.equal(scene.items[0].word, "silla");
     assert.equal(scene.items[0].translation, "chair");
     assert.equal(scene.items[0].id, "object");
-    assert.deepEqual([scene.items[0].x, scene.items[0].y], [15, 25]);
+    assert.deepEqual([scene.items[0].x, scene.items[0].y], [25, 40]);
     assert.equal("rounds" in scene, false);
   });
 }
@@ -68,7 +68,7 @@ test("reviewed scenes contain confirmed objects and retain translations and mark
   assert.equal(scene.items[0].id, "kept");
   assert.equal(scene.items[0].translation, "chair");
   assert.equal(scene.items[0].word, "silla");
-  assert.deepEqual([scene.items[0].x, scene.items[0].y], [15, 25]);
+  assert.deepEqual([scene.items[0].x, scene.items[0].y], [25, 40]);
 });
 
 

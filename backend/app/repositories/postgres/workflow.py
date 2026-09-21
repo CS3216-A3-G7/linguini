@@ -610,7 +610,9 @@ class PostgresWorkflowRepository:
                 .one()
             )
             for object_id in request.accepted_object_ids:
-                obj = existing[object_id]
+                obj = existing[object_id].model_copy(
+                    update={"attributes": request.object_attributes.get(object_id) or None}
+                )
                 c.execute(
                     upsert(scene_objects)
                     .values(**object_values(obj))
@@ -626,6 +628,7 @@ class PostgresWorkflowRepository:
                     label=added.label,
                     vocabulary_item_id=word.id,
                     bounding_box={"x": added.x, "y": added.y, "width": 0.01, "height": 0.01},
+                    attributes=request.object_attributes.get(added.id) or None,
                 )
                 values = object_values(obj)
                 c.execute(

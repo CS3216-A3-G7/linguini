@@ -18,6 +18,12 @@ class PrivateMediaUrls:
         self.bucket = bucket
         self.service_key = service_key
 
+    def _headers(self) -> dict[str, str]:
+        headers = {"apikey": self.service_key}
+        if not self.service_key.startswith("sb_"):
+            headers["Authorization"] = f"Bearer {self.service_key}"
+        return headers
+
     def resolve(self, keys: list[str]) -> dict[str, str | None]:
         result = {key: public_media_url(key, None) for key in keys}
         paths = list(
@@ -33,7 +39,7 @@ class PrivateMediaUrls:
         try:
             response = httpx.post(
                 f"{self.storage_url}/object/sign/{quote(self.bucket, safe='')}",
-                headers={"apikey": self.service_key, "Authorization": f"Bearer {self.service_key}"},
+                headers=self._headers(),
                 json={"paths": paths, "expiresIn": 3600},
                 timeout=15,
             )

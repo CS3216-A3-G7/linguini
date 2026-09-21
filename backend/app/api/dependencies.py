@@ -26,6 +26,7 @@ from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
 from app.repositories.scenes import SceneRepository
 from app.repositories.users import UserRepository
+from app.services.gemini_scene_analysis import GeminiSceneAnalyzer, RoutedSceneAnalyzer
 from app.services.image_storage import ImageStorage
 from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
@@ -131,10 +132,24 @@ def get_practice_repository(
     request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
 ) -> PostgresWorkflowRepository:
     engine = request.app.state.database_engine
+    deterministic = DeterministicSceneAnalyzer(engine)
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    gemini_model = os.getenv("GEMINI_SCENE_MODEL", "").strip()
+    analyzer = deterministic
+    if gemini_key and gemini_model:
+        analyzer = RoutedSceneAnalyzer(
+            deterministic,
+            GeminiSceneAnalyzer(
+                ImageStorage(
+                    os.getenv("SUPABASE_URL", "").strip(),
+                    os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+                ),
+                gemini_key,
+                gemini_model,
+            ),
+        )
     # The only place a different scene-analysis provider gets swapped in.
-    return PostgresWorkflowRepository(
-        engine, demo_user_id, analyzer=DeterministicSceneAnalyzer(engine)
-    )
+    return PostgresWorkflowRepository(engine, demo_user_id, analyzer=analyzer)
 
 
 def get_practice_service(

@@ -295,6 +295,7 @@ export interface PracticeReview {
   acceptedObjectIds: string[];
   relations: SceneObjectRelation[];
   addedObjects: { id: string; label: string; x: number; y: number }[];
+  objectAttributes: Record<string, Record<string, string>>;
 }
 export const reviewPractice = (id: string, review: PracticeReview) => write<PracticeDetail>(`/api/v1/sessions/${id}/review`, "PUT", review);
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);
