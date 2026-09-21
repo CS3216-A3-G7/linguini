@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
+import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getPracticeStatus, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
@@ -18,10 +18,10 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
   const loadVersion = useRef(0);
   const creation = useRef<{ asset: string; key: string } | null>(null);
   const [micReady, setMicReady] = useState(false);
-  const loadSession = useCallback(async (id: string) => {
+  const loadSession = useCallback(async (id: string, initial?: PracticeDetail) => {
     const version = ++loadVersion.current;
     setStalled(false);
-    let data = await getPractice(id);
+    let data = initial?.session.id === id ? initial : await getPractice(id);
     if (data.session.status === "created") {
       try { data = await analyzePractice(id); }
       catch (error) {
@@ -30,10 +30,14 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
         data = await getPractice(id);
       }
     }
-    for (let attempt = 0; attempt < 20 && PROCESSING.includes(data.session.status); attempt += 1) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      if (version !== loadVersion.current) break;
-      data = await getPractice(id);
+    if (PROCESSING.includes(data.session.status)) {
+      let status = data.session.status;
+      for (let attempt = 0; attempt < 20 && PROCESSING.includes(status); attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        if (version !== loadVersion.current) break;
+        status = (await getPracticeStatus(id)).status;
+      }
+      if (version === loadVersion.current && !PROCESSING.includes(status)) data = await getPractice(id);
     }
     if (version === loadVersion.current) {
       setSession(data);

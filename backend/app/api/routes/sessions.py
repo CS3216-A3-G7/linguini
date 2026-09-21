@@ -10,6 +10,7 @@ from app.schemas.sessions import (
     ReviewPracticeRequest,
     Session,
     SessionDetailResponse,
+    SessionStatusResponse,
     SessionSummaryResponse,
 )
 from app.schemas.tasks import SessionTaskPublic
@@ -39,6 +40,11 @@ def get_active_session(service: PracticeServiceDep) -> SessionDetailResponse | N
 @router.get("/{session_id}", response_model=SessionDetailResponse)
 def get_session(session_id: UUID, service: PracticeServiceDep) -> SessionDetailResponse:
     return service.get(session_id)
+
+
+@router.get("/{session_id}/status", response_model=SessionStatusResponse)
+def get_session_status(session_id: UUID, service: PracticeServiceDep) -> SessionStatusResponse:
+    return service.status(session_id)
 
 
 @router.post("/{session_id}/analyze", response_model=SessionDetailResponse)

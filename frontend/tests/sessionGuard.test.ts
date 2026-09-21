@@ -45,7 +45,7 @@ let fixture = detail("inProgress");
 function detail(status: PracticeDetail["session"]["status"], tasks: SessionTask[] = []): PracticeDetail {
   return {
     session: { id: SESSION_ID, status, sceneMediaAssetId: "asset", sessionTitle: null, sessionSummary: null, failureCode: null },
-    mediaAsset: { id: "asset", source: "preloaded" }, sceneId: null, title: "Scene", analysisMode: null,
+    mediaAsset: { id: "asset", source: "preloaded" }, imageUrl: "http://test.local/img.jpg", sceneId: null, title: "Scene", analysisMode: null,
     sceneObjects: [], sceneObjectRelations: [], vocabulary: [], translations: [],
     tasks, nextTaskId: null, progress: { completedTaskCount: 0, skippedTaskCount: 0, terminalTaskCount: 0, totalTaskCount: tasks.length },
   };
@@ -60,13 +60,14 @@ const apiFixtures: Record<string, unknown> = {
   "/api/v1/journals": [],
 };
 
+const requests: string[] = [];
+
 globals.fetch = async (input: unknown) => {
   const url = typeof input === "string" ? input : (input as Request).url;
   const path = url.replace(/^https?:\/\/[^/]+/, "");
+  requests.push(path);
   if (path === `/api/v1/sessions/${SESSION_ID}`) return Response.json(fixture);
-  if (path === "/api/v1/media/asset") {
-    return Response.json({ id: "asset", signedUrl: "http://test.local/img.jpg", mimeType: "image/jpeg", width: 100, height: 100 });
-  }
+  if (path === `/api/v1/sessions/${SESSION_ID}/status`) return Response.json({ id: SESSION_ID, status: fixture.session.status, failureCode: fixture.session.failureCode });
   if (path in apiFixtures) return Response.json(apiFixtures[path]);
   return new Response("not found", { status: 404 });
 };
@@ -176,8 +177,8 @@ async function mount(path: string) {
   await act(async () => {
     root.render(
       h(QueryClientProvider, { client },
-        h(AppStateProvider, null,
-          h(MemoryRouter, { initialEntries: [path] },
+        h(MemoryRouter, { initialEntries: [path] },
+          h(AppStateProvider, null,
             h(Probe),
             h(Routes, null,
               h(Route, { path: "/practice/sessions/:sessionId", element: h(SessionRoute) },
@@ -250,4 +251,16 @@ test("standing on a page is not re-validated when the session advances", async (
   assert.equal(shown(), "page-learn-task");
   await go(`${BASE}/learn`);
   assert.equal(shown(), "page-ispy-1");
+});
+
+test("session entry fetches details once and avoids unrelated datasets", async () => {
+  fixture = detail("inProgress", [task("learn", "pending", 0)]);
+  requests.length = 0;
+  await mount(`${BASE}/learn`);
+  assert.equal(shown(), "page-learn");
+  assert.equal(requests.filter(path => path === `/api/v1/sessions/${SESSION_ID}`).length, 1);
+  assert.ok(!requests.some(path => path.startsWith("/api/v1/media/")));
+  for (const path of ["/api/v1/me/vocabulary", "/api/v1/me/progress", "/api/v1/journals", "/api/v1/preloaded-scenes"]) {
+    assert.ok(!requests.includes(path), path);
+  }
 });

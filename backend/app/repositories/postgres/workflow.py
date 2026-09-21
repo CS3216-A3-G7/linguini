@@ -34,7 +34,12 @@ from app.repositories.practice import (
 from app.schemas.base import utc_now
 from app.schemas.enums import SessionStatus
 from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
-from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
+from app.schemas.sessions import (
+    Session,
+    SessionDetailResponse,
+    SessionStatusResponse,
+    SessionSummaryResponse,
+)
 from app.schemas.tasks import (
     SessionProgress,
     SessionTask,
@@ -48,6 +53,7 @@ from app.schemas.vocabulary import (
     VocabularyItem,
     VocabularyTranslation,
 )
+from app.services.media_urls import MediaUrlError, PrivateMediaUrls, public_media_url
 from app.services.scene_analysis import DeterministicSceneAnalyzer, SceneAnalysisError
 from app.services.session_plan import build_tasks
 
@@ -99,9 +105,18 @@ def _stale_processing(status=None):
 
 
 class PostgresWorkflowRepository:
-    def __init__(self, engine, user_id, analyzer=None):
+    def __init__(
+        self,
+        engine,
+        user_id,
+        analyzer=None,
+        private_media_urls: PrivateMediaUrls | None = None,
+        media_public_base_url: str | None = None,
+    ):
         self.engine, self.user_id = engine, user_id
         self.analyzer = analyzer or DeterministicSceneAnalyzer(engine)
+        self.private_media_urls = private_media_urls
+        self.media_public_base_url = media_public_base_url
 
     @contextmanager
     def transaction(self):
@@ -179,6 +194,15 @@ class PostgresWorkflowRepository:
                 .order_by(session_tasks.c.order_index)
             ).mappings()
         ]
+
+    def _image_url(self, asset):
+        try:
+            if self.private_media_urls is not None:
+                return self.private_media_urls.resolve([asset.storage_key]).get(asset.storage_key)
+            return public_media_url(asset.storage_key, self.media_public_base_url)
+        except MediaUrlError:
+            # A signing outage must not roll back the surrounding session transaction.
+            return None
 
     def _detail(self, c, session):
         asset = MediaAsset.model_validate(
@@ -285,6 +309,7 @@ class PostgresWorkflowRepository:
         return SessionDetailResponse(
             session=session,
             media_asset=asset,
+            image_url=self._image_url(asset),
             scene_id=scene["slug"] if scene else None,
             title=session.session_title or (scene["title"] if scene else "Your uploaded photo"),
             analysis_mode=None if asset.source == "preloaded" else "placeholder",
@@ -335,6 +360,32 @@ class PostgresWorkflowRepository:
                 sessions.c.user_id == self.user_id,
             )
             return self._detail(c, self._session(c, session_id, profile_id))
+
+    def status(self, session_id, profile_id=None):
+        with self.read_connection() as c:
+            session = self._session(c, session_id, profile_id)
+            response = SessionStatusResponse(
+                id=session.id, status=session.status, failure_code=session.failure_code
+            )
+            if session.status not in PROCESSING_STATUSES:
+                return response
+            stale = c.execute(
+                select(_stale_processing())
+                .select_from(sessions)
+                .where(sessions.c.id == session.id)
+            ).scalar_one()
+            if not stale:
+                return response
+        with self.transaction() as c:
+            self._expire_stale(
+                c,
+                sessions.c.id == session_id,
+                sessions.c.user_id == self.user_id,
+            )
+            session = self._session(c, session_id, profile_id)
+            return SessionStatusResponse(
+                id=session.id, status=session.status, failure_code=session.failure_code
+            )
 
     def active(self, profile_id):
         try:

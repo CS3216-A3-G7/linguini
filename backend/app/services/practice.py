@@ -17,6 +17,9 @@ class PracticeService:
     def get(self, session_id):
         return self.repository.get(session_id, self._profile().id)
 
+    def status(self, session_id):
+        return self.repository.status(session_id, self._profile().id)
+
     def active(self):
         return self.repository.active(self._profile().id)
 

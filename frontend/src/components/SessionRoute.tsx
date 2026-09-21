@@ -2,7 +2,7 @@ import { practiceScene } from "../lib/practiceScene";
 import { useCallback, useRef, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getMedia, getPractice } from "../lib/api";
+import { getPractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
 import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
@@ -27,9 +27,9 @@ function SessionLoader({ id }: { id: string }) {
   const checked = useRef<{ path: string; allowed: boolean } | null>(null);
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
     const initial = await getPractice(id);
-    const media = await getMedia(initial.mediaAsset.id);
+    const media = { id: initial.mediaAsset.id, signedUrl: initial.imageUrl ?? "" };
     if (!signal?.aborted) setPreview(practiceScene(initial, media, learner.language));
-    const loaded = await loadSession(id);
+    const loaded = await loadSession(id, initial);
     setDetail(loaded);
     return practiceScene(loaded, media, learner.language);
   }, [id, loadSession, learner.language]);

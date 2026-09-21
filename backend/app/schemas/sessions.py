@@ -99,6 +99,7 @@ class ReviewPracticeRequest(ApiModel):
 
 class SessionDetailResponse(ApiModel):
     analysis_mode: Literal["placeholder"] | None = None
+    image_url: str | None = None
     media_asset: MediaAsset
     scene_id: str | None = None
     title: str
@@ -110,6 +111,12 @@ class SessionDetailResponse(ApiModel):
     tasks: list[SessionTaskPublic] = Field(default_factory=list)
     next_task_id: UUID | None = None
     progress: SessionProgress | None = None
+
+
+class SessionStatusResponse(ApiModel):
+    id: UUID
+    status: SessionStatus
+    failure_code: SessionFailureCode | None = None
 
 
 class SessionSummaryResponse(ApiModel):

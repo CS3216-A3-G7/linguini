@@ -133,7 +133,11 @@ def get_practice_repository(
     engine = request.app.state.database_engine
     # The only place a different scene-analysis provider gets swapped in.
     return PostgresWorkflowRepository(
-        engine, demo_user_id, analyzer=DeterministicSceneAnalyzer(engine)
+        engine,
+        demo_user_id,
+        analyzer=DeterministicSceneAnalyzer(engine),
+        private_media_urls=get_private_media_urls(),
+        media_public_base_url=get_media_public_base_url(),
     )
 
 

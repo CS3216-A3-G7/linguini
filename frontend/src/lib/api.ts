@@ -267,6 +267,7 @@ export type SessionStatus = "created" | "analyzingScene" | "awaitingObjectReview
 export interface PracticeDetail {
   session: { id: string; status: SessionStatus; sceneMediaAssetId: string; sessionTitle: string | null; sessionSummary: string | null; failureCode: "imageUploadFailed" | "sceneAnalysisFailed" | "noValidObjects" | "vocabularyMappingFailed" | "taskGenerationFailed" | null };
   mediaAsset: { id: string; source: "preloaded" | "camera" | "userUpload" };
+  imageUrl?: string | null;
   sceneId: string | null; title: string;
   analysisMode: "placeholder" | null;
   sceneObjects: SceneObject[];
@@ -298,6 +299,12 @@ export interface PracticeReview {
 }
 export const reviewPractice = (id: string, review: PracticeReview) => write<PracticeDetail>(`/api/v1/sessions/${id}/review`, "PUT", review);
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);
+export interface PracticeStatus {
+  id: string;
+  status: SessionStatus;
+  failureCode: PracticeDetail["session"]["failureCode"];
+}
+export const getPracticeStatus = (id: string) => request<PracticeStatus>(`/api/v1/sessions/${id}/status`);
 export const getActivePractice = () => request<PracticeDetail | null>("/api/v1/sessions/active");
 export const createPractice = (profileId: string, assetId: string, key: string) => write<PracticeDetail>("/api/v1/sessions", "POST", {
   languageProfileId: profileId, mediaAssetId: assetId, idempotencyKey: key,

@@ -1,6 +1,7 @@
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { JournalEntry, VocabRecord, VocabStatus } from "../data/types";
 import { AppStateContext } from "./context";
@@ -21,10 +22,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 function LoadedAppState({ account, children }: { account: ReturnType<typeof useAccount>; children: ReactNode }) {
   const queryClient = useQueryClient();
   const profileId = account.activeProfile?.id ?? "";
-  const scenes = useQuery({ queryKey: queryKeys.scenes, queryFn: ({ signal }) => getScenes(signal) });
-  const vocabulary = useQuery({ queryKey: queryKeys.vocabulary(profileId), queryFn: ({ signal }) => getVocabulary(signal) });
-  const progress = useQuery({ queryKey: queryKeys.progress(profileId), queryFn: ({ signal }) => getProgress(signal) });
-  const journal = useQuery({ queryKey: queryKeys.journals(profileId), queryFn: ({ signal }) => getJournals(signal) });
+  const location = useLocation();
+  const pathname = location.pathname.replace(/\/+$/, "") || "/";
+  // Keep shared caches, but only fetch data consumed by the current page.
+  const needsScenes = pathname === "/practice" || pathname === "/vocabulary";
+  const needsProgress = ["/home", "/progress", "/profile"].includes(pathname);
+  const needsVocabulary = needsProgress || pathname === "/vocabulary" || pathname.startsWith("/journal/")
+    || /^\/practice\/sessions\/[^/]+\/summary$/.test(pathname);
+  const needsJournal = pathname === "/journal" || pathname === "/profile";
+  const scenes = useQuery({ enabled: needsScenes, queryKey: queryKeys.scenes, queryFn: ({ signal }) => getScenes(signal) });
+  const vocabulary = useQuery({ enabled: needsVocabulary, queryKey: queryKeys.vocabulary(profileId), queryFn: ({ signal }) => getVocabulary(signal) });
+  const progress = useQuery({ enabled: needsProgress, queryKey: queryKeys.progress(profileId), queryFn: ({ signal }) => getProgress(signal) });
+  const journal = useQuery({ enabled: needsJournal, queryKey: queryKeys.journals(profileId), queryFn: ({ signal }) => getJournals(signal) });
 
   const onLearningChanged = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.progress(profileId) });

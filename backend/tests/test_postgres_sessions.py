@@ -402,6 +402,20 @@ def test_get_session_reaps_stale_processing(database):
     assert client.get(f"/api/v1/sessions/{third}").json()["session"]["status"] == "analyzingScene"
 
 
+def test_get_session_status(database):
+    _, _, profile, client = database
+    sid = create_run(client, profile)["session"]["id"]
+    response = client.get(f"/api/v1/sessions/{sid}/status")
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "id": sid,
+        "status": "created",
+        "failureCode": None,
+    }
+    missing = client.get(f"/api/v1/sessions/{uuid4()}/status")
+    assert missing.status_code == 404
+
+
 def test_all_task_kinds_complete_with_server_evaluation(database):
     engine, owner, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
