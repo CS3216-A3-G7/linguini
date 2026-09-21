@@ -141,12 +141,35 @@ class JournalPhotoOption(ApiModel):
     completed_at: AwareDatetime
 
 
+class JournalContextPhoto(ApiModel):
+    media_asset_id: UUID
+    display_order: Annotated[int, Field(ge=0)]
+    image_url: str | None = None
+
+
+class JournalContextEntry(ApiModel):
+    journal: Journal
+    content: str = ""
+    photos: list[JournalContextPhoto] = Field(default_factory=list)
+
+
 class JournalTodayContextResponse(ApiModel):
     local_date: date
     journal: Journal | None = None
+    entry: JournalContextEntry | None = None
     eligible_photos: list[JournalPhotoOption] = Field(default_factory=list)
     learned_words: list[DailyVocabularyItem] = Field(default_factory=list)
     can_create: bool
+
+
+class JournalSummaryResponse(ApiModel):
+    id: UUID
+    language_profile_id: UUID
+    local_date: date
+    title: str
+    word_count: Annotated[int, Field(ge=0)] = 0
+    cover_media_asset_id: UUID | None = None
+    image_url: str | None = None
 
 
 class JournalDetailResponse(ApiModel):

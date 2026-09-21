@@ -25,6 +25,7 @@ def _service(rows, media=None, signer=None):
     profiles.list_profiles.return_value = [MagicMock(id=uuid4(), is_active=True)]
     repository = MagicMock()
     repository.read.return_value = rows
+    repository.read_one.return_value = None
     repository.change.side_effect = lambda fn: fn(rows)
     service = JournalService(repository, users, profiles, media, None, signer)
     return service, user, profiles.list_profiles.return_value[0]
@@ -54,6 +55,7 @@ def test_day_context_returns_journal_and_signed_eligible_photos():
     )
     entry = JournalDetailResponse(journal=journal)
     service.repository.read.return_value = [entry]
+    service.repository.read_one.return_value = entry
     asset = _asset("users/x/photo.jpg")
     completed_at = datetime.now(ZoneInfo(TIMEZONE))
     service.media.list_completed_session_images.return_value = [

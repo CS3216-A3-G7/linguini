@@ -36,13 +36,36 @@ class LearningService:
             row.rank = rank
         return ProgressResponse(xp=data.xp, scenarios=data.scenarios, leaderboard=board)
 
+    def _vocabulary_for_language(
+        self, user_id, language_code: str | None
+    ) -> list[DailyVocabularyItem]:
+        rows = self.repository.list_vocabulary(user_id)
+        if language_code is not None:
+            rows = [
+                row for row in rows if row.vocabulary.language_code.lower() == language_code
+            ]
+        return rows
+
+    def count_vocabulary(self, language_code: str) -> int:
+        user = self.users.get_current_user()
+        return len(self._vocabulary_for_language(user.id, language_code))
+
+    def journal_words(self, language_code: str, limit: int) -> list[str]:
+        user = self.users.get_current_user()
+        words = []
+        for row in self._vocabulary_for_language(user.id, language_code):
+            text = row.vocabulary.display_text
+            if text not in words:
+                words.append(text)
+            if len(words) >= limit:
+                break
+        return words
+
     def list_vocabulary(
         self, cursor: str | None, limit: int, language_code: str | None = None
     ) -> CursorPage[DailyVocabularyItem]:
         user = self.users.get_current_user()
-        rows = self.repository.list_vocabulary(user.id)
-        if language_code is not None:
-            rows = [row for row in rows if row.vocabulary.language_code.lower() == language_code]
+        rows = self._vocabulary_for_language(user.id, language_code)
         offset = 0
         if cursor is not None:
             index = next(

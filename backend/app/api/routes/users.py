@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.api.dependencies import get_language_profile_service, get_user_service
 from app.repositories.users import UserRepositoryError
 from app.schemas.users import (
+    AccountResponse,
     CreateLanguageProfileRequest,
     LanguageProfile,
     UpdateLanguageProfileRequest,
@@ -32,6 +33,26 @@ def get_me(service: Annotated[UserService, Depends(get_user_service)]) -> User:
             status_code=500,
             detail={"code": "user_storage_error", "message": "Unable to load demo user data."},
         ) from exc
+
+
+@router.get("/me/account", response_model=AccountResponse)
+def get_account(
+    users: Annotated[UserService, Depends(get_user_service)],
+    profiles: Annotated[LanguageProfileService, Depends(get_language_profile_service)],
+) -> AccountResponse:
+    try:
+        user = users.get_current_user()
+    except UserNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "user_not_found", "message": str(exc)},
+        ) from exc
+    except UserRepositoryError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "user_storage_error", "message": "Unable to load demo user data."},
+        ) from exc
+    return AccountResponse(user=user, language_profiles=profiles.list_profiles())
 
 
 @router.patch("/me", response_model=User)

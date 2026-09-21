@@ -16,6 +16,7 @@ from app.schemas.journals import (
     JournalMedia,
     JournalRevision,
     JournalSuggestion,
+    JournalSummaryResponse,
     JournalTodayContextResponse,
     UpdateJournalRequest,
     UpsertTodayJournalRequest,
@@ -27,9 +28,9 @@ router = APIRouter(tags=["journals"])
 JournalServiceDep = Annotated[JournalService, Depends(get_journal_service)]
 
 
-@router.get("/journals", response_model=list[JournalDetailResponse])
-def list_journals(service: JournalServiceDep) -> list[JournalDetailResponse]:
-    return service.list_entries()
+@router.get("/journals", response_model=list[JournalSummaryResponse])
+def list_journals(service: JournalServiceDep) -> list[JournalSummaryResponse]:
+    return service.list_summaries()
 
 
 @router.get("/journal/today/context", response_model=JournalTodayContextResponse)

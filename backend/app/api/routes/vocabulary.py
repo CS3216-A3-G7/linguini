@@ -28,6 +28,15 @@ async def get_daily_vocabulary(local_date: date | None = None) -> DailyVocabular
     service_not_implemented("Get daily vocabulary")
 
 
+@router.get("/journal-words", response_model=list[str])
+def list_journal_words(
+    service: Annotated[LearningService, Depends(get_learning_service)],
+    language: Annotated[str, Depends(get_active_language)],
+    limit: int = Query(default=20, ge=1, le=100),
+) -> list[str]:
+    return service.journal_words(language, limit)
+
+
 @router.get("/{vocabulary_item_id}", response_model=DailyVocabularyItem)
 async def get_vocabulary_item(vocabulary_item_id: UUID) -> DailyVocabularyItem:
     service_not_implemented("Get learner vocabulary item")

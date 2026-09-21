@@ -137,7 +137,6 @@ export interface HomeSummary {
     imageUrl: string | null;
     completedTaskCount: number;
     totalTaskCount: number;
-    destination: string;
   };
 }
 
@@ -192,7 +191,7 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
   const items: DailyVocabularyItem[] = [];
   let cursor: string | null = null;
   do {
-    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    const query = `?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
     const page: { items: DailyVocabularyItem[]; nextCursor: string | null } =
       await request(`/api/v1/me/vocabulary${query}`, signal);
     items.push(...page.items);

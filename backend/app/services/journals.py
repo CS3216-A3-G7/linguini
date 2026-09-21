@@ -14,11 +14,14 @@ from app.schemas.enums import JournalStatus, JournalSuggestionStatus, MediaSourc
 from app.schemas.journals import (
     AddJournalMediaRequest,
     Journal,
+    JournalContextEntry,
+    JournalContextPhoto,
     JournalDetailResponse,
     JournalMedia,
     JournalPhotoOption,
     JournalRevision,
     JournalSuggestion,
+    JournalSummaryResponse,
     JournalTodayContextResponse,
     UpdateJournalRequest,
     UpsertTodayJournalRequest,
@@ -64,14 +67,27 @@ class JournalService:
                 )
             ):
                 keys[row.journal.id] = asset.storage_key
-        urls = (
-            self.private_media_urls.resolve(list(keys.values()))
-            if self.private_media_urls
-            else {key: public_media_url(key, self.media_public_base_url) for key in keys.values()}
-        )
+        urls = self._resolve_urls(keys.values())
         return [
             row.model_copy(update={"image_url": urls.get(keys.get(row.journal.id))}) for row in rows
         ]
+
+    def _resolve_urls(self, storage_keys) -> dict[str, str | None]:
+        keys = list(storage_keys)
+        if self.private_media_urls:
+            return self.private_media_urls.resolve(keys)
+        return {key: public_media_url(key, self.media_public_base_url) for key in keys}
+
+    def _asset_image_urls(self, asset_ids: list[UUID], user_id: UUID) -> dict[UUID, str | None]:
+        assets = self.media.get_by_ids(asset_ids) if self.media and asset_ids else {}
+        keys = {
+            asset_id: asset.storage_key
+            for asset_id, asset in assets.items()
+            if asset.media_type == MediaType.IMAGE
+            and (asset.owner_user_id == user_id or asset.source == MediaSource.PRELOADED)
+        }
+        urls = self._resolve_urls(keys.values())
+        return {asset_id: urls.get(key) for asset_id, key in keys.items()}
 
     @staticmethod
     def _find(rows, journal_id, user_id):
@@ -102,21 +118,26 @@ class JournalService:
                 "Journal media is missing, inaccessible or has the wrong type."
             )
 
-    def list_entries(self) -> list[JournalDetailResponse]:
+    def list_summaries(self) -> list[JournalSummaryResponse]:
         user = self.users.get_current_user()
-        return self._with_images(
-            sorted(
-                (row for row in self.repository.read() if row.journal.user_id == user.id),
-                key=lambda row: row.journal.local_date,
-                reverse=True,
-            )
+        rows = sorted(
+            self.repository.read_summaries(),
+            key=lambda row: row.local_date,
+            reverse=True,
         )
+        urls = self._asset_image_urls(
+            [row.cover_media_asset_id for row in rows if row.cover_media_asset_id], user.id
+        )
+        return [
+            row.model_copy(update={"image_url": urls.get(row.cover_media_asset_id)})
+            for row in rows
+        ]
 
     def get_entry(self, journal_id: UUID) -> JournalDetailResponse:
-        entry = next((row for row in self.list_entries() if row.journal.id == journal_id), None)
-        if entry is None:
+        row = self.repository.read_one(journal_id=journal_id)
+        if row is None:
             raise JournalNotFoundError("Journal not found.")
-        return entry
+        return self._with_images([row])[0]
 
     def today(self) -> JournalTodayContextResponse:
         return self.day_context(None)
@@ -128,7 +149,33 @@ class JournalService:
         day = day or today
         if day > today:
             raise FutureJournalDateError("Cannot create a journal entry for a future date.")
-        entry = next((row for row in self.list_entries() if row.journal.local_date == day), None)
+        row = self.repository.read_one(local_date=day)
+        entry = None
+        if row is not None:
+            content = next(
+                (
+                    revision.content
+                    for revision in row.revisions
+                    if revision.id == row.journal.current_revision_id
+                ),
+                "",
+            )
+            photos = sorted(row.media, key=lambda media: media.display_order)
+            urls = self._asset_image_urls(
+                [photo.media_asset_id for photo in photos], row.journal.user_id
+            )
+            entry = JournalContextEntry(
+                journal=row.journal,
+                content=content,
+                photos=[
+                    JournalContextPhoto(
+                        media_asset_id=photo.media_asset_id,
+                        display_order=photo.display_order,
+                        image_url=urls.get(photo.media_asset_id),
+                    )
+                    for photo in photos
+                ],
+            )
         eligible_photos: list[JournalPhotoOption] = []
         if self.media is not None:
             start = datetime.combine(day, time.min, tzinfo=tz)
@@ -154,9 +201,10 @@ class JournalService:
             ]
         return JournalTodayContextResponse(
             local_date=day,
-            journal=entry.journal if entry else None,
+            journal=row.journal if row else None,
+            entry=entry,
             eligible_photos=eligible_photos,
-            can_create=entry is None,
+            can_create=row is None,
         )
 
     @staticmethod

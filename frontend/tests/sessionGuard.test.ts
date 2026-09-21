@@ -74,7 +74,8 @@ globals.fetch = async (input: unknown) => {
   if (path === "/api/v1/media/asset") {
     return Response.json({ id: "asset", signedUrl: "http://test.local/img.jpg", mimeType: "image/jpeg", width: 100, height: 100 });
   }
-  if (path in apiFixtures) return Response.json(apiFixtures[path]);
+  const key = path.split("?")[0];
+  if (key in apiFixtures) return Response.json(apiFixtures[key]);
   return new Response("not found", { status: 404 });
 };
 

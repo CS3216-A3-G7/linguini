@@ -1,6 +1,7 @@
 """Five relational journal entities, written atomically under a per-user lock."""
 
 from collections.abc import Callable
+from datetime import date
 from uuid import UUID
 
 from pydantic import TypeAdapter, ValidationError
@@ -32,6 +33,7 @@ from app.schemas.journals import (
     JournalMedia,
     JournalRevision,
     JournalSuggestion,
+    JournalSummaryResponse,
     JournalWordMention,
 )
 
@@ -182,6 +184,110 @@ class PostgresJournalRepository:
                 isolation_level="REPEATABLE READ"
             ) as connection:
                 return self._read(connection)
+        except (SQLAlchemyError, ValueError) as exc:
+            raise JournalStorageError("Unable to read journals.") from exc
+
+    def _read_one(
+        self,
+        connection: Connection,
+        *,
+        journal_id: UUID | None = None,
+        local_date: date | None = None,
+    ) -> JournalDetailResponse | None:
+        selector = (
+            journals.c.id == journal_id
+            if journal_id is not None
+            else journals.c.local_date == local_date
+        )
+        row = (
+            connection.execute(
+                select(journals)
+                .where(journals.c.user_id == self.user_id, selector)
+                .limit(1)
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return None
+        entry = JournalDetailResponse(journal=Journal.model_validate(dict(row)))
+        jid = entry.journal.id
+        for name, table, model, order in CHILDREN:
+            if table is journal_word_mentions:
+                statement = (
+                    select(table)
+                    .join(journal_revisions, table.c.journal_revision_id == journal_revisions.c.id)
+                    .where(journal_revisions.c.journal_id == jid)
+                )
+            else:
+                statement = select(table).where(table.c.journal_id == jid)
+            for child in connection.execute(
+                statement.order_by(table.c[order], table.c.id)
+            ).mappings():
+                getattr(entry, name).append(model.model_validate(dict(child)))
+        return entry
+
+    def read_one(
+        self, *, journal_id: UUID | None = None, local_date: date | None = None
+    ) -> JournalDetailResponse | None:
+        try:
+            with self.engine.connect().execution_options(
+                isolation_level="REPEATABLE READ"
+            ) as connection:
+                entry = self._read_one(
+                    connection, journal_id=journal_id, local_date=local_date
+                )
+                if entry is not None:
+                    validate_entries([entry])
+                return entry
+        except (SQLAlchemyError, ValueError) as exc:
+            raise JournalStorageError("Unable to read journal.") from exc
+
+    def read_summaries(self) -> list[JournalSummaryResponse]:
+        try:
+            with self.engine.connect().execution_options(
+                isolation_level="REPEATABLE READ"
+            ) as connection:
+                rows = (
+                    connection.execute(
+                        select(
+                            journals.c.id,
+                            journals.c.language_profile_id,
+                            journals.c.local_date,
+                            journals.c.title,
+                            journal_revisions.c.content,
+                        )
+                        .select_from(
+                            journals.outerjoin(
+                                journal_revisions,
+                                journals.c.current_revision_id == journal_revisions.c.id,
+                            )
+                        )
+                        .where(journals.c.user_id == self.user_id)
+                    )
+                    .mappings()
+                    .all()
+                )
+                covers = {}
+                ids = [row["id"] for row in rows]
+                if ids:
+                    for media in connection.execute(
+                        select(journal_media.c.journal_id, journal_media.c.media_asset_id)
+                        .where(journal_media.c.journal_id.in_(ids))
+                        .order_by(journal_media.c.display_order, journal_media.c.id)
+                    ).mappings():
+                        covers.setdefault(media["journal_id"], media["media_asset_id"])
+                return [
+                    JournalSummaryResponse(
+                        id=row["id"],
+                        language_profile_id=row["language_profile_id"],
+                        local_date=row["local_date"],
+                        title=row["title"],
+                        word_count=len(row["content"].split()) if row["content"] else 0,
+                        cover_media_asset_id=covers.get(row["id"]),
+                    )
+                    for row in rows
+                ]
         except (SQLAlchemyError, ValueError) as exc:
             raise JournalStorageError("Unable to read journals.") from exc
 

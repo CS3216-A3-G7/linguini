@@ -81,3 +81,8 @@ class UpdateLanguageProfileRequest(ApiModel):
     preferred_input_mode: PreferredInputMode | None = None
     daily_goal_minutes: Annotated[int, Field(ge=1, le=240)] | None = None
     is_active: bool | None = None
+
+
+class AccountResponse(ApiModel):
+    user: User
+    language_profiles: list[LanguageProfile]
