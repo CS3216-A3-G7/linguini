@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import timedelta
 from uuid import uuid5
 
-from sqlalchemy import DateTime, and_, case, delete, func, insert, select, update
+from sqlalchemy import DateTime, and_, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as upsert
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -20,11 +20,12 @@ from app.repositories.postgres.scenes import preloaded_scenes
 from app.repositories.postgres.tasks import entity_values, session_tasks, task_attempts
 from app.repositories.postgres.users import users
 from app.repositories.postgres.vocabulary import (
-    user_vocabulary_progress,
+    record_vocabulary_evidence,
     vocabulary_encounters,
     vocabulary_items,
     vocabulary_translations,
 )
+from app.repositories.postgres.xp import award, xp_events
 from app.repositories.practice import (
     ActiveSessionExistsError,
     PracticeConflictError,
@@ -43,7 +44,6 @@ from app.schemas.tasks import (
     TaskAttempt,
 )
 from app.schemas.vocabulary import (
-    UserVocabularyProgress,
     VocabularyEncounter,
     VocabularyItem,
     VocabularyTranslation,
@@ -728,7 +728,31 @@ class PostgresWorkflowRepository:
                 not tasks or any(t.status not in {"completed", "skipped"} for t in tasks)
             ):
                 raise PracticeConflictError("Complete or skip every task first.")
-            return self._transition(c, session, target)
+            session = self._transition(c, session, target)
+            if not abandon:
+                award(
+                    c,
+                    user_id=self.user_id,
+                    event_type="sessionCompleted",
+                    idempotency_key=f"session:{session.id}",
+                    language_profile_id=session.language_profile_id,
+                    session_id=session.id,
+                )
+                ispy = self._ispy_summary(c, session.id)
+                if (
+                    all(task.status == "completed" for task in tasks)
+                    and ispy["ispy_attempt_count"] > 0
+                    and ispy["ispy_correct_count"] == ispy["ispy_attempt_count"]
+                ):
+                    award(
+                        c,
+                        user_id=self.user_id,
+                        event_type="perfectSession",
+                        idempotency_key=f"perfect:{session.id}",
+                        language_profile_id=session.language_profile_id,
+                        session_id=session.id,
+                    )
+            return session
 
     def summary(self, session_id, profile_id):
         with self.read_connection() as c:
@@ -750,14 +774,13 @@ class PostgresWorkflowRepository:
                 progress=task_progress(self._tasks(c, session.id)),
                 learned_vocabulary_ids=learned,
                 xp_earned=c.execute(
-                    select(func.count())
-                    .select_from(vocabulary_encounters)
+                    select(func.coalesce(func.sum(xp_events.c.amount), 0))
+                    .select_from(xp_events)
                     .where(
-                        vocabulary_encounters.c.session_id == session.id,
-                        vocabulary_encounters.c.user_id == self.user_id,
+                        xp_events.c.session_id == session.id,
+                        xp_events.c.user_id == self.user_id,
                     )
-                ).scalar_one()
-                * 5,
+                ).scalar_one(),
                 **self._ispy_summary(c, session.id),
             )
 
@@ -781,14 +804,6 @@ class PostgresWorkflowRepository:
     def _encounter(self, c, task, event_id, outcome, introduced=False):
         if not task.vocabulary_item_id:
             return
-        initial = UserVocabularyProgress(
-            user_id=self.user_id, vocabulary_item_id=task.vocabulary_item_id
-        )
-        c.execute(
-            upsert(user_vocabulary_progress)
-            .values(**initial.model_dump(by_alias=False))
-            .on_conflict_do_nothing(index_elements=["user_id", "vocabulary_item_id"])
-        )
         event = VocabularyEncounter(
             id=uuid5(event_id, "vocabulary"),
             user_id=self.user_id,
@@ -798,35 +813,12 @@ class PostgresWorkflowRepository:
             encounter_type="introduced" if introduced else "practised",
             outcome=outcome,
         )
-        saved = c.execute(
-            upsert(vocabulary_encounters)
-            .values(**event.model_dump(by_alias=False))
-            .on_conflict_do_nothing(index_elements=["id"])
-            .returning(vocabulary_encounters.c.id)
-        ).scalar_one_or_none()
-        if saved:
-            values = dict(
-                status=case(
-                    (user_vocabulary_progress.c.status == "new", "learning"),
-                    else_=user_vocabulary_progress.c.status,
-                ),
-                exposure_count=user_vocabulary_progress.c.exposure_count + 1,
-                correct_attempt_count=user_vocabulary_progress.c.correct_attempt_count
-                + int(outcome == "correct"),
-                first_learned_at=func.coalesce(
-                    user_vocabulary_progress.c.first_learned_at, event.occurred_at
-                ),
-            )
-            if not introduced:
-                values["last_practised_at"] = event.occurred_at
-            c.execute(
-                update(user_vocabulary_progress)
-                .where(
-                    user_vocabulary_progress.c.user_id == self.user_id,
-                    user_vocabulary_progress.c.vocabulary_item_id == task.vocabulary_item_id,
-                )
-                .values(**values)
-            )
+        record_vocabulary_evidence(
+            c,
+            user_id=self.user_id,
+            vocabulary_item_id=task.vocabulary_item_id,
+            encounter=event,
+        )
 
     def task_action(self, task_id, action, request=None):
         with self.transaction() as c:
@@ -915,6 +907,15 @@ class PostgresWorkflowRepository:
                         },
                     )
                     c.execute(insert(task_attempts).values(**entity_values(attempt)))
+                    if correct is True and task.kind == "ispyRound":
+                        award(
+                            c,
+                            user_id=self.user_id,
+                            event_type="ispyCorrect",
+                            idempotency_key=f"attempt:{attempt.id}",
+                            language_profile_id=session.language_profile_id,
+                            session_id=task.session_id,
+                        )
                     self._encounter(
                         c,
                         task,
@@ -931,6 +932,15 @@ class PostgresWorkflowRepository:
                 c.execute(
                     update(session_tasks).where(session_tasks.c.id == task.id).values(**values)
                 )
+                if values["status"] == "completed":
+                    award(
+                        c,
+                        user_id=self.user_id,
+                        event_type="taskCompleted",
+                        idempotency_key=f"task:{task.id}",
+                        language_profile_id=session.language_profile_id,
+                        session_id=task.session_id,
+                    )
             tasks = self._tasks(c, task.session_id)
             return TaskActionResponse(
                 task=SessionTaskPublic.from_internal(next(t for t in tasks if t.id == task.id)),

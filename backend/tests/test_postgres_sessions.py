@@ -200,11 +200,12 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
         skip = f"/api/v1/tasks/{task['id']}/skip"
         assert client.post(skip, json={}).status_code == 200
         assert client.post(skip, json={}).status_code == 200
-    assert client.get("/api/v1/me/progress").json()["xp"] == 10
+    # XP ledger: 10 per completed task, 20 for finishing the session.
+    assert client.get("/api/v1/me/progress").json()["xp"] == 20
     assert client.post(endpoint + "/complete").status_code == 200
     assert client.post(endpoint + "/complete").status_code == 200
     summary = client.get(endpoint + "/summary").json()
-    assert summary["xpEarned"] == 10
+    assert summary["xpEarned"] == 40
     assert summary["ispyCorrectCount"] == summary["ispyAttemptCount"] == 0
     assert summary["progress"]["completedTaskCount"] == 2
     assert summary["progress"]["skippedTaskCount"] == 6
@@ -222,10 +223,11 @@ def test_skip_all_adds_no_learning_credit(database):
     for task in detail["tasks"]:
         assert client.post(f"/api/v1/tasks/{task['id']}/skip", json={}).status_code == 200
     assert client.post(f"/api/v1/sessions/{sid}/complete").status_code == 200
-    assert client.get("/api/v1/me/progress").json()["xp"] == 0
+    # Skipped tasks earn nothing; completing the session itself pays 20.
+    assert client.get("/api/v1/me/progress").json()["xp"] == 20
     assert client.get("/api/v1/me/vocabulary").json()["items"] == []
     summary = client.get(f"/api/v1/sessions/{sid}/summary").json()
-    assert summary["xpEarned"] == 0
+    assert summary["xpEarned"] == 20
     assert summary["ispyCorrectCount"] == summary["ispyAttemptCount"] == 0
 
 
@@ -441,9 +443,10 @@ def test_all_task_kinds_complete_with_server_evaluation(database):
         if kind == "grammarPractice":
             assert result.json()["attempt"]["isCorrect"] is False
     assert client.post(f"/api/v1/sessions/{sid}/complete").status_code == 200
-    assert client.get("/api/v1/me/progress").json()["xp"] == 30
+    # 8 completed tasks + correct I-Spy + session completion + a clean sweep bonus.
+    assert client.get("/api/v1/me/progress").json()["xp"] == 125
     summary = client.get(f"/api/v1/sessions/{sid}/summary").json()
-    assert summary["xpEarned"] == 30
+    assert summary["xpEarned"] == 125
     assert summary["ispyCorrectCount"] == summary["ispyAttemptCount"] == 1
     with engine.connect() as c:
         progress = (
@@ -461,7 +464,7 @@ def test_all_task_kinds_complete_with_server_evaluation(database):
     other = create_run(client, profile, "another-session-key")
     again = analyze(client, other["session"]["id"])
     assert {v["id"] for v in again["vocabulary"]} == {v["id"] for v in detail["vocabulary"]}
-    assert client.get("/api/v1/me/progress").json()["xp"] == 30
+    assert client.get("/api/v1/me/progress").json()["xp"] == 125
 
 
 def test_other_user_cannot_access_sessions_or_tasks(database, monkeypatch):

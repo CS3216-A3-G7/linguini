@@ -3,9 +3,10 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import AwareDatetime, Field, model_validator
 
-from app.schemas.base import ApiModel
+from app.schemas.base import ApiModel, EntityModel
+from app.schemas.enums import XpEventType
 
 
 class ScenarioProgress(ApiModel):
@@ -41,3 +42,13 @@ class ProgressResponse(ApiModel):
 class StoredProgress(ProgressResponse):
     language_code: str = "es"
     user_id: UUID
+
+
+class XpEvent(EntityModel):
+    user_id: UUID
+    language_profile_id: UUID | None = None
+    session_id: UUID | None = None
+    event_type: XpEventType
+    amount: Annotated[int, Field(ge=0)]
+    idempotency_key: Annotated[str, Field(min_length=1)]
+    occurred_at: AwareDatetime | None = None

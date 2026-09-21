@@ -9,6 +9,7 @@ from app.repositories.journals import (
     JournalRepository,
 )
 from app.repositories.media_assets import MediaAssetRepository, SessionImage
+from app.repositories.vocabulary import VocabularyRepository
 from app.schemas.base import utc_now
 from app.schemas.enums import JournalStatus, JournalSuggestionStatus, MediaSource, MediaType
 from app.schemas.journals import (
@@ -40,6 +41,7 @@ class JournalService:
         media: MediaAssetRepository | None = None,
         media_public_base_url: str | None = None,
         private_media_urls: PrivateMediaUrls | None = None,
+        vocabulary: VocabularyRepository | None = None,
     ) -> None:
         self.repository = repository
         self.users = users
@@ -47,6 +49,7 @@ class JournalService:
         self.media = media
         self.media_public_base_url = media_public_base_url
         self.private_media_urls = private_media_urls
+        self.vocabulary = vocabulary
 
     def _with_images(self, rows: list[JournalDetailResponse]) -> list[JournalDetailResponse]:
         covers = {
@@ -246,6 +249,16 @@ class JournalService:
                     )
                 )
 
+    def _record_usage(self, journal: Journal, user_id: UUID) -> None:
+        if self.vocabulary is not None:
+            self.vocabulary.record_journal_usage(
+                user_id=user_id,
+                language_profile_id=journal.language_profile_id,
+                journal_id=journal.id,
+                words=journal.selected_words,
+                occurred_at=utc_now(),
+            )
+
     def upsert_today(self, request: UpsertTodayJournalRequest) -> Journal:
         return self.upsert(request, None)
 
@@ -294,7 +307,9 @@ class JournalService:
                 self._set_cover(entry, request.media_asset_id)
             return entry.journal
 
-        return self.repository.change(change)
+        journal = self.repository.change(change)
+        self._record_usage(journal, user.id)
+        return journal
 
     def update(self, journal_id: UUID, request: UpdateJournalRequest) -> Journal:
         user = self.users.get_current_user()
@@ -326,7 +341,9 @@ class JournalService:
             entry.journal.updated_at = utc_now()
             return entry.journal
 
-        return self.repository.change(change)
+        journal = self.repository.change(change)
+        self._record_usage(journal, user.id)
+        return journal
 
     def add_revision(self, journal_id: UUID, content: str) -> JournalRevision:
         journal = self.update(journal_id, UpdateJournalRequest(content=content))
