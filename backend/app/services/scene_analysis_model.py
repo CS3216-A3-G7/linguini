@@ -51,6 +51,13 @@ class ModelSceneAnalyzer:
         self._client = client
         self._config = config
         self._json_schema = build_strict_json_schema(SceneAnalysisModelResult)
+        # The original provider contract does not request relation confidence;
+        # newer direct providers may still supply it for filtering.
+        relation_schema = self._json_schema["properties"]["relations"]["items"]
+        relation_schema["properties"].pop("confidenceScore", None)
+        relation_schema["required"] = [
+            field for field in relation_schema["required"] if field != "confidenceScore"
+        ]
 
     def analyze(self, image: VisionImage) -> SceneAnalysisModelResult:
         request = VisionModelRequest(

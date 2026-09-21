@@ -110,7 +110,11 @@ def model_result_to_domain(
             session_id=session.id,
             label=item.label,
             bounding_box=item.bounding_box.model_dump(),
-            attributes=item.attributes,
+            attributes=(
+                item.attributes
+                if isinstance(item.attributes, dict)
+                else {"description": ", ".join(item.attributes)}
+            ),
             confidence_score=item.confidence,
             source_object_key=item.key,
         )
