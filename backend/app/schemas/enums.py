@@ -111,6 +111,7 @@ class TaskPhase(StrEnum):
 class TaskKind(StrEnum):
     VOCABULARY_INTRODUCTION = "vocabularyIntroduction"
     PRONUNCIATION_PRACTICE = "pronunciationPractice"
+    GRAMMAR_LESSON = "grammarLesson"
     GRAMMAR_EXPLANATION = "grammarExplanation"
     GRAMMAR_PRACTICE = "grammarPractice"
     SYNTAX_EXPLANATION = "syntaxExplanation"

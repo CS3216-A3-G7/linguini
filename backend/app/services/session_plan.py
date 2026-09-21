@@ -175,6 +175,44 @@ def _with_article(text, translated_term):
     return f"{translated_term.article}{separator}{text}"
 
 
+def build_grammar_lessons(session_id, result):
+    """Turn generated grammar lessons into tasks; the caller assigns their order."""
+    return [
+        SessionTask(
+            id=uuid5(session_id, "learning-tasks-v1:" + lesson.focus),
+            session_id=session_id,
+            phase="learning",
+            kind="grammarLesson",
+            order_index=0,
+            public_content=dict(
+                kind="grammarLesson",
+                focus=lesson.focus,
+                title=lesson.title,
+                explanation=lesson.explanation,
+                questions=[
+                    dict(
+                        question_id=question.question_id,
+                        prompt=question.prompt,
+                        options=[
+                            dict(option_id=option.option_id, label=option.label)
+                            for option in question.options
+                        ],
+                        translation=question.translation,
+                    )
+                    for question in lesson.questions
+                ],
+            ),
+            answer_key=dict(
+                correct_option_ids={
+                    question.question_id: question.correct_option_id
+                    for question in lesson.questions
+                }
+            ),
+        )
+        for lesson in result.tasks
+    ]
+
+
 def build_tasks(session_id, objects, words, translations, uploaded, translated_scene=None):
     # Two sets choose different focus objects and context, with the same public contract.
     index = min(1, len(words) - 1) if uploaded else 0

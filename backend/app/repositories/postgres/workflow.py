@@ -48,8 +48,9 @@ from app.schemas.vocabulary import (
     VocabularyItem,
     VocabularyTranslation,
 )
+from app.services.learning_tasks import LearningTaskGenerationError
 from app.services.scene_analysis import DeterministicSceneAnalyzer, SceneAnalysisError
-from app.services.session_plan import bootstrap_word, build_tasks
+from app.services.session_plan import bootstrap_word, build_grammar_lessons, build_tasks
 
 TERMINAL = {"completed", "abandoned", "failed"}
 ALLOWED_TRANSITIONS = {
@@ -78,6 +79,22 @@ def task_progress(tasks):
     )
 
 
+def _learning_task_payload(translation_payload, translated_scene):
+    """Reuse the translator payload, carrying the target-language terms it produced."""
+    return {
+        "targetLanguage": translation_payload["targetLanguage"],
+        "sceneTitle": translation_payload["sceneTitle"],
+        "sceneSummary": translation_payload["sceneSummary"],
+        **{
+            field: [
+                term.model_dump(mode="json", by_alias=True, exclude_none=True)
+                for term in getattr(translated_scene, field)
+            ]
+            for field in ("objects", "attributes", "relationships")
+        },
+    }
+
+
 def parse_session(row):
     return Session.model_validate({k: row[k] for k in Session.model_fields})
 
@@ -99,10 +116,13 @@ def _stale_processing(status=None):
 
 
 class PostgresWorkflowRepository:
-    def __init__(self, engine, user_id, analyzer=None, translator=None):
+    def __init__(
+        self, engine, user_id, analyzer=None, translator=None, learning_task_generator=None
+    ):
         self.engine, self.user_id = engine, user_id
         self.analyzer = analyzer or DeterministicSceneAnalyzer(engine)
         self.translator = translator
+        self.learning_task_generator = learning_task_generator
 
     @contextmanager
     def transaction(self):
@@ -585,6 +605,18 @@ class PostgresWorkflowRepository:
             return {"available": True}
 
     def review(self, session_id, profile_id, request):
+        try:
+            return self._review(session_id, profile_id, request)
+        except LearningTaskGenerationError:
+            # The rolled-back review leaves the session un-planned; record why it stopped.
+            with self.transaction() as c:
+                current = self._session(c, session_id)
+                if current.status not in TERMINAL:
+                    self._transition(c, current, "failed", failure_code="taskGenerationFailed")
+            raise
+
+    def _review(self, session_id, profile_id, request):
+        lessons = []
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
             if session.status in TERMINAL:
@@ -717,6 +749,20 @@ class PostgresWorkflowRepository:
                     ],
                 }
                 translated_scene = self.translator.translate(payload)
+                if self.learning_task_generator:
+                    try:
+                        lessons = build_grammar_lessons(
+                            session_id,
+                            self.learning_task_generator.generate(
+                                _learning_task_payload(payload, translated_scene)
+                            ),
+                        )
+                    except LearningTaskGenerationError:
+                        raise
+                    except Exception as exc:
+                        raise LearningTaskGenerationError(
+                            "Learning tasks could not be built."
+                        ) from exc
                 translated_objects = {row.key: row for row in translated_scene.objects}
                 for obj in objects:
                     translated = translated_objects[str(obj.id)]
@@ -765,6 +811,13 @@ class PostgresWorkflowRepository:
                 False,
                 getattr(detail, "translation_preview", None),
             )
+            if lessons:
+                # Generated lessons replace the deterministic grammar/syntax/sentence tasks.
+                rebuilt = [
+                    *[task for task in rebuilt if task.kind == "vocabularyIntroduction"],
+                    *lessons,
+                    *[task for task in rebuilt if task.kind in {"ispyRound", "reflection"}],
+                ]
             for index, task in enumerate(rebuilt):
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
@@ -1025,6 +1078,7 @@ def evaluate(task, request):
         raise PracticeConflictError("This task is completed by reading it.")
     allowed = {
         "vocabularyIntroduction": {"vocabularyReview"},
+        "grammarLesson": {"vocabularyReview"},
         "pronunciationPractice": {"text"},
         "grammarPractice": {"text", "multipleChoice"},
         "sentenceBuilding": {"text"},
@@ -1046,7 +1100,7 @@ def evaluate(task, request):
             for question in task.public_content.questions
         }
         if set(request.answers) != set(offered_questions):
-            raise PracticeConflictError("Answer every vocabulary question once.")
+            raise PracticeConflictError("Answer every question in this lesson once.")
         if any(
             answer not in offered_questions[question_id]
             for question_id, answer in request.answers.items()

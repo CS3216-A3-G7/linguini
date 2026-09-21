@@ -247,6 +247,7 @@ export async function saveJournal(draft: JournalDraft, profileId: string, id?: s
 
 export type TaskContent =
   | { kind: "vocabularyIntroduction"; title: string; words: VocabularyLearningWord[]; questions: VocabularyQuestion[]; allowTypingPractice: boolean; targetText?: string | null; translation?: string | null; partOfSpeech?: WordClass | null; exampleSentence?: string | null }
+  | { kind: "grammarLesson"; focus: string; title: string; explanation: string; questions: GrammarLessonQuestion[] }
   | { kind: "pronunciationPractice"; prompt: string; targetText: string }
   | { kind: "grammarExplanation"; title: string; explanation: string; examples: string[] }
   | { kind: "grammarPractice"; prompt: string; options: string[] }
@@ -297,6 +298,7 @@ export interface VocabularyLearningWord {
   pronunciationAudioAssetId: string | null; exampleSentence: string | null;
 }
 export interface VocabularyQuestion { questionId: string; prompt: string; options: { optionId: string; label: string }[] }
+export interface GrammarLessonQuestion extends VocabularyQuestion { translation?: string | null }
 export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string } | { inputMode: "vocabularyReview"; answers: Record<string, string>; typedAnswers: Record<string, string> };
 export interface TaskActionResult {
   task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;

@@ -135,8 +135,13 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
     assert settled["session"]["status"] == "awaitingObjectReview"
     assert settled["sceneObjects"]
     detail = analyze(client, sid)
-    assert len(detail["tasks"]) == len(TaskKind)
-    assert {t["kind"] for t in detail["tasks"]} == {k.value for k in TaskKind}
+    # Without a learning-task generator the plan is the deterministic fallback.
+    planned = {kind.value for kind in TaskKind} - {
+        TaskKind.PRONUNCIATION_PRACTICE.value,
+        TaskKind.GRAMMAR_LESSON.value,
+    }
+    assert len(detail["tasks"]) == len(planned)
+    assert {t["kind"] for t in detail["tasks"]} == planned
     assert all(o["vocabularyItemId"] for o in detail["sceneObjects"])
     assert "answerKey" not in str(detail) and "demoState" not in detail
     assert client.get("/api/v1/me/progress").json()["xp"] == 0
