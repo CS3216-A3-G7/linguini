@@ -26,6 +26,7 @@ from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
 from app.repositories.scenes import SceneRepository
 from app.repositories.users import UserRepository
+from app.services.gemini_learning_tasks import GeminiLearningTaskGenerator
 from app.services.gemini_scene_analysis import GeminiSceneAnalyzer, RoutedSceneAnalyzer
 from app.services.gemini_translation import GeminiSceneTranslator
 from app.services.image_storage import ImageStorage
@@ -33,6 +34,7 @@ from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
+from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
 from app.services.openai_scene_analysis import OpenAISceneAnalyzer
 from app.services.openai_translation import OpenAISceneTranslator
 from app.services.practice import PracticeService
@@ -203,8 +205,41 @@ def get_practice_repository(
         )
     else:
         raise ValueError(f"Unsupported TRANSLATION_PROVIDER: {translation_provider}")
+
+    learning_task_provider = os.getenv("LEARNING_TASK_PROVIDER", "openai").strip().casefold()
+    learning_task_timeout = int(os.getenv("LEARNING_TASK_TIMEOUT_SECONDS", "60"))
+    if learning_task_provider == "openai":
+        openai_learning_model = os.getenv("OPENAI_LEARNING_TASK_MODEL", "gpt-4o-mini").strip()
+        learning_task_generator = (
+            OpenAILearningTaskGenerator(
+                openai_key,
+                openai_learning_model,
+                timeout_seconds=learning_task_timeout,
+            )
+            if openai_key and openai_learning_model
+            else None
+        )
+    elif learning_task_provider == "gemini":
+        gemini_learning_model = os.getenv(
+            "GEMINI_LEARNING_TASK_MODEL", "gemini-3.5-flash-lite"
+        ).strip()
+        learning_task_generator = (
+            GeminiLearningTaskGenerator(
+                gemini_key,
+                gemini_learning_model,
+                timeout_seconds=learning_task_timeout,
+            )
+            if gemini_key and gemini_learning_model
+            else None
+        )
+    else:
+        raise ValueError(f"Unsupported LEARNING_TASK_PROVIDER: {learning_task_provider}")
     return PostgresWorkflowRepository(
-        engine, demo_user_id, analyzer=analyzer, translator=translator
+        engine,
+        demo_user_id,
+        analyzer=analyzer,
+        translator=translator,
+        learning_task_generator=learning_task_generator,
     )
 
 

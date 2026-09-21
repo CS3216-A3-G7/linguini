@@ -73,14 +73,19 @@ class VocabularyIntroductionContent(ApiModel):
         raise ValueError("vocabulary introduction requires grouped words or legacy word fields")
 
 
-class PronunciationPracticeContent(ApiModel):
-    kind: Literal["pronunciationPractice"] = "pronunciationPractice"
-    vocabulary_item_id: UUID
+class GrammarLessonQuestion(ApiModel):
+    question_id: NonEmptyText
     prompt: NonEmptyText
-    target_text: NonEmptyText
-    phonetic_text: str | None = None
-    reference_audio_asset_id: UUID | None = None
-    allow_text_fallback: bool = True
+    options: Annotated[list[VocabularyChoice], Field(min_length=2)]
+    translation: str | None = None
+
+
+class GrammarLessonContent(ApiModel):
+    kind: Literal["grammarLesson"] = "grammarLesson"
+    focus: NonEmptyText
+    title: NonEmptyText
+    explanation: NonEmptyText
+    questions: Annotated[list[GrammarLessonQuestion], Field(min_length=1)]
 
 
 class GrammarExplanationContent(ApiModel):
@@ -144,7 +149,7 @@ class ReflectionContent(ApiModel):
 
 type TaskPublicContent = Annotated[
     VocabularyIntroductionContent
-    | PronunciationPracticeContent
+    | GrammarLessonContent
     | GrammarExplanationContent
     | GrammarPracticeContent
     | SyntaxExplanationContent

@@ -82,6 +82,17 @@ def create_run(client, profile, key="session-key-1"):
     return response.json()
 
 
+def vocabulary_answer(content, correct=True):
+    """Grouped lessons are answered in one attempt covering every question."""
+    return {
+        "inputMode": "vocabularyReview",
+        "answers": {
+            question["questionId"]: question["options"][0 if correct else -1]["optionId"]
+            for question in content["questions"]
+        },
+    }
+
+
 def analyze(client, sid, confirm=True):
     response = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert response.status_code == 200, response.text
@@ -135,29 +146,21 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
     assert settled["session"]["status"] == "awaitingObjectReview"
     assert settled["sceneObjects"]
     detail = analyze(client, sid)
-    assert len(detail["tasks"]) == len(TaskKind)
-    assert {t["kind"] for t in detail["tasks"]} == {k.value for k in TaskKind}
+    # Without a learning-task generator the plan is the deterministic fallback.
+    planned = {kind.value for kind in TaskKind} - {TaskKind.GRAMMAR_LESSON.value}
+    assert len(detail["tasks"]) == len(planned)
+    assert {t["kind"] for t in detail["tasks"]} == planned
     assert all(o["vocabularyItemId"] for o in detail["sceneObjects"])
     assert "answerKey" not in str(detail) and "demoState" not in detail
     assert client.get("/api/v1/me/progress").json()["xp"] == 0
     assert client.post(endpoint + "/complete").status_code == 409
     tasks = detail["tasks"]
-    intro = tasks[0]["id"]
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        completed = list(
-            pool.map(lambda _: client.post(f"/api/v1/tasks/{intro}/complete"), range(4))
-        )
-    assert all(r.status_code == 200 for r in completed)
-    pronunciation = tasks[1]
-    answer = {
-        "inputMode": "text",
-        "text": pronunciation["publicContent"]["targetText"],
-        "idempotencyKey": "same-attempt-key",
-    }
+    intro = tasks[0]
+    answer = vocabulary_answer(intro["publicContent"]) | {"idempotencyKey": "same-attempt-key"}
     with ThreadPoolExecutor(max_workers=4) as pool:
         evaluated = list(
             pool.map(
-                lambda _: client.post(f"/api/v1/tasks/{pronunciation['id']}/attempts", json=answer),
+                lambda _: client.post(f"/api/v1/tasks/{intro['id']}/attempts", json=answer),
                 range(4),
             )
         )
@@ -165,7 +168,8 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
     assert len({r.json()["attempt"]["id"] for r in evaluated}) == 1
     assert (
         client.post(
-            f"/api/v1/tasks/{pronunciation['id']}/attempts", json=answer | {"text": "different"}
+            f"/api/v1/tasks/{intro['id']}/attempts",
+            json=answer | vocabulary_answer(intro["publicContent"], correct=False),
         ).status_code
         == 409
     )
@@ -174,7 +178,7 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
             c.execute(
                 select(func.count())
                 .select_from(task_attempts)
-                .where(task_attempts.c.session_task_id == UUID(pronunciation["id"]))
+                .where(task_attempts.c.session_task_id == UUID(intro["id"]))
             ).scalar_one()
             == 1
         )
@@ -185,7 +189,7 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
             .mappings()
             .all()
         )
-        assert len(events) == 2
+        assert len(events) == 1
         progress = (
             c.execute(
                 select(user_vocabulary_progress).where(
@@ -195,22 +199,22 @@ def test_normalized_workflow_and_idempotent_progress(database, source):
             .mappings()
             .one()
         )
-        assert progress["exposure_count"] == 2 and progress["correct_attempt_count"] == 1
-    for task in tasks[2:]:
+        assert progress["exposure_count"] == 1 and progress["correct_attempt_count"] == 1
+    for task in tasks[1:]:
         skip = f"/api/v1/tasks/{task['id']}/skip"
         assert client.post(skip, json={}).status_code == 200
         assert client.post(skip, json={}).status_code == 200
-    # XP ledger: 10 per completed task, 20 for finishing the session.
-    assert client.get("/api/v1/me/progress").json()["xp"] == 20
+    # One completed task earns 10 XP; completing the session adds 20 XP.
+    assert client.get("/api/v1/me/progress").json()["xp"] == 10
     assert client.post(endpoint + "/complete").status_code == 200
     assert client.post(endpoint + "/complete").status_code == 200
     summary = client.get(endpoint + "/summary").json()
-    assert summary["xpEarned"] == 40
+    assert summary["xpEarned"] == 30
     assert summary["ispyCorrectCount"] == summary["ispyAttemptCount"] == 0
-    assert summary["progress"]["completedTaskCount"] == 2
+    assert summary["progress"]["completedTaskCount"] == 1
     assert summary["progress"]["skippedTaskCount"] == 6
     assert len(summary["learnedVocabularyIds"]) == 1
-    assert client.post(f"/api/v1/tasks/{intro}/skip", json={}).status_code == 409
+    assert client.post(f"/api/v1/tasks/{intro['id']}/skip", json={}).status_code == 409
     with TestClient(create_app()) as restarted:
         assert restarted.get(endpoint).json()["progress"] == summary["progress"]
     assert PostgresWorkflowRepository(engine, uuid4()).active(profile.id) is None
@@ -239,23 +243,24 @@ def test_task_updates_roll_back_with_encounter_failure(database, monkeypatch):
     def fail(*args, **kwargs):
         raise RuntimeError("Simulated progress write failure")
 
+    intro = detail["tasks"][0]
     with monkeypatch.context() as patcher:
         patcher.setattr(PostgresWorkflowRepository, "_encounter", fail)
         with pytest.raises(RuntimeError):
             client.post(
-                f"/api/v1/tasks/{detail['tasks'][1]['id']}/attempts",
-                json={"inputMode": "text", "text": "test"},
+                f"/api/v1/tasks/{intro['id']}/attempts",
+                json=vocabulary_answer(intro["publicContent"]),
             )
     with engine.connect() as c:
         assert (
             c.execute(
                 select(func.count())
                 .select_from(task_attempts)
-                .where(task_attempts.c.session_task_id == UUID(detail["tasks"][1]["id"]))
+                .where(task_attempts.c.session_task_id == UUID(intro["id"]))
             ).scalar_one()
             == 0
         )
-    assert client.get(f"/api/v1/sessions/{sid}").json()["tasks"][1]["status"] == "pending"
+    assert client.get(f"/api/v1/sessions/{sid}").json()["tasks"][0]["status"] == "pending"
 
 
 def upload_asset(engine, owner):
@@ -417,14 +422,8 @@ def test_all_task_kinds_complete_with_server_evaluation(database):
             result = client.post(endpoint + "/complete")
         else:
             assert client.post(endpoint + "/complete").status_code == 409
-            if kind == "vocabularyIntroduction":
-                answer = {
-                    "inputMode": "vocabularyReview",
-                    "answers": {
-                        question["questionId"]: question["options"][0]["optionId"]
-                        for question in content["questions"]
-                    },
-                }
+            if kind in {"vocabularyIntroduction", "grammarLesson"}:
+                answer = vocabulary_answer(content)
             elif kind == "ispyRound":
                 with engine.connect() as c:
                     key = c.execute(
@@ -451,10 +450,11 @@ def test_all_task_kinds_complete_with_server_evaluation(database):
         if kind == "grammarPractice":
             assert result.json()["attempt"]["isCorrect"] is False
     assert client.post(f"/api/v1/sessions/{sid}/complete").status_code == 200
-    # 8 completed tasks + correct I-Spy + session completion + a clean sweep bonus.
-    assert client.get("/api/v1/me/progress").json()["xp"] == 125
+    # 7 completed tasks + correct I-Spy + session completion + clean sweep bonus:
+    # 7*10 + 15 + 20 + 10 = 115 XP.
+    assert client.get("/api/v1/me/progress").json()["xp"] == 115
     summary = client.get(f"/api/v1/sessions/{sid}/summary").json()
-    assert summary["xpEarned"] == 125
+    assert summary["xpEarned"] == 115
     assert summary["ispyCorrectCount"] == summary["ispyAttemptCount"] == 1
     with engine.connect() as c:
         progress = (
@@ -466,13 +466,13 @@ def test_all_task_kinds_complete_with_server_evaluation(database):
             .mappings()
             .one()
         )
-        assert progress["exposure_count"] == 6
+        assert progress["exposure_count"] == 5
         assert progress["correct_attempt_count"] == 3
     # Planning another session reuses vocabulary and does not credit exposure.
     other = create_run(client, profile, "another-session-key")
     again = analyze(client, other["session"]["id"])
     assert {v["id"] for v in again["vocabulary"]} == {v["id"] for v in detail["vocabulary"]}
-    assert client.get("/api/v1/me/progress").json()["xp"] == 125
+    assert client.get("/api/v1/me/progress").json()["xp"] == 115
 
 
 def test_other_user_cannot_access_sessions_or_tasks(database, monkeypatch):
@@ -539,14 +539,20 @@ def test_review_rejects_adds_and_rebuilds_without_duplicate_objects(database):
     assert relation["referenceSceneObjectId"] in {obj["id"] for obj in selected}
     assert relation["referenceSceneObjectId"] != payload["addedObjects"][0]["id"]
     assert any(obj["label"] == detail["sceneObjects"][1]["label"] for obj in selected)
-    assert all(task["sceneObjectId"] in {obj["id"] for obj in selected} for task in saved["tasks"])
+    assert all(
+        task["sceneObjectId"] in {obj["id"] for obj in selected}
+        for task in saved["tasks"]
+        if task["sceneObjectId"]
+    )
+    # The grouped introduction covers every accepted object in one task.
     introductions = [task for task in saved["tasks"] if task["kind"] == "vocabularyIntroduction"]
-    assert len(introductions) == 2
+    assert len(introductions) == 1
+    assert len(introductions[0]["publicContent"]["words"]) == 2
     retry = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
     assert retry.status_code == 200, retry.text
     assert len(retry.json()["sceneObjects"]) == len(saved["sceneObjects"])
     assert retry.json()["sceneObjectRelations"] == saved["sceneObjectRelations"]
-    task_id = introductions[0]["id"]
+    task_id = next(task["id"] for task in saved["tasks"] if task["kind"] == "grammarExplanation")
     assert client.post(f"/api/v1/tasks/{task_id}/complete", json={}).status_code == 200
     assert client.put(f"/api/v1/sessions/{sid}/review", json=payload).status_code == 409
     persisted = client.get(f"/api/v1/sessions/{sid}").json()

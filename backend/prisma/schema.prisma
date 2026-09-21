@@ -330,7 +330,7 @@ model TaskAttempt {
   sessionTaskId     String @map("session_task_id") @db.Uuid
   sessionTask       SessionTask @relation(fields: [sessionTaskId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   attemptNumber     Int @map("attempt_number")
-  inputMode         String @map("input_mode") @db.VarChar(15)
+  inputMode         String @map("input_mode") @db.VarChar(16)
   responsePayload   Json @map("response_payload") @db.JsonB
   audioMediaAssetId String? @map("audio_media_asset_id") @db.Uuid
   audioMediaAsset   MediaAsset? @relation(fields: [audioMediaAssetId], references: [id], onDelete: Restrict, onUpdate: Cascade)

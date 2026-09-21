@@ -15,7 +15,7 @@ export function taskTitle(task: SessionTask) {
   const content = task.publicContent;
   if ("title" in content) return content.title;
   const labels: Partial<Record<SessionTask["kind"], string>> = {
-    pronunciationPractice: "Practise pronunciation", grammarPractice: "Practise grammar",
+    grammarPractice: "Practise grammar",
     sentenceBuilding: "Build a sentence", ispyRound: "Linguini clues", reflection: "Your reflection",
   };
   return labels[task.kind] ?? "Practise";
