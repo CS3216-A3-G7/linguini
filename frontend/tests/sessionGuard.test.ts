@@ -68,13 +68,12 @@ const requests: string[] = [];
 
 globals.fetch = async (input: unknown) => {
   const url = typeof input === "string" ? input : (input as Request).url;
-  const path = url.replace(/^https?:\/\/[^/]+/, "");
-  requests.push(path);
-  if (path === `/api/v1/sessions/${SESSION_ID}`) return Response.json(fixture);
-  if (path === "/api/v1/media/asset") {
+  const key = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
+  requests.push(key);
+  if (key === `/api/v1/sessions/${SESSION_ID}`) return Response.json(fixture);
+  if (key === "/api/v1/media/asset") {
     return Response.json({ id: "asset", signedUrl: "http://test.local/img.jpg", mimeType: "image/jpeg", width: 100, height: 100 });
   }
-  const key = path.split("?")[0];
   if (key in apiFixtures) return Response.json(apiFixtures[key]);
   return new Response("not found", { status: 404 });
 };
