@@ -11,6 +11,7 @@ from app.schemas.base import ApiModel, JsonObject
 from app.schemas.enums import SessionFailureCode, SessionStatus
 from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.tasks import SessionProgress, SessionTaskPublic
+from app.schemas.translation import SceneTranslationResult
 from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
 
 
@@ -107,6 +108,7 @@ class SessionDetailResponse(ApiModel):
     title: str
     vocabulary: list[VocabularyItem] = Field(default_factory=list)
     translations: list[VocabularyTranslation] = Field(default_factory=list)
+    translation_preview: SceneTranslationResult | None = None
     session: Session
     scene_object_relations: list[SceneObjectRelation] = Field(default_factory=list)
     scene_objects: list[SceneObject] = Field(default_factory=list)

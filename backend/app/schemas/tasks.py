@@ -18,10 +18,11 @@ from app.schemas.enums import (
 )
 
 
-class VocabularyIntroductionContent(ApiModel):
-    kind: Literal["vocabularyIntroduction"] = "vocabularyIntroduction"
-    title: NonEmptyText
-    vocabulary_item_id: UUID
+class VocabularyLearningWord(ApiModel):
+    learning_key: str | None = None
+    term_type: Literal["object", "attribute", "relationship"] = "object"
+    vocabulary_item_id: UUID | None = None
+    scene_object_id: UUID | None = None
     target_text: NonEmptyText
     translation: NonEmptyText
     part_of_speech: PartOfSpeech
@@ -30,6 +31,46 @@ class VocabularyIntroductionContent(ApiModel):
     phonetic_text: str | None = None
     pronunciation_audio_asset_id: UUID | None = None
     example_sentence: str | None = None
+
+
+class VocabularyChoice(ApiModel):
+    option_id: NonEmptyText
+    label: NonEmptyText
+
+
+class VocabularyQuestion(ApiModel):
+    question_id: NonEmptyText
+    prompt: NonEmptyText
+    options: Annotated[list[VocabularyChoice], Field(min_length=2)]
+
+
+class VocabularyIntroductionContent(ApiModel):
+    kind: Literal["vocabularyIntroduction"] = "vocabularyIntroduction"
+    title: NonEmptyText
+    words: list[VocabularyLearningWord] = Field(default_factory=list)
+    questions: list[VocabularyQuestion] = Field(default_factory=list)
+    allow_typing_practice: bool = True
+    # Kept temporarily so active sessions created before the grouped lesson remain readable.
+    vocabulary_item_id: UUID | None = None
+    target_text: str | None = None
+    translation: str | None = None
+    part_of_speech: PartOfSpeech | None = None
+    gender: str | None = None
+    example_sentence: str | None = None
+
+    @model_validator(mode="after")
+    def validate_words(self) -> VocabularyIntroductionContent:
+        if self.words and self.questions:
+            return self
+        legacy_fields = (
+            self.vocabulary_item_id,
+            self.target_text,
+            self.translation,
+            self.part_of_speech,
+        )
+        if all(legacy_fields):
+            return self
+        raise ValueError("vocabulary introduction requires grouped words or legacy word fields")
 
 
 class PronunciationPracticeContent(ApiModel):
@@ -123,6 +164,8 @@ class TaskAnswerKey(ApiModel):
     expected_token_order: list[NonEmptyText] = Field(default_factory=list)
     reference_text: str | None = None
     evaluation_notes: str | None = None
+    correct_option_ids: dict[str, str] = Field(default_factory=dict)
+    accepted_text_answers_by_vocabulary_id: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class SessionTask(EntityModel):
@@ -234,11 +277,25 @@ class SubmitMultipleChoiceAttemptRequest(ApiModel):
     idempotency_key: Annotated[str, Field(min_length=8, max_length=200)] | None = None
 
 
+class SubmitVocabularyReviewAttemptRequest(ApiModel):
+    input_mode: Literal["vocabularyReview"] = "vocabularyReview"
+    answers: dict[str, NonEmptyText]
+    typed_answers: dict[str, str] = Field(default_factory=dict)
+    idempotency_key: Annotated[str, Field(min_length=8, max_length=200)] | None = None
+
+    @model_validator(mode="after")
+    def validate_answers(self) -> SubmitVocabularyReviewAttemptRequest:
+        if not self.answers:
+            raise ValueError("answers cannot be empty")
+        return self
+
+
 type SubmitTaskAttemptRequest = Annotated[
     SubmitTextAttemptRequest
     | SubmitSpeechAttemptRequest
     | SubmitObjectSelectionAttemptRequest
-    | SubmitMultipleChoiceAttemptRequest,
+    | SubmitMultipleChoiceAttemptRequest
+    | SubmitVocabularyReviewAttemptRequest,
     Field(discriminator="input_mode"),
 ]
 

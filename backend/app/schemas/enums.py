@@ -131,6 +131,7 @@ class AttemptInputMode(StrEnum):
     TEXT = "text"
     OBJECT_SELECTION = "objectSelection"
     MULTIPLE_CHOICE = "multipleChoice"
+    VOCABULARY_REVIEW = "vocabularyReview"
 
 
 class ISpyInteractionMode(StrEnum):

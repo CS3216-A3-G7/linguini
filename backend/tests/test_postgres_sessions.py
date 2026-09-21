@@ -411,11 +411,19 @@ def test_all_task_kinds_complete_with_server_evaluation(database):
         assert client.post(endpoint + "/start").status_code == 200
         content = task["publicContent"]
         kind = task["kind"]
-        if kind in {"vocabularyIntroduction", "grammarExplanation", "syntaxExplanation"}:
+        if kind in {"grammarExplanation", "syntaxExplanation"}:
             result = client.post(endpoint + "/complete")
         else:
             assert client.post(endpoint + "/complete").status_code == 409
-            if kind == "ispyRound":
+            if kind == "vocabularyIntroduction":
+                answer = {
+                    "inputMode": "vocabularyReview",
+                    "answers": {
+                        question["questionId"]: question["options"][0]["optionId"]
+                        for question in content["questions"]
+                    },
+                }
+            elif kind == "ispyRound":
                 with engine.connect() as c:
                     key = c.execute(
                         select(session_tasks.c.answer_key).where(
@@ -441,9 +449,9 @@ def test_all_task_kinds_complete_with_server_evaluation(database):
         if kind == "grammarPractice":
             assert result.json()["attempt"]["isCorrect"] is False
     assert client.post(f"/api/v1/sessions/{sid}/complete").status_code == 200
-    assert client.get("/api/v1/me/progress").json()["xp"] == 30
+    assert client.get("/api/v1/me/progress").json()["xp"] == 35
     summary = client.get(f"/api/v1/sessions/{sid}/summary").json()
-    assert summary["xpEarned"] == 30
+    assert summary["xpEarned"] == 35
     assert summary["ispyCorrectCount"] == summary["ispyAttemptCount"] == 1
     with engine.connect() as c:
         progress = (

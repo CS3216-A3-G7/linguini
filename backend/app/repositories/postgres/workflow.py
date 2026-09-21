@@ -49,7 +49,7 @@ from app.schemas.vocabulary import (
     VocabularyTranslation,
 )
 from app.services.scene_analysis import DeterministicSceneAnalyzer, SceneAnalysisError
-from app.services.session_plan import build_tasks
+from app.services.session_plan import bootstrap_word, build_tasks
 
 TERMINAL = {"completed", "abandoned", "failed"}
 ALLOWED_TRANSITIONS = {
@@ -99,9 +99,10 @@ def _stale_processing(status=None):
 
 
 class PostgresWorkflowRepository:
-    def __init__(self, engine, user_id, analyzer=None):
+    def __init__(self, engine, user_id, analyzer=None, translator=None):
         self.engine, self.user_id = engine, user_id
         self.analyzer = analyzer or DeterministicSceneAnalyzer(engine)
+        self.translator = translator
 
     @contextmanager
     def transaction(self):
@@ -292,6 +293,7 @@ class PostgresWorkflowRepository:
             scene_object_relations=relations,
             vocabulary=words,
             translations=translations,
+            translation_preview=(draft or {}).get("translationPreview"),
             tasks=[SessionTaskPublic.from_internal(t) for t in tasks],
             progress=task_progress(tasks),
             next_task_id=next(
@@ -692,6 +694,59 @@ class PostgresWorkflowRepository:
                 session = self._transition(c, session, "generatingTasks")
             detail = self._detail(c, session)
             objects = [obj for obj in detail.scene_objects if obj.id in accepted]
+            if self.translator:
+                payload = {
+                    "targetLanguage": profile["target_language_code"],
+                    "sceneTitle": session.session_title or detail.title,
+                    "sceneSummary": session.session_summary or "Confirmed scene vocabulary.",
+                    "objects": [
+                        {"key": str(obj.id), "source": obj.label} for obj in objects
+                    ],
+                    "attributes": [
+                        {
+                            "key": f"{obj.id}:{attribute_type}",
+                            "source": value,
+                        }
+                        for obj in objects
+                        for attribute_type, value in (obj.attributes or {}).items()
+                        if isinstance(value, str) and value.strip()
+                    ],
+                    "relationships": [
+                        {"key": str(row.id), "source": row.relation}
+                        for row in detail.scene_object_relations
+                    ],
+                }
+                translated_scene = self.translator.translate(payload)
+                translated_objects = {row.key: row for row in translated_scene.objects}
+                for obj in objects:
+                    translated = translated_objects[str(obj.id)]
+                    word, _source_translation = bootstrap_word(
+                        c,
+                        profile["target_language_code"],
+                        profile["source_language_code"],
+                        translated.translation,
+                        obj.label,
+                        gender=translated.gender,
+                    )
+                    c.execute(
+                        update(scene_objects)
+                        .where(scene_objects.c.id == obj.id)
+                        .values(vocabulary_item_id=word.id)
+                    )
+                draft = {
+                    **(session.analysis_draft or {}),
+                    "translationPreview": translated_scene.model_dump(
+                        mode="json", by_alias=True
+                    ),
+                }
+                c.execute(
+                    update(sessions)
+                    .where(sessions.c.id == session.id)
+                    .values(analysis_draft=draft)
+                )
+                session = session.model_copy(update={"analysis_draft": draft})
+                detail = self._detail(c, session)
+                objects = [obj for obj in detail.scene_objects if obj.id in accepted]
             words_by_id = {word.id: word for word in detail.vocabulary}
             translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
             if any(
@@ -702,16 +757,14 @@ class PostgresWorkflowRepository:
                 raise PracticeConflictError("Every selected object needs a word and translation.")
             words = [words_by_id[obj.vocabulary_item_id] for obj in objects]
             translations = [translations_by_id[obj.vocabulary_item_id] for obj in objects]
-            rebuilt = build_tasks(session_id, objects, words, translations, False)
-            # Every kept object gets vocabulary and pronunciation practice, not just the first.
-            extra = []
-            for obj, word, translation in zip(
-                objects[1:], words[1:], translations[1:], strict=True
-            ):
-                for task in build_tasks(session_id, [obj], [word], [translation], False)[:2]:
-                    task.id = uuid5(obj.id, "review:" + task.kind.value)
-                    extra.append(task)
-            rebuilt = rebuilt[:2] + extra + rebuilt[2:]
+            rebuilt = build_tasks(
+                session_id,
+                objects,
+                words,
+                translations,
+                False,
+                getattr(detail, "translation_preview", None),
+            )
             for index, task in enumerate(rebuilt):
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
@@ -781,11 +834,14 @@ class PostgresWorkflowRepository:
             "ispy_attempt_count": sum(outcome is not None for outcome in outcomes),
         }
 
-    def _encounter(self, c, task, event_id, outcome, introduced=False):
-        if not task.vocabulary_item_id:
+    def _encounter(
+        self, c, task, event_id, outcome, introduced=False, vocabulary_item_id=None
+    ):
+        vocabulary_item_id = vocabulary_item_id or task.vocabulary_item_id
+        if not vocabulary_item_id:
             return
         initial = UserVocabularyProgress(
-            user_id=self.user_id, vocabulary_item_id=task.vocabulary_item_id
+            user_id=self.user_id, vocabulary_item_id=vocabulary_item_id
         )
         c.execute(
             upsert(user_vocabulary_progress)
@@ -793,9 +849,12 @@ class PostgresWorkflowRepository:
             .on_conflict_do_nothing(index_elements=["user_id", "vocabulary_item_id"])
         )
         event = VocabularyEncounter(
-            id=uuid5(event_id, "vocabulary"),
+            id=uuid5(
+                event_id,
+                "vocabulary" if task.vocabulary_item_id else f"vocabulary:{vocabulary_item_id}",
+            ),
             user_id=self.user_id,
-            vocabulary_item_id=task.vocabulary_item_id,
+            vocabulary_item_id=vocabulary_item_id,
             session_id=task.session_id,
             session_task_id=task.id,
             encounter_type="introduced" if introduced else "practised",
@@ -826,7 +885,7 @@ class PostgresWorkflowRepository:
                 update(user_vocabulary_progress)
                 .where(
                     user_vocabulary_progress.c.user_id == self.user_id,
-                    user_vocabulary_progress.c.vocabulary_item_id == task.vocabulary_item_id,
+                    user_vocabulary_progress.c.vocabulary_item_id == vocabulary_item_id,
                 )
                 .values(**values)
             )
@@ -888,7 +947,9 @@ class PostgresWorkflowRepository:
                         status="skipped", skipped_at=utc_now(), skip_reason=request.reason
                     )
                 elif action == "complete":
-                    if task.kind not in READ_TASKS:
+                    if task.kind not in READ_TASKS or (
+                        task.kind == "vocabularyIntroduction" and task.public_content.words
+                    ):
                         raise PracticeConflictError("Submit an answer or skip this task.")
                     values = dict(
                         status="completed",
@@ -924,6 +985,16 @@ class PostgresWorkflowRepository:
                         attempt.id,
                         "completed" if correct is None else ("correct" if correct else "incorrect"),
                     )
+                    if task.kind == "vocabularyIntroduction" and task.public_content.words:
+                        for learning_word in task.public_content.words:
+                            self._encounter(
+                                c,
+                                task,
+                                attempt.id,
+                                "correct" if correct else "incorrect",
+                                introduced=True,
+                                vocabulary_item_id=learning_word.vocabulary_item_id,
+                            )
                     values = dict(
                         status="completed",
                         completed_at=utc_now(),
@@ -948,9 +1019,12 @@ class PostgresWorkflowRepository:
 def evaluate(task, request):
     """Small deterministic evaluator; never accepts client scores or answer keys."""
     mode = request.input_mode
-    if task.kind in READ_TASKS:
+    if task.kind in READ_TASKS and not (
+        task.kind == "vocabularyIntroduction" and mode == "vocabularyReview"
+    ):
         raise PracticeConflictError("This task is completed by reading it.")
     allowed = {
+        "vocabularyIntroduction": {"vocabularyReview"},
         "pronunciationPractice": {"text"},
         "grammarPractice": {"text", "multipleChoice"},
         "sentenceBuilding": {"text"},
@@ -966,6 +1040,26 @@ def evaluate(task, request):
     key = task.answer_key
     if key is None:
         raise PracticeConflictError("Task has no evaluation key.")
+    if mode == "vocabularyReview":
+        offered_questions = {
+            question.question_id: {option.option_id for option in question.options}
+            for question in task.public_content.questions
+        }
+        if set(request.answers) != set(offered_questions):
+            raise PracticeConflictError("Answer every vocabulary question once.")
+        if any(
+            answer not in offered_questions[question_id]
+            for question_id, answer in request.answers.items()
+        ):
+            raise PracticeConflictError("Select only choices offered by this lesson.")
+        if not set(request.typed_answers).issubset(
+            key.accepted_text_answers_by_vocabulary_id
+        ):
+            raise PracticeConflictError("Typing practice contains an unknown word.")
+        return all(
+            answer == key.correct_option_ids.get(question_id)
+            for question_id, answer in request.answers.items()
+        )
     if mode == "objectSelection":
         if request.scene_object_id not in {o.scene_object_id for o in task.public_content.options}:
             raise PracticeConflictError("Select an object offered by this task.")
