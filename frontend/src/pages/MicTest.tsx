@@ -4,14 +4,13 @@ import { Button } from "../components/ui";
 import { ArrowRightIcon, MicIcon } from "../components/icons";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
-import { startSession } from "../lib/api";
 
 type MicState = "idle" | "listening" | "working" | "unavailable";
 
 export function MicTest() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { setMicReady, learner } = useAppState();
+  const { setMicReady, learner, beginSession } = useAppState();
   const [state, setState] = useState<MicState>(learner.micOn ? "idle" : "unavailable");
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -103,7 +102,7 @@ export function MicTest() {
         block
         disabled={state === "idle" || state === "listening"}
         onClick={async () => {
-          if (scene.sessionId) await startSession(scene.sessionId).catch(() => {});
+          if (scene.sessionId) await beginSession(scene.sessionId).catch(() => {});
           navigate(`/practice/sessions/${scene.sessionId}/learn`);
         }}
       >

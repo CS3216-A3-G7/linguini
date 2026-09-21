@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
+import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, startPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
@@ -67,6 +67,12 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save task. Retry your action."); return null; }
     finally { busy.current = false; setSaving(false); }
   }, [session, onLearningChanged]);
+  const beginSession = useCallback(async (id: string) => {
+    await startPractice(id);
+    const detail = await getPractice(id);
+    setSession(detail);
+    return detail;
+  }, []);
   const completeSession = useCallback(async () => {
     if (!session || busy.current) return false;
     busy.current = true; setSaving(true); setError(null);
@@ -92,5 +98,5 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       return false;
     } finally { busy.current = false; setSaving(false); }
   }, [session]);
-  return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, retryProcessing, actOnTask, completeSession, saveReview, micReady, setMicReady };
+  return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, retryProcessing, actOnTask, beginSession, completeSession, saveReview, micReady, setMicReady };
 }
