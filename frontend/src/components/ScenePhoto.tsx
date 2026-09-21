@@ -48,7 +48,7 @@ export function ScenePhoto({
       tabIndex={onLocationSelect ? 0 : undefined}
       aria-label={onLocationSelect ? locationLabel ?? "Choose a location in the scene" : undefined}
     >
-      <SceneVisual scene={scene} className="scene__art" />
+      <SceneVisual scene={scene} className="scene__art" loading="eager" />
       {markers.map((item) => {
         const active = item.id === activeItemId;
         const custom = item.id.startsWith("custom-");

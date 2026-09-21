@@ -106,7 +106,7 @@ function JournalMonths({ journal }: { journal: ReturnType<typeof useAppState>["j
               onClick={() => navigate(`/journal/${entry.id}`)}
             >
               <span className="thumb thumb--lg">
-                <JournalImage title={entry.title} imageUrl={entry.imageUrl} />
+                <JournalImage title={entry.title} imageUrl={entry.imageUrl} width={entry.photos[0]?.width} height={entry.photos[0]?.height} />
               </span>
               <span className="grow journal-list-entry__details">
                 <strong className="journal-list-entry__title">{entry.title}</strong>

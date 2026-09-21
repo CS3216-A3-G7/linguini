@@ -23,7 +23,9 @@ class SceneService:
         self.media_public_base_url = media_public_base_url
         self.private_media_urls = private_media_urls
 
-    def _hydrate_media(self, rows: list[PreloadedSceneDetail]) -> list[PreloadedSceneDetail]:
+    def _hydrate_media(
+        self, rows: list[PreloadedSceneDetail], *, width: int | None = None
+    ) -> list[PreloadedSceneDetail]:
         assets = (
             self.media.get_by_ids([row.media_asset.id for row in rows])
             if self.media is not None
@@ -33,9 +35,12 @@ class SceneService:
             asset = assets.get(row.media_asset.id)
             if asset is None or asset.source is not MediaSource.PRELOADED:
                 raise MediaAssetStorageError("Preloaded scene media is missing or not shared.")
+        keys = [assets[row.media_asset.id].storage_key for row in rows]
         urls = (
-            self.private_media_urls.resolve(
-                [assets[row.media_asset.id].storage_key for row in rows]
+            (
+                self.private_media_urls.resolve(keys, width=width)
+                if width is not None
+                else self.private_media_urls.resolve(keys)
             )
             if self.private_media_urls is not None
             else {}
@@ -63,7 +68,8 @@ class SceneService:
                     row
                     for row in self.repository.list_scenes()
                     if language_code is None or row.language_code.lower() == language_code
-                ]
+                ],
+                width=800,
             )
         ]
 

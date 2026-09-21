@@ -140,7 +140,7 @@ export function getProgress(signal?: AbortSignal): Promise<ProgressResponse> {
 
 interface PreloadedScene {
   imageUrl?: string | null;
-  mediaAsset: { id: string };
+  mediaAsset: { id: string; width?: number | null; height?: number | null };
   languageCode: string;
   sceneId: string;
   title: string;
@@ -149,7 +149,7 @@ interface PreloadedScene {
 }
 
 function sceneSummary(row: PreloadedScene): SceneSummary {
-  return { id: row.sceneId, mediaAssetId: row.mediaAsset.id, imageUrl: row.imageUrl ?? null, title: row.title, blurb: row.description ?? "", language: row.language, languageCode: row.languageCode };
+  return { id: row.sceneId, mediaAssetId: row.mediaAsset.id, imageUrl: row.imageUrl ?? null, width: row.mediaAsset.width ?? null, height: row.mediaAsset.height ?? null, title: row.title, blurb: row.description ?? "", language: row.language, languageCode: row.languageCode };
 }
 
 export async function getScenes(signal?: AbortSignal): Promise<SceneSummary[]> {
@@ -192,7 +192,7 @@ interface JournalRecord {
   selectedWords: string[]; currentRevisionId: string | null;
 }
 interface JournalDetail {
-  media: { mediaAssetId: string; displayOrder: number }[];
+  media: { mediaAssetId: string; displayOrder: number; imageUrl?: string | null; width?: number | null; height?: number | null }[];
   imageUrl?: string | null;
   journal: JournalRecord;
   revisions: { id: string; content: string }[];
@@ -201,7 +201,7 @@ function journalEntry(detail: JournalDetail): JournalEntry {
   const row = detail.journal;
   const media = [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder);
   return { id: row.id, languageProfileId: row.languageProfileId, date: row.localDate,
-    photos: media.map((photo, index) => ({ ...photo, imageUrl: index === 0 ? detail.imageUrl ?? null : null })),
+    photos: media.map((photo, index) => ({ ...photo, imageUrl: photo.imageUrl ?? (index === 0 ? detail.imageUrl ?? null : null) })),
     title: row.title, mediaAssetId: [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.mediaAssetId ?? null, imageUrl: detail.imageUrl ?? null, wordsUsed: row.selectedWords,
     body: detail.revisions.find((revision) => revision.id === row.currentRevisionId)?.content ?? "" };
 }
@@ -214,6 +214,8 @@ export async function getJournal(id: string, signal?: AbortSignal): Promise<Jour
 export interface JournalPhotoOption {
   mediaAssetId: string;
   imageUrl: string | null;
+  width?: number | null;
+  height?: number | null;
   sessionId: string;
   completedAt: string;
 }
@@ -266,7 +268,7 @@ export interface SessionProgress {
 export type SessionStatus = "created" | "analyzingScene" | "awaitingObjectReview" | "generatingTasks" | "ready" | "inProgress" | "completed" | "abandoned" | "failed";
 export interface PracticeDetail {
   session: { id: string; status: SessionStatus; sceneMediaAssetId: string; sessionTitle: string | null; sessionSummary: string | null; failureCode: "imageUploadFailed" | "sceneAnalysisFailed" | "noValidObjects" | "vocabularyMappingFailed" | "taskGenerationFailed" | null };
-  mediaAsset: { id: string; source: "preloaded" | "camera" | "userUpload" };
+  mediaAsset: { id: string; source: "preloaded" | "camera" | "userUpload"; width?: number | null; height?: number | null };
   sceneId: string | null; title: string;
   analysisMode: "placeholder" | null;
   sceneObjects: SceneObject[];
@@ -289,7 +291,8 @@ export interface TaskActionResult {
   task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;
   attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null } | null;
 }
-export const getMedia = (id: string) => request<UploadedImage>(`/api/v1/media/${id}`);
+export const getMedia = (id: string, width?: number) =>
+  request<UploadedImage>(`/api/v1/media/${id}${width === undefined ? "" : `?width=${width}`}`);
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
 export interface PracticeReview {
   acceptedObjectIds: string[];

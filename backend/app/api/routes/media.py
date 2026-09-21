@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.dependencies import get_active_language, get_media_asset_service, get_scene_service
 from app.schemas.media import (
@@ -22,8 +22,9 @@ router = APIRouter(tags=["media"])
 def get_media_asset(
     asset_id: UUID,
     service: Annotated[MediaAssetService, Depends(get_media_asset_service)],
+    width: Annotated[int | None, Query(ge=64, le=2048)] = None,
 ) -> MediaAssetResponse:
-    return service.read_asset(asset_id)
+    return service.read_asset(asset_id, width=width)
 
 
 @router.post("/media/upload-url", response_model=CreateUploadUrlResponse)

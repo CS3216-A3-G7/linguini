@@ -7,7 +7,8 @@ export const queryKeys = {
   activeSession: (profileId: string) => ["session", "active", profileId] as const,
   journal: (id: string) => ["journal", id] as const,
   journalDayContext: (date: string) => ["journal", "day", date] as const,
-  media: (assetId: string) => ["media", assetId] as const,
+  media: (assetId: string, width?: number) =>
+    width === undefined ? (["media", assetId] as const) : (["media", assetId, width] as const),
   sessionScene: (sessionId: string) => ["session", sessionId, "scene"] as const,
   sceneSession: (sceneId: string) => ["scene", sceneId, "session"] as const,
   sessionSummary: (sessionId: string) => ["session", sessionId, "summary"] as const,

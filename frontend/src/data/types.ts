@@ -20,6 +20,8 @@ export type Scene = {
   sessionId?: string;
   isUploaded?: boolean;
   imageUrl: string | null;
+  width?: number | null;
+  height?: number | null;
   mediaAssetId: string;
   languageCode: string;
   id: string;
@@ -29,7 +31,7 @@ export type Scene = {
   items: LanguageItem[];
 };
 
-export type SceneSummary = Pick<Scene, "id" | "mediaAssetId" | "imageUrl" | "title" | "blurb" | "language" | "languageCode">;
+export type SceneSummary = Pick<Scene, "id" | "mediaAssetId" | "imageUrl" | "width" | "height" | "title" | "blurb" | "language" | "languageCode">;
 
 export type ScenarioProgress = {
   sceneId: string;
@@ -55,7 +57,7 @@ export type VocabRecord = {
 };
 
 export type JournalEntry = {
-  photos: { mediaAssetId: string; displayOrder: number; imageUrl: string | null }[];
+  photos: { mediaAssetId: string; displayOrder: number; imageUrl: string | null; width?: number | null; height?: number | null }[];
   imageUrl: string | null;
   languageProfileId: string;
   id: string;

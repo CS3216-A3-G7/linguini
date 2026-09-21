@@ -77,6 +77,27 @@ def test_storage_errors_are_controlled():
     assert "private" not in response.text
 
 
+def test_media_width_query_param_forwards_to_service():
+    from app.api.dependencies import get_media_asset_service
+    from app.schemas.media import MediaAssetResponse
+
+    service = MagicMock()
+    service.read_asset.return_value = MediaAssetResponse(
+        **asset().model_dump(), signed_url="https://example.com/signed"
+    )
+    app = create_app()
+    app.dependency_overrides[get_media_asset_service] = lambda: service
+    client = TestClient(app)
+    asset_id = uuid4()
+    assert client.get(f"/api/v1/media/{asset_id}?width=200").status_code == 200
+    service.read_asset.assert_called_once_with(asset_id, width=200)
+    service.read_asset.reset_mock()
+    assert client.get(f"/api/v1/media/{asset_id}").status_code == 200
+    service.read_asset.assert_called_once_with(asset_id, width=None)
+    assert client.get(f"/api/v1/media/{asset_id}?width=32").status_code == 422
+    assert client.get(f"/api/v1/media/{asset_id}?width=4096").status_code == 422
+
+
 @pytest.fixture
 def database(monkeypatch):
     if not os.getenv("TEST_DATABASE_URL"):
@@ -100,7 +121,9 @@ def database(monkeypatch):
 def test_owned_and_shared_lookup(database, monkeypatch):
     from app.services.image_storage import ImageStorage
 
-    monkeypatch.setattr(ImageStorage, "read_url", lambda self, key: "https://example.com/signed")
+    monkeypatch.setattr(
+        ImageStorage, "read_url", lambda self, key, **kwargs: "https://example.com/signed"
+    )
     engine, owner, ids = database
     repository = PostgresMediaAssetRepository(engine)
     own = asset(source="camera", owner_user_id=owner.id, width=100)

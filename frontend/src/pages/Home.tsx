@@ -97,7 +97,7 @@ export function Home() {
           <p role="alert">{progressError ?? resumeError} Reload to retry.</p>
         ) : resume ? (
           <Card className="home-featured">
-            <div className="home-featured__image"><MediaImage assetId={resume.session.sceneMediaAssetId} title={resume.title} /></div>
+            <div className="home-featured__image"><MediaImage assetId={resume.session.sceneMediaAssetId} title={resume.title} requestWidth={800} /></div>
             <div className="home-featured__body">
               <div className="stack-2">
                 <h3>Continue learning</h3>

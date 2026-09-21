@@ -2,10 +2,11 @@ import type { Scene } from "../data/types";
 import type { PracticeDetail, UploadedImage } from "./api";
 
 /** Join accepted objects to catalog vocabulary by ID; labels are only a fallback. */
-export function practiceScene(detail: PracticeDetail, media: Pick<UploadedImage, "id" | "signedUrl">, language: string): Scene {
+export function practiceScene(detail: PracticeDetail, media: Pick<UploadedImage, "id" | "signedUrl"> & Partial<Pick<UploadedImage, "width" | "height">>, language: string): Scene {
   return {
       sessionId: detail.session.id, isUploaded: detail.mediaAsset.source !== "preloaded", id: detail.sceneId ?? detail.session.id,
       mediaAssetId: media.id, imageUrl: media.signedUrl, title: detail.title,
+      width: media.width ?? detail.mediaAsset.width ?? null, height: media.height ?? detail.mediaAsset.height ?? null,
       languageCode: detail.vocabulary[0]?.languageCode ?? "", language,
       blurb: "",
       items: detail.sceneObjects.map((object, i) => {

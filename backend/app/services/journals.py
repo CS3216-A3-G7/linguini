@@ -27,6 +27,9 @@ from app.services.language_profiles import LanguageProfileService
 from app.services.media_urls import PrivateMediaUrls, public_media_url
 from app.services.users import UserService
 
+THUMBNAIL_WIDTH = 400
+DETAIL_WIDTH = 1200
+
 
 class JournalService:
     def __init__(
@@ -45,7 +48,9 @@ class JournalService:
         self.media_public_base_url = media_public_base_url
         self.private_media_urls = private_media_urls
 
-    def _with_images(self, rows: list[JournalDetailResponse]) -> list[JournalDetailResponse]:
+    def _with_images(
+        self, rows: list[JournalDetailResponse], *, cover_width: int | None = None
+    ) -> list[JournalDetailResponse]:
         covers = {
             row.journal.id: min(row.media, key=lambda media: media.display_order).media_asset_id
             for row in rows
@@ -65,13 +70,66 @@ class JournalService:
             ):
                 keys[row.journal.id] = asset.storage_key
         urls = (
-            self.private_media_urls.resolve(list(keys.values()))
+            (
+                self.private_media_urls.resolve(list(keys.values()), width=cover_width)
+                if cover_width is not None
+                else self.private_media_urls.resolve(list(keys.values()))
+            )
             if self.private_media_urls
             else {key: public_media_url(key, self.media_public_base_url) for key in keys.values()}
         )
         return [
             row.model_copy(update={"image_url": urls.get(keys.get(row.journal.id))}) for row in rows
         ]
+
+    def _with_media(self, entry: JournalDetailResponse) -> JournalDetailResponse:
+        """Hydrate every attached photo, never mutating the repository's rows."""
+        assets = (
+            self.media.get_by_ids([media.media_asset_id for media in entry.media])
+            if self.media is not None and entry.media
+            else {}
+        )
+        allowed = {
+            media.media_asset_id: asset
+            for media in entry.media
+            if (asset := assets.get(media.media_asset_id)) is not None
+            and asset.media_type == MediaType.IMAGE
+            and (
+                asset.owner_user_id == entry.journal.user_id
+                or asset.source == MediaSource.PRELOADED
+            )
+        }
+        keys = [asset.storage_key for asset in allowed.values()]
+        urls = (
+            self.private_media_urls.resolve(keys, width=DETAIL_WIDTH)
+            if self.private_media_urls
+            else {key: public_media_url(key, self.media_public_base_url) for key in keys}
+        )
+        media = [
+            media.model_copy(
+                update={
+                    "image_url": (
+                        urls.get(asset.storage_key)
+                        if (asset := allowed.get(media.media_asset_id)) is not None
+                        else None
+                    ),
+                    "width": asset.width
+                    if (asset := allowed.get(media.media_asset_id)) is not None
+                    else None,
+                    "height": asset.height
+                    if (asset := allowed.get(media.media_asset_id)) is not None
+                    else None,
+                }
+            )
+            for media in entry.media
+        ]
+        cover = min(media, key=lambda row: row.display_order) if media else None
+        cover_url = (
+            urls.get(allowed[cover.media_asset_id].storage_key)
+            if cover is not None and cover.media_asset_id in allowed
+            else None
+        )
+        return entry.model_copy(update={"media": media, "image_url": cover_url})
 
     @staticmethod
     def _find(rows, journal_id, user_id):
@@ -109,14 +167,14 @@ class JournalService:
                 (row for row in self.repository.read() if row.journal.user_id == user.id),
                 key=lambda row: row.journal.local_date,
                 reverse=True,
-            )
+            ),
+            cover_width=THUMBNAIL_WIDTH,
         )
 
     def get_entry(self, journal_id: UUID) -> JournalDetailResponse:
-        entry = next((row for row in self.list_entries() if row.journal.id == journal_id), None)
-        if entry is None:
-            raise JournalNotFoundError("Journal not found.")
-        return entry
+        user = self.users.get_current_user()
+        entry = self._find(self.repository.read(), journal_id, user.id)
+        return self._with_media(entry)
 
     def today(self) -> JournalTodayContextResponse:
         return self.day_context(None)
@@ -139,7 +197,7 @@ class JournalService:
             images = list(unique.values())
             keys = [image.asset.storage_key for image in images]
             urls = (
-                self.private_media_urls.resolve(keys)
+                self.private_media_urls.resolve(keys, width=THUMBNAIL_WIDTH)
                 if self.private_media_urls
                 else {key: public_media_url(key, self.media_public_base_url) for key in keys}
             )
@@ -147,6 +205,8 @@ class JournalService:
                 JournalPhotoOption(
                     media_asset_id=image.asset.id,
                     image_url=urls.get(image.asset.storage_key),
+                    width=image.asset.width,
+                    height=image.asset.height,
                     session_id=image.session_id,
                     completed_at=image.completed_at,
                 )

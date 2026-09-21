@@ -94,6 +94,9 @@ def test_list_and_detail_use_current_media_key(private):
         signer.resolve.return_value = {"new.jpg": expected_url}
     service = SceneService(repository, media, BASE, signer)
     summary = service.list_scenes("es")[0]
+    if signer:
+        # Catalog cards render thumbnails; detail keeps the full-resolution key.
+        signer.resolve.assert_called_with(["new.jpg"], width=800)
     detail = service.get_scene("cafe", "es")
     assert summary.model_dump(by_alias=True)["imageUrl"] == expected_url
     assert detail.image_url == summary.image_url
@@ -160,3 +163,72 @@ def test_signing_failure_does_not_fall_back_to_public_url(monkeypatch, payload):
 def test_signing_requires_server_credentials():
     with pytest.raises(MediaUrlError, match="not configured"):
         PrivateMediaUrls("https://project.supabase.co", "media-assets", "").resolve(["photo.jpg"])
+
+
+def _fake_client(calls, signed):
+    import httpx
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def post(self, url, **kwargs):
+            calls.append((url, kwargs))
+            if isinstance(signed, Exception):
+                raise signed
+            return httpx.Response(
+                200,
+                request=httpx.Request("POST", url),
+                json={"signedURL": signed},
+            )
+
+    return FakeClient
+
+
+def test_transformed_signing_uses_render_endpoint_per_path(monkeypatch):
+    import httpx
+
+    calls = []
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        _fake_client(calls, "/render/image/sign/media-assets/photo.jpg?token=t"),
+    )
+    resolver = PrivateMediaUrls("https://project.supabase.co", "media-assets", "server-secret")
+    result = resolver.resolve(["photo.jpg", "demo-art/street"], width=400)
+    assert result["photo.jpg"] == (
+        "https://project.supabase.co/storage/v1/render/image/sign/media-assets/"
+        "photo.jpg?token=t"
+    )
+    assert result["demo-art/street"] is None
+    assert len(calls) == 1
+    assert calls[0][0].endswith("/object/sign/media-assets/photo.jpg")
+    assert calls[0][1]["json"] == {
+        "expiresIn": 3600,
+        "transform": {"width": 400, "quality": 70},
+    }
+    assert "server-secret" not in str(result)
+
+
+@pytest.mark.parametrize(
+    "signed",
+    [
+        "/object/sign/media-assets/photo.jpg?token=t",
+        "https://evil.example/photo.jpg",
+        42,
+    ],
+)
+def test_transformed_signing_rejects_non_render_urls(monkeypatch, signed):
+    import httpx
+
+    monkeypatch.setattr(httpx, "Client", _fake_client([], signed))
+    with pytest.raises(MediaUrlError, match="Unable to sign"):
+        PrivateMediaUrls("https://project.supabase.co", "media-assets", "secret").resolve(
+            ["photo.jpg"], width=400
+        )

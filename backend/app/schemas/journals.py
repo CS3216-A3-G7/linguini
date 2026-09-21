@@ -56,6 +56,9 @@ class JournalMedia(EntityModel):
     media_asset_id: UUID
     display_order: Annotated[int, Field(ge=0)]
     caption: Annotated[str, Field(max_length=1000)] | None = None
+    image_url: str | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 class JournalRevision(EntityModel):
@@ -137,6 +140,8 @@ class CompleteJournalRequest(ApiModel):
 class JournalPhotoOption(ApiModel):
     media_asset_id: UUID
     image_url: str | None = None
+    width: int | None = None
+    height: int | None = None
     session_id: UUID
     completed_at: AwareDatetime
 

@@ -57,7 +57,7 @@ function JournalEntryDetail({ entryId }: { entryId: string }) {
       <Button variant="secondary" onClick={() => setEditing(true)}>Edit entry</Button>
       {photo ? <div className="journal-carousel">
         <div className="scene">
-          <MediaImage key={photo.mediaAssetId} assetId={photo.mediaAssetId} title={entry.title} imageUrl={photo.imageUrl} />
+          <MediaImage key={photo.mediaAssetId} assetId={photo.mediaAssetId} title={entry.title} imageUrl={photo.imageUrl} width={photo.width} height={photo.height} loading="eager" />
         </div>
         {entry.photos.length > 1 ? <>
           <IconButton className="journal-carousel__control journal-carousel__control--previous" label="Previous photo" onClick={() => changePhoto(-1)}><ChevronLeftIcon /></IconButton>

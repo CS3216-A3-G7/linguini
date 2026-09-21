@@ -116,6 +116,17 @@ CHILDREN = [
     ("word_mentions", journal_word_mentions, JournalWordMention, "start_offset"),
 ]
 
+# Hydrated at read time for API responses; they are not persisted columns.
+MEDIA_TRANSIENT = {"image_url", "width", "height"}
+
+
+def record_values(table: Table, record) -> dict:
+    values = record.model_dump(by_alias=False)
+    if table is journal_media:
+        for key in MEDIA_TRANSIENT:
+            values.pop(key, None)
+    return values
+
 
 def entity_groups(rows):
     groups = [(journals, [entry.journal for entry in rows])]
@@ -131,7 +142,7 @@ def insert_entries(connection: Connection, rows: list[JournalDetailResponse]) ->
     validate_entries(rows)
     for table, records in entity_groups(rows):
         for record in records:
-            connection.execute(insert(table).values(**record.model_dump(by_alias=False)))
+            connection.execute(insert(table).values(**record_values(table, record)))
 
 
 class PostgresJournalRepository:
@@ -197,7 +208,7 @@ class PostgresJournalRepository:
                     raise JournalStorageError("Journal user does not exist.")
                 rows = self._read(connection)
                 before = {
-                    table.name: {record.id: record.model_dump(by_alias=False) for record in records}
+                    table.name: {record.id: record_values(table, record) for record in records}
                     for table, records in entity_groups(rows)
                 }
                 result = action(rows)
@@ -218,7 +229,7 @@ class PostgresJournalRepository:
                             raise JournalConflictError("Journal history cannot be removed.")
                         connection.execute(delete(table).where(table.c.id.in_(removed)))
                     for record in records:
-                        values = record.model_dump(by_alias=False)
+                        values = record_values(table, record)
                         old = prior.get(record.id)
                         if old == values:
                             continue

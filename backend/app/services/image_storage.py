@@ -86,8 +86,8 @@ class ImageStorage:
         except httpx.HTTPError as exc:
             raise MediaUrlError("Unable to remove invalid upload; retry confirmation.") from exc
 
-    def read_url(self, key: str) -> str:
-        url = self.signer.resolve([key]).get(key)
+    def read_url(self, key: str, *, width: int | None = None) -> str:
+        url = self.signer.resolve([key], width=width).get(key)
         if not url:
             raise MediaUrlError("Image URL unavailable.")
         return url

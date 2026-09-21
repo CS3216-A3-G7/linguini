@@ -82,7 +82,7 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
         {photos.length ? (
           <div className="photo-strip" aria-label={`${photos.length} photos added`}>
             {photos.map((photo, index) => <div key={photo.mediaAssetId} className="photo-thumb">
-              <MediaImage assetId={photo.mediaAssetId} imageUrl={photo.imageUrl} title={`Journal photo ${index + 1}`} />
+              <MediaImage assetId={photo.mediaAssetId} imageUrl={photo.imageUrl} width={photo.width} height={photo.height} title={`Journal photo ${index + 1}`} />
               <button type="button" className="photo-thumb__remove" aria-label={`Remove photo ${index + 1}`}
                 disabled={journalSaving || uploading}
                 onClick={() => setPhotos(current => current.filter(item => item.mediaAssetId !== photo.mediaAssetId))}>
@@ -102,8 +102,8 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
                 className={`scene-pick${selected ? " scene-pick--selected" : ""}`} aria-pressed={selected}
                 onClick={() => setPhotos(current => selected
                   ? current.filter(photo => photo.mediaAssetId !== option.mediaAssetId)
-                  : [...current, { mediaAssetId: option.mediaAssetId, imageUrl: option.imageUrl, displayOrder: current.length }])}>
-                <MediaImage assetId={option.mediaAssetId} imageUrl={option.imageUrl} title="Photo from your practice session" />
+                  : [...current, { mediaAssetId: option.mediaAssetId, imageUrl: option.imageUrl, width: option.width, height: option.height, displayOrder: current.length }])}>
+                <MediaImage assetId={option.mediaAssetId} imageUrl={option.imageUrl} width={option.width} height={option.height} title="Photo from your practice session" />
               </button>;
             })}
           </div>
@@ -111,7 +111,7 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
         <div className="journal-new__upload">
           <ImageUpload cameraEnabled={learner.cameraOn} disabled={journalSaving} onBusyChange={setUploading}
             onUploaded={(image) => setPhotos(current => current.some(photo => photo.mediaAssetId === image.id) ? current
-              : [...current, { mediaAssetId: image.id, imageUrl: image.signedUrl, displayOrder: current.length }])} />
+              : [...current, { mediaAssetId: image.id, imageUrl: image.signedUrl, width: image.width, height: image.height, displayOrder: current.length }])} />
         </div>
       </div>
 

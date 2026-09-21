@@ -40,13 +40,14 @@ class MediaAssetService:
             raise MediaUrlError("Storage is not configured.")
         return self.storage
 
-    def _response(self, asset: MediaAsset) -> MediaAssetResponse:
+    def _response(self, asset: MediaAsset, width: int | None = None) -> MediaAssetResponse:
         return MediaAssetResponse(
-            **asset.model_dump(), signed_url=self._storage().read_url(asset.storage_key)
+            **asset.model_dump(),
+            signed_url=self._storage().read_url(asset.storage_key, width=width),
         )
 
-    def read_asset(self, asset_id: UUID) -> MediaAssetResponse:
-        return self._response(self.get_asset(asset_id))
+    def read_asset(self, asset_id: UUID, width: int | None = None) -> MediaAssetResponse:
+        return self._response(self.get_asset(asset_id), width=width)
 
     def create_upload(self, request: CreateUploadUrlRequest) -> CreateUploadUrlResponse:
         user = self.users.get_current_user()
