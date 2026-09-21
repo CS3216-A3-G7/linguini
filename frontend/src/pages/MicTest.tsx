@@ -4,6 +4,7 @@ import { Button } from "../components/ui";
 import { ArrowRightIcon, MicIcon } from "../components/icons";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
+import { startSession } from "../lib/api";
 
 type MicState = "idle" | "listening" | "working" | "unavailable";
 
@@ -101,7 +102,10 @@ export function MicTest() {
       <Button
         block
         disabled={state === "idle" || state === "listening"}
-        onClick={() => navigate(`/practice/sessions/${scene.sessionId}/learn`)}
+        onClick={async () => {
+          await startSession(scene.sessionId);
+          navigate(`/practice/sessions/${scene.sessionId}/learn`);
+        }}
       >
         Continue <ArrowRightIcon />
       </Button>

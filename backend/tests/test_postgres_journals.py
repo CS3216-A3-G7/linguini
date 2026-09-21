@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
@@ -309,7 +310,7 @@ def test_rls_and_cascade(context):
     assert repository.read() == []
 
 
-def test_journal_words_mark_mastered_and_award_xp_once(context):
+def test_journal_words_refresh_recency_and_award_xp_once(context):
     engine, owner, profile, client, repository, words, *_ = context
     row = save(client, profile, words=[" Mundo ", "amigo", "not-in-my-bank"])
     journal_id = row["id"]
@@ -322,9 +323,12 @@ def test_journal_words_mark_mastered_and_award_xp_once(context):
                 )
             ).mappings()
         }
-        assert progress[words[0].id]["status"] == "mastered"
-        assert progress[words[0].id]["mastery_score"] == 1
-        assert progress[words[1].id]["status"] == "mastered"
+        # Journal usage is unevaluated evidence: it refreshes recency and
+        # rederives counters, but never promotes a word to mastered.
+        assert progress[words[0].id]["status"] == "learning"
+        assert progress[words[0].id]["mastery_score"] == Decimal("0.25")
+        assert progress[words[0].id]["last_practised_at"] is not None
+        assert progress[words[1].id]["status"] == "learning"
 
         def journal_xp():
             return connection.execute(
@@ -355,7 +359,7 @@ def test_journal_words_mark_mastered_and_award_xp_once(context):
             .mappings()
             .one()
         )
-        assert row["exposure_count"] == 0 and row["status"] == "mastered"
+        assert row["exposure_count"] == 1 and row["status"] == "learning"
 
 
 def test_journal_entry_xp_independent_of_words(context):
@@ -376,15 +380,21 @@ def test_journal_entry_xp_independent_of_words(context):
 
     # A journal with no picked words still earns the journal award, once.
     assert journal_xp() == 20
-    # Adding words on a later save marks them mastered but never re-awards.
+    # Adding words on a later save refreshes their recency but never re-awards
+    # and never promotes a word without evaluated evidence.
     update = client.patch(f"/api/v1/journals/{journal_id}", json={"selectedWords": ["mundo"]})
     assert update.status_code == 200, update.text
     assert journal_xp() == 20
     with engine.connect() as connection:
-        mastered = connection.execute(
-            select(user_vocabulary_progress.c.status).where(
-                user_vocabulary_progress.c.user_id == owner.id,
-                user_vocabulary_progress.c.vocabulary_item_id == words[0].id,
+        progress = (
+            connection.execute(
+                select(user_vocabulary_progress).where(
+                    user_vocabulary_progress.c.user_id == owner.id,
+                    user_vocabulary_progress.c.vocabulary_item_id == words[0].id,
+                )
             )
-        ).scalar_one()
-    assert mastered == "mastered"
+            .mappings()
+            .one()
+        )
+    assert progress["status"] == "learning"
+    assert progress["last_practised_at"] is not None

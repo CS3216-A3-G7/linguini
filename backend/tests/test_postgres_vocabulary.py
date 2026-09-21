@@ -500,8 +500,9 @@ def progress_row(engine, user_id, item_id):
 
 def test_status_ladder_mastery_and_replay(database, encounter_task):
     engine, owner, ids, _, repository = database
+    day0 = utc_now() - timedelta(days=4)
 
-    def encounter(item_id, encounter_type, outcome, event_id=None):
+    def encounter(item_id, encounter_type, outcome, event_id=None, at=None):
         return VocabularyEncounter(
             id=event_id or uuid4(),
             user_id=owner.id,
@@ -510,70 +511,113 @@ def test_status_ladder_mastery_and_replay(database, encounter_task):
             session_task_id=encounter_task.id,
             encounter_type=encounter_type,
             outcome=outcome,
+            occurred_at=at or utc_now(),
         )
 
-    introduced = encounter(ids[0], "introduced", "completed")
+    introduced = encounter(ids[0], "introduced", "completed", at=day0)
     assert repository.record_encounter(introduced).id == introduced.id
     row = progress_row(engine, owner.id, ids[0])
-    assert row["status"] == "new" and row["mastery_score"] == 0
+    # Unevaluated evidence exists, so the word is learning, not new.
+    assert row["status"] == "learning" and row["mastery_score"] == Decimal("0.25")
     assert row["exposure_count"] == 1 and row["last_practised_at"] is None
 
-    practised = encounter(ids[0], "practised", "correct")
+    practised = encounter(ids[0], "practised", "correct", at=day0 + timedelta(hours=2))
     repository.record_encounter(practised)
     row = progress_row(engine, owner.id, ids[0])
-    assert row["status"] == "learning" and row["mastery_score"] == Decimal("0.5")
+    # One evaluated attempt on one day is still learning.
+    assert row["status"] == "learning" and row["mastery_score"] == Decimal("0.25")
     assert row["exposure_count"] == 2 and row["correct_attempt_count"] == 1
     assert row["last_practised_at"] == practised.occurred_at
+    assert row["first_learned_at"] == introduced.occurred_at
+
+    # Three evaluated attempts over two days at 100% accuracy reach familiar.
+    day1 = day0 + timedelta(days=1)
+    repository.record_encounter(encounter(ids[0], "practised", "correct", at=day1))
+    repository.record_encounter(
+        encounter(ids[0], "practised", "correct", at=day1 + timedelta(hours=2))
+    )
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["status"] == "familiar" and row["mastery_score"] == Decimal("0.6")
+    assert row["exposure_count"] == 4 and row["correct_attempt_count"] == 3
+    assert row["last_practised_at"] == day1 + timedelta(hours=2)
 
     # An out-of-order write can never move last_practised_at backwards.
-    earlier = practised.model_copy(
-        update={"id": uuid4(), "occurred_at": practised.occurred_at - timedelta(days=1)}
-    )
+    earlier = encounter(ids[0], "practised", "correct", at=day0 - timedelta(days=10))
     repository.record_encounter(earlier)
     row = progress_row(engine, owner.id, ids[0])
-    assert row["last_practised_at"] == practised.occurred_at
-    assert row["exposure_count"] == 3
+    assert row["last_practised_at"] == day1 + timedelta(hours=2)
+    assert row["exposure_count"] == 5
 
-    # Replays of the same event id never move counters again.
+    # Replays of the same event id never change the derived history.
     assert repository.record_encounter(practised).id == practised.id
     row = progress_row(engine, owner.id, ids[0])
-    assert row["exposure_count"] == 3 and row["correct_attempt_count"] == 2
+    assert row["exposure_count"] == 5 and row["correct_attempt_count"] == 4
     with pytest.raises(VocabularyEncounterConflictError):
         repository.record_encounter(
             practised.model_copy(update={"outcome": VocabularyEncounterOutcome.INCORRECT})
         )
 
+    # Five evaluated attempts over three days at 100% accuracy reach mastered
+    # and award the mastery XP exactly once.
+    day2 = day0 + timedelta(days=2)
+    repository.record_encounter(encounter(ids[0], "practised", "correct", at=day2))
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["status"] == "mastered" and row["mastery_score"] == 1
+
+    def mastery_events():
+        with engine.connect() as connection:
+            return connection.execute(
+                select(func.count())
+                .select_from(xp_events)
+                .where(
+                    xp_events.c.user_id == owner.id,
+                    xp_events.c.idempotency_key == f"mastery:{ids[0]}",
+                    xp_events.c.event_type == "vocabularyMastered",
+                )
+            ).scalar_one()
+
+    assert mastery_events() == 1
+    repository.record_encounter(
+        encounter(ids[0], "practised", "correct", at=day2 + timedelta(hours=2))
+    )
+    row = progress_row(engine, owner.id, ids[0])
+    assert row["status"] == "mastered" and mastery_events() == 1
+
+    # Journal usage is unevaluated evidence: it bumps recency only.
     profile = PostgresLanguageProfileRepository(engine).list_for_user(owner.id)[0]
+    used_at = utc_now()
     resolved = repository.record_journal_usage(
         user_id=owner.id,
         language_profile_id=profile.id,
         journal_id=uuid4(),
         words=["CALLE", "not-a-real-word"],
-        occurred_at=utc_now(),
+        occurred_at=used_at,
     )
     assert resolved == [ids[0]]
     row = progress_row(engine, owner.id, ids[0])
-    assert row["status"] == "mastered" and row["mastery_score"] == 1
+    assert row["status"] == "mastered"
+    assert row["exposure_count"] == 7 and row["correct_attempt_count"] == 6
+    assert row["last_practised_at"] == used_at
 
-    # Journal evidence is not an encounter and never counts as exposure.
-    assert row["exposure_count"] == 3 and row["correct_attempt_count"] == 2
-
-    # A later practice encounter cannot downgrade mastered, and nothing emits familiar.
-    repository.record_encounter(encounter(ids[0], "practised", "incorrect"))
-    row = progress_row(engine, owner.id, ids[0])
-    assert row["status"] == "mastered" and row["mastery_score"] == 1
-    assert row["exposure_count"] == 4
-    with engine.connect() as connection:
-        statuses = (
+    # Regression: a mastered word whose correct evidence all ages past the
+    # decay window recomputes down a rank on the next write.
+    old = utc_now() - timedelta(days=40)
+    with engine.begin() as connection:
+        for day in range(5):
             connection.execute(
-                select(user_vocabulary_progress.c.status).where(
-                    user_vocabulary_progress.c.user_id == owner.id
+                insert(vocabulary_encounters).values(
+                    **encounter(
+                        ids[1], "practised", "correct", at=old + timedelta(days=day)
+                    ).model_dump(by_alias=False)
                 )
             )
-            .scalars()
-            .all()
-        )
-    assert "familiar" not in statuses
+    repository.record_encounter(
+        encounter(ids[1], "introduced", "completed", at=utc_now())
+    )
+    row = progress_row(engine, owner.id, ids[1])
+    assert row["status"] == "familiar" and row["mastery_score"] == Decimal("0.6")
+    # The newly introduced word still counts as an exposure.
+    assert row["exposure_count"] == 6
 
 
 def test_journal_usage_scoping_and_xp_once(database, encounter_task):
@@ -604,7 +648,8 @@ def test_journal_usage_scoping_and_xp_once(database, encounter_task):
         assert set(resolved) == {ids[0], ids[1]}
         for item_id in (ids[0], ids[1]):
             row = progress_row(engine, owner.id, item_id)
-            assert row["status"] == "mastered" and row["mastery_score"] == 1
+            # Usage alone never promotes: with no encounters the word stays new.
+            assert row["status"] == "new" and row["mastery_score"] == 0
             assert row["last_practised_at"] is not None
         # Another user's progress on the same word is untouched.
         assert progress_row(engine, other.id, ids[1])["status"] == "new"

@@ -303,6 +303,7 @@ export const createPractice = (profileId: string, assetId: string, key: string) 
   languageProfileId: profileId, mediaAssetId: assetId, idempotencyKey: key,
 });
 export const taskAction = (id: string, action: "start" | "complete" | "skip" | "attempts", body: unknown = {}) => write<TaskActionResult>(`/api/v1/tasks/${id}/${action}`, "POST", body);
+export const startSession = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/start`, "POST", {});
 export const completePractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/complete`, "POST", {});
 export const abandonPractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/abandon`, "POST", {});
 export const getPracticeSummary = (id: string) => request<{ progress: SessionProgress; learnedVocabularyIds: string[]; xpEarned: number; ispyCorrectCount: number; ispyAttemptCount: number }>(`/api/v1/sessions/${id}/summary`);

@@ -319,7 +319,8 @@ def test_active_session_replacement_and_owner_scope(database, monkeypatch):
         with pytest.raises(PracticeConflictError):
             repository._transition(connection, session, "completed")
 
-    # created -> analyzingScene -> awaitingObjectReview -> generatingTasks -> inProgress.
+    # created -> analyzingScene -> awaitingObjectReview -> generatingTasks
+    # -> ready -> inProgress.
     assert client.post(f"/api/v1/sessions/{first}/analyze").status_code == 200
     detail = client.get(f"/api/v1/sessions/{first}").json()
     assert detail["session"]["status"] == "awaitingObjectReview"
@@ -328,8 +329,12 @@ def test_active_session_replacement_and_owner_scope(database, monkeypatch):
         json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
     )
     assert reviewed.status_code == 200, reviewed.text
-    assert reviewed.json()["session"]["status"] == "inProgress"
-    assert reviewed.json()["session"]["startedAt"] is not None
+    assert reviewed.json()["session"]["status"] == "ready"
+    assert reviewed.json()["session"]["startedAt"] is None
+    started = client.post(f"/api/v1/sessions/{first}/start")
+    assert started.status_code == 200, started.text
+    assert started.json()["status"] == "inProgress"
+    assert started.json()["startedAt"] is not None
     for task in reviewed.json()["tasks"]:
         assert client.post(f"/api/v1/tasks/{task['id']}/skip", json={}).status_code == 200
     assert client.post(f"/api/v1/sessions/{first}/complete").status_code == 200
@@ -545,3 +550,70 @@ def test_review_rejects_adds_and_rebuilds_without_duplicate_objects(database):
     assert (
         next(task for task in persisted["tasks"] if task["id"] == task_id)["status"] == "completed"
     )
+
+
+def test_start_moves_ready_to_in_progress_and_is_idempotent(database):
+    _, _, profile, client = database
+    sid = create_run(client, profile, "start-flow-key")["session"]["id"]
+    # A session that has not finished review cannot start.
+    assert client.post(f"/api/v1/sessions/{sid}/start").status_code == 409
+    detail = analyze(client, sid)
+    assert detail["session"]["status"] == "ready"
+    first = client.post(f"/api/v1/sessions/{sid}/start")
+    assert first.status_code == 200, first.text
+    assert first.json()["status"] == "inProgress"
+    assert first.json()["startedAt"] is not None
+    repeat = client.post(f"/api/v1/sessions/{sid}/start")
+    assert repeat.status_code == 200
+    assert repeat.json()["status"] == "inProgress"
+    assert repeat.json()["startedAt"] == first.json()["startedAt"]
+    for task in detail["tasks"]:
+        assert client.post(f"/api/v1/tasks/{task['id']}/skip", json={}).status_code == 200
+    assert client.post(f"/api/v1/sessions/{sid}/complete").status_code == 200
+    # A terminal session rejects start.
+    assert client.post(f"/api/v1/sessions/{sid}/start").status_code == 409
+
+
+def test_confirm_objects_mirrors_review_and_task_action_auto_starts(database):
+    _, _, profile, client = database
+    sid = create_run(client, profile, "confirm-objects-key")["session"]["id"]
+    detail = analyze(client, sid, confirm=False)
+    confirmed = client.post(
+        f"/api/v1/sessions/{sid}/confirm-objects",
+        json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    session = confirmed.json()["session"]
+    assert session["status"] == "ready" and session["startedAt"] is None
+    tasks = confirmed.json()["tasks"]
+    assert tasks
+    # A first task action defensively auto-starts a ready session.
+    intro = next(task for task in tasks if task["kind"] == "vocabularyIntroduction")
+    assert client.post(f"/api/v1/tasks/{intro['id']}/complete").status_code == 200
+    session = client.get(f"/api/v1/sessions/{sid}").json()["session"]
+    assert session["status"] == "inProgress" and session["startedAt"] is not None
+
+
+def test_abandon_clears_the_analysis_draft(database):
+    engine, _, profile, client = database
+    sid = create_run(client, profile, "abandon-draft-key")["session"]["id"]
+    analyze(client, sid, confirm=False)
+    with engine.connect() as c:
+        assert (
+            c.execute(
+                select(sessions.c.analysis_draft).where(sessions.c.id == UUID(sid))
+            ).scalar_one()
+            is not None
+        )
+    assert client.post(f"/api/v1/sessions/{sid}/abandon").status_code == 200
+    with engine.connect() as c:
+        row = (
+            c.execute(
+                select(sessions.c.status, sessions.c.analysis_draft).where(
+                    sessions.c.id == UUID(sid)
+                )
+            )
+            .mappings()
+            .one()
+        )
+    assert row["status"] == "abandoned" and row["analysis_draft"] is None

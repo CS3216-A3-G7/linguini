@@ -37,6 +37,9 @@ class PracticeService:
     def review(self, session_id, request):
         return self.repository.review(session_id, self._profile().id, request)
 
+    def start(self, session_id):
+        return self.repository.start(session_id, self._profile().id)
+
     def abandon(self, session_id):
         return self.repository.finish(session_id, self._profile().id, abandon=True)
 

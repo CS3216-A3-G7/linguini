@@ -55,8 +55,8 @@ TERMINAL = {"completed", "abandoned", "failed"}
 ALLOWED_TRANSITIONS = {
     "created": {"analyzingScene", "abandoned", "failed"},
     "analyzingScene": {"awaitingObjectReview", "abandoned", "failed"},
-    "awaitingObjectReview": {"analyzingScene", "generatingTasks", "abandoned", "failed"},
-    "generatingTasks": {"awaitingObjectReview", "ready", "inProgress", "abandoned", "failed"},
+    "awaitingObjectReview": {"generatingTasks", "abandoned", "failed"},
+    "generatingTasks": {"ready", "abandoned", "failed"},
     "ready": {"inProgress", "abandoned", "failed"},
     "inProgress": {"completed", "abandoned", "failed"},
     "completed": set(),
@@ -159,6 +159,8 @@ class PostgresWorkflowRepository:
             values["completed_at"] = utc_now()
         elif target == "abandoned":
             values["abandoned_at"] = utc_now()
+            # Abandoning discards the unconfirmed analysis draft.
+            values["analysis_draft"] = None
         changed = c.execute(
             update(sessions)
             .where(sessions.c.id == session.id, sessions.c.status == session.status)
@@ -712,8 +714,16 @@ class PostgresWorkflowRepository:
             for index, task in enumerate(rebuilt):
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
-            session = self._transition(c, session, "inProgress")
+            # Review ends at ready; the learner starts the session explicitly.
+            if session.status == "generatingTasks":
+                session = self._transition(c, session, "ready")
             return self._detail(c, session)
+
+    def start(self, session_id, profile_id):
+        """Move a ready session to inProgress; calling it again is a no-op."""
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            return self._transition(c, session, "inProgress")
 
     def finish(self, session_id, profile_id, abandon=False):
         with self.transaction() as c:
@@ -801,7 +811,7 @@ class PostgresWorkflowRepository:
             "ispy_attempt_count": sum(outcome is not None for outcome in outcomes),
         }
 
-    def _encounter(self, c, task, event_id, outcome, introduced=False):
+    def _encounter(self, c, task, session, event_id, outcome, introduced=False):
         if not task.vocabulary_item_id:
             return
         event = VocabularyEncounter(
@@ -818,6 +828,8 @@ class PostgresWorkflowRepository:
             user_id=self.user_id,
             vocabulary_item_id=task.vocabulary_item_id,
             encounter=event,
+            language_profile_id=session.language_profile_id,
+            session_id=task.session_id,
         )
 
     def task_action(self, task_id, action, request=None):
@@ -842,6 +854,9 @@ class PostgresWorkflowRepository:
                 raise PracticeNotFoundError("Task not found.")
             task = SessionTask.model_validate(dict(row))
             session = self._session(c, task.session_id)
+            # Defensive auto-start: a ready session begins on its first action.
+            if session.status == "ready":
+                session = self._transition(c, session, "inProgress")
             attempt = None
             if action == "attempt":
                 payload = request.model_dump(
@@ -885,7 +900,9 @@ class PostgresWorkflowRepository:
                         started_at=task.started_at or utc_now(),
                     )
                     if task.kind == "vocabularyIntroduction":
-                        self._encounter(c, task, task.id, "completed", introduced=True)
+                        self._encounter(
+                            c, task, session, task.id, "completed", introduced=True
+                        )
                 elif action == "attempt":
                     correct = evaluate(task, request)
                     attempt = TaskAttempt(
@@ -919,6 +936,7 @@ class PostgresWorkflowRepository:
                     self._encounter(
                         c,
                         task,
+                        session,
                         attempt.id,
                         "completed" if correct is None else ("correct" if correct else "incorrect"),
                     )

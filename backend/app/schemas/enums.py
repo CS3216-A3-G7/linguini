@@ -158,6 +158,7 @@ class XpEventType(StrEnum):
     SESSION_COMPLETED = "sessionCompleted"
     PERFECT_SESSION = "perfectSession"
     JOURNAL_ENTRY = "journalEntry"
+    VOCABULARY_MASTERED = "vocabularyMastered"
     LEGACY_BACKFILL = "legacyBackfill"
 
 

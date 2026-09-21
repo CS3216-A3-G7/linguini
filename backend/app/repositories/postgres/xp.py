@@ -34,6 +34,7 @@ XP_AMOUNTS = {
     "sessionCompleted": 20,
     "perfectSession": 10,
     "journalEntry": 20,
+    "vocabularyMastered": 25,
 }
 
 

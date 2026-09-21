@@ -69,6 +69,18 @@ def review_session(
     return service.review(session_id, request)
 
 
+@router.post("/{session_id}/confirm-objects", response_model=SessionDetailResponse)
+def confirm_session_objects(
+    session_id: UUID, request: ReviewPracticeRequest, service: PracticeServiceDep
+) -> SessionDetailResponse:
+    return review_session(session_id, request, service)
+
+
+@router.post("/{session_id}/start", response_model=Session)
+def start_session(session_id: UUID, service: PracticeServiceDep) -> Session:
+    return service.start(session_id)
+
+
 @router.get("/{session_id}/summary", response_model=SessionSummaryResponse)
 def get_session_summary(session_id: UUID, service: PracticeServiceDep) -> SessionSummaryResponse:
     return service.summary(session_id)

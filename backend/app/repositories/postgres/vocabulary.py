@@ -1,7 +1,6 @@
 """PostgreSQL vocabulary persistence."""
 
 from datetime import datetime
-from decimal import Decimal
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -15,7 +14,6 @@ from sqlalchemy import (
     String,
     Table,
     Uuid,
-    case,
     func,
     select,
     update,
@@ -29,6 +27,7 @@ from app.repositories.postgres.practice import sessions
 from app.repositories.postgres.scenes import preloaded_scenes
 from app.repositories.postgres.users import users
 from app.repositories.postgres.xp import award
+from app.schemas.base import utc_now
 from app.schemas.vocabulary import (
     DailyVocabularyItem,
     UserVocabularyProgress,
@@ -36,6 +35,7 @@ from app.schemas.vocabulary import (
     VocabularyItem,
     VocabularyTranslation,
 )
+from app.services.vocabulary_mastery import Evidence, derive_progress
 
 metadata = MetaData()
 
@@ -107,33 +107,37 @@ class VocabularyEncounterConflictError(Exception):
     """An existing event ID was reused with different event data."""
 
 
-STATUS_RANK = {"new": 0, "learning": 1, "familiar": 2, "mastered": 3}
-STATUS_BY_ENCOUNTER_TYPE = {
-    "introduced": "new",
-    "practised": "learning",
-    "recalled": "learning",
-    "mastered": "mastered",
-}
-MASTERY_BY_STATUS = {"new": Decimal("0"), "learning": Decimal("0.5"), "mastered": Decimal("1")}
-
-
 def record_vocabulary_evidence(
     connection,
     *,
     user_id: UUID,
     vocabulary_item_id: UUID,
     encounter: VocabularyEncounter | None = None,
-    status_target: str | None = None,
-    occurred_at: datetime | None = None,
+    usage_at: datetime | None = None,
+    language_profile_id: UUID | None = None,
+    session_id: UUID | None = None,
+    now: datetime | None = None,
 ) -> VocabularyEncounter | None:
-    """Single write path for learning evidence; status only ever moves up a rank."""
+    """Single write path for learning evidence; status is rederived from all of it."""
     initial = UserVocabularyProgress(user_id=user_id, vocabulary_item_id=vocabulary_item_id)
     connection.execute(
         insert(user_vocabulary_progress)
         .values(**initial.model_dump(by_alias=False))
         .on_conflict_do_nothing(index_elements=["user_id", "vocabulary_item_id"])
     )
-    inserted = None
+    # Locking the progress row serializes concurrent writers for this word.
+    stored = (
+        connection.execute(
+            select(user_vocabulary_progress)
+            .where(
+                user_vocabulary_progress.c.user_id == user_id,
+                user_vocabulary_progress.c.vocabulary_item_id == vocabulary_item_id,
+            )
+            .with_for_update()
+        )
+        .mappings()
+        .one()
+    )
     if encounter is not None:
         inserted = connection.execute(
             insert(vocabulary_encounters)
@@ -142,7 +146,7 @@ def record_vocabulary_evidence(
             .returning(vocabulary_encounters.c.id)
         ).scalar_one_or_none()
         if inserted is None:
-            stored = VocabularyEncounter.model_validate(
+            existing = VocabularyEncounter.model_validate(
                 dict(
                     connection.execute(
                         select(vocabulary_encounters).where(
@@ -154,52 +158,66 @@ def record_vocabulary_evidence(
                 )
             )
             excluded = {"created_at", "updated_at"}
-            if stored.model_dump(exclude=excluded) != encounter.model_dump(exclude=excluded):
+            if existing.model_dump(exclude=excluded) != encounter.model_dump(exclude=excluded):
                 raise VocabularyEncounterConflictError("Encounter ID already has different data.")
-            return stored
-        if status_target is None:
-            status_target = STATUS_BY_ENCOUNTER_TYPE[encounter.encounter_type.value]
-        if occurred_at is None:
-            occurred_at = encounter.occurred_at
-    if status_target is None and occurred_at is None:
-        return encounter
-    status_rank = case(
-        *(
-            (user_vocabulary_progress.c.status == status, rank)
-            for status, rank in STATUS_RANK.items()
-        ),
-        else_=0,
-    )
-    values = {}
-    if status_target is not None:
-        advances = status_rank < STATUS_RANK[status_target]
-        values["status"] = case((advances, status_target), else_=user_vocabulary_progress.c.status)
-        values["mastery_score"] = case(
-            (advances, MASTERY_BY_STATUS[status_target]),
-            else_=user_vocabulary_progress.c.mastery_score,
+            return existing
+    evidence = [
+        Evidence(
+            occurred_at=row["occurred_at"],
+            encounter_type=row["encounter_type"],
+            outcome=row["outcome"],
         )
-    if inserted is not None:
-        values["exposure_count"] = user_vocabulary_progress.c.exposure_count + 1
-        values["correct_attempt_count"] = user_vocabulary_progress.c.correct_attempt_count + int(
-            encounter.outcome.value == "correct"
-        )
-        values["first_learned_at"] = func.least(
-            user_vocabulary_progress.c.first_learned_at, occurred_at
-        )
-    if occurred_at is not None and (
-        encounter is None or encounter.encounter_type.value != "introduced"
-    ):
-        values["last_practised_at"] = func.greatest(
-            user_vocabulary_progress.c.last_practised_at, occurred_at
-        )
-    if values:
-        connection.execute(
-            update(user_vocabulary_progress)
-            .where(
-                user_vocabulary_progress.c.user_id == user_id,
-                user_vocabulary_progress.c.vocabulary_item_id == vocabulary_item_id,
+        for row in connection.execute(
+            select(
+                vocabulary_encounters.c.occurred_at,
+                vocabulary_encounters.c.encounter_type,
+                vocabulary_encounters.c.outcome,
+            ).where(
+                vocabulary_encounters.c.user_id == user_id,
+                vocabulary_encounters.c.vocabulary_item_id == vocabulary_item_id,
             )
-            .values(**values)
+        ).mappings()
+    ]
+    timezone = connection.execute(
+        select(users.c.timezone).where(users.c.id == user_id)
+    ).scalar_one()
+    derived = derive_progress(evidence, timezone=timezone, now=now or utc_now())
+    # Usage without an encounter (journal writes) refreshes recency but never
+    # moves last_practised_at backwards.
+    last_practised = max(
+        (
+            moment
+            for moment in (
+                stored["last_practised_at"], derived.last_practised_at, usage_at
+            )
+            if moment is not None
+        ),
+        default=None,
+    )
+    connection.execute(
+        update(user_vocabulary_progress)
+        .where(
+            user_vocabulary_progress.c.user_id == user_id,
+            user_vocabulary_progress.c.vocabulary_item_id == vocabulary_item_id,
+        )
+        .values(
+            status=derived.status,
+            mastery_score=derived.mastery_score,
+            exposure_count=derived.exposure_count,
+            correct_attempt_count=derived.correct_attempt_count,
+            first_learned_at=derived.first_learned_at,
+            last_practised_at=last_practised,
+            updated_at=utc_now(),
+        )
+    )
+    if stored["status"] != "mastered" and derived.status == "mastered":
+        award(
+            connection,
+            user_id=user_id,
+            event_type="vocabularyMastered",
+            idempotency_key=f"mastery:{vocabulary_item_id}",
+            language_profile_id=language_profile_id,
+            session_id=session_id,
         )
     return encounter
 
@@ -265,6 +283,7 @@ class PostgresVocabularyRepository:
                     ).mappings()
                 }
                 encounters: dict[UUID, list[UUID]] = {}
+                histories: dict[UUID, list[Evidence]] = {}
                 latest_session: dict[UUID, UUID] = {}
                 for row in connection.execute(
                     select(vocabulary_encounters)
@@ -275,7 +294,20 @@ class PostgresVocabularyRepository:
                     .order_by(vocabulary_encounters.c.occurred_at, vocabulary_encounters.c.id)
                 ).mappings():
                     encounters.setdefault(row["vocabulary_item_id"], []).append(row["id"])
+                    histories.setdefault(row["vocabulary_item_id"], []).append(
+                        Evidence(
+                            occurred_at=row["occurred_at"],
+                            encounter_type=row["encounter_type"],
+                            outcome=row["outcome"],
+                        )
+                    )
                     latest_session[row["vocabulary_item_id"]] = row["session_id"]
+                # Status is derived, never trusted from the stored column, so
+                # decayed words show their demoted rank without a write.
+                timezone = connection.execute(
+                    select(users.c.timezone).where(users.c.id == user_id)
+                ).scalar_one()
+                now = utc_now()
                 # scene_id/topic describe the word's most recent encounter scene.
                 scene_assets = (
                     {
@@ -310,13 +342,22 @@ class PostgresVocabularyRepository:
                     )
                     return scene_row
 
+                def progress(row):
+                    derived = derive_progress(
+                        histories.get(row["vocabulary_item_id"], []),
+                        timezone=timezone,
+                        now=now,
+                    )
+                    return UserVocabularyProgress.model_validate(
+                        {key: row[key] for key in UserVocabularyProgress.model_fields}
+                        | {"status": derived.status, "mastery_score": derived.mastery_score}
+                    )
+
                 return [
                     DailyVocabularyItem(
                         vocabulary=items[row["vocabulary_item_id"]],
                         translation=translations.get(row["vocabulary_item_id"]),
-                        progress=UserVocabularyProgress.model_validate(
-                            {key: row[key] for key in UserVocabularyProgress.model_fields}
-                        ),
+                        progress=progress(row),
                         scene_id=(scene(row) or {}).get("slug"),
                         topic=(scene(row) or {}).get("title"),
                         encounter_ids=encounters.get(row["vocabulary_item_id"], []),
@@ -392,12 +433,14 @@ class PostgresVocabularyRepository:
                     else []
                 )
                 for item_id in resolved:
+                    # Journal usage is unevaluated evidence: it refreshes recency
+                    # through usage_at but never promotes a word's status.
                     record_vocabulary_evidence(
                         connection,
                         user_id=user_id,
                         vocabulary_item_id=item_id,
-                        status_target="mastered",
-                        occurred_at=occurred_at,
+                        usage_at=occurred_at,
+                        language_profile_id=language_profile_id,
                     )
                 award(
                     connection,

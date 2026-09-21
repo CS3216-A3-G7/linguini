@@ -41,7 +41,9 @@ def test_processing_transition_preserves_draft_and_records_timeout_clock():
         <= utc_now()
     )
     assert "processingStartedAt" not in session.analysis_draft
-    running = repository._transition(connection, processing, "inProgress")
+    ready = repository._transition(connection, processing, "ready")
+    assert ready.started_at is None
+    running = repository._transition(connection, ready, "inProgress")
     assert running.started_at is not None
     assert running.analysis_draft == processing.analysis_draft
     with pytest.raises(PracticeConflictError):
