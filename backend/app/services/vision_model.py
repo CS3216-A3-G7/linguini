@@ -1,0 +1,171 @@
+"""Provider-independent vision-model client interface.
+
+Defines the request/response contract every vision adapter implements plus the
+stable error codes surfaced to callers. Images are always inlined as raw bytes
+— no code path accepts a remote image URL.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any, Protocol
+
+from pydantic import BaseModel
+
+from app.schemas.media import MAX_IMAGE_BYTES
+
+ALLOWED_IMAGE_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
+
+
+class VisionModelErrorCode(StrEnum):
+    INVALID_IMAGE = "invalidImage"
+    PROVIDER_TIMEOUT = "providerTimeout"
+    PROVIDER_UNAVAILABLE = "providerUnavailable"
+    PROVIDER_RATE_LIMITED = "providerRateLimited"
+    PROVIDER_AUTH = "providerAuth"
+    PROVIDER_REFUSED = "providerRefused"
+    PROVIDER_RESPONSE_INVALID = "providerResponseInvalid"
+    PROVIDER_ERROR = "providerError"
+
+
+_TRANSIENT_CODES = frozenset(
+    {
+        VisionModelErrorCode.PROVIDER_TIMEOUT,
+        VisionModelErrorCode.PROVIDER_UNAVAILABLE,
+        VisionModelErrorCode.PROVIDER_RATE_LIMITED,
+    }
+)
+
+
+class VisionModelError(Exception):
+    """Stable vision-model failure. Never carries provider payload text."""
+
+    def __init__(self, code: VisionModelErrorCode, message: str) -> None:
+        self.code = code
+        super().__init__(message)
+
+    @property
+    def transient(self) -> bool:
+        return self.code in _TRANSIENT_CODES
+
+
+@dataclass(frozen=True)
+class VisionImage:
+    data: bytes
+    mime_type: str
+
+    def __post_init__(self) -> None:
+        if self.mime_type not in ALLOWED_IMAGE_MIME_TYPES:
+            raise VisionModelError(
+                VisionModelErrorCode.INVALID_IMAGE,
+                f"unsupported image mime type {self.mime_type!r}",
+            )
+        if not self.data:
+            raise VisionModelError(
+                VisionModelErrorCode.INVALID_IMAGE, "image data must not be empty"
+            )
+        if len(self.data) > MAX_IMAGE_BYTES:
+            raise VisionModelError(
+                VisionModelErrorCode.INVALID_IMAGE,
+                f"image data exceeds the {MAX_IMAGE_BYTES}-byte limit",
+            )
+
+
+@dataclass(frozen=True)
+class VisionModelConfig:
+    model_name: str
+    timeout_seconds: float = 30.0
+    max_output_tokens: int = 1500
+    max_retries: int = 1
+
+    def __post_init__(self) -> None:
+        if not self.model_name:
+            raise ValueError("model_name must not be empty")
+        if self.timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
+        if self.max_output_tokens <= 0:
+            raise ValueError("max_output_tokens must be positive")
+        if not 0 <= self.max_retries <= 1:
+            raise ValueError("max_retries must be 0 or 1: retry at most once")
+
+
+@dataclass(frozen=True)
+class VisionModelRequest:
+    image: VisionImage
+    system_prompt: str
+    user_instruction: str
+    json_schema_name: str
+    json_schema: dict[str, Any]
+    prompt_version: str
+
+
+@dataclass(frozen=True)
+class VisionModelResponse:
+    output_text: str
+    model_name: str
+    prompt_version: str
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+
+class VisionModelClient(Protocol):
+    def generate(self, request: VisionModelRequest) -> VisionModelResponse: ...
+
+
+_STRIPPED_KEYWORDS = frozenset(
+    {
+        "minLength",
+        "maxLength",
+        "pattern",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "minItems",
+        "maxItems",
+        "default",
+        "format",
+        "title",
+        "$defs",
+        "$id",
+        "$schema",
+    }
+)
+
+
+def _strictify(node: Any, defs: dict[str, Any]) -> Any:
+    """Recursively inline $refs and enforce strict-mode constraints in place."""
+    if isinstance(node, list):
+        return [_strictify(item, defs) for item in node]
+    if not isinstance(node, dict):
+        return node
+
+    ref = node.get("$ref")
+    if ref is not None:
+        if not isinstance(ref, str) or not ref.startswith("#/$defs/"):
+            raise ValueError(f"unsupported schema reference {ref!r}")
+        target = defs[ref.removeprefix("#/$defs/")]
+        return _strictify(target, defs)
+
+    schema = {
+        key: _strictify(value, defs)
+        for key, value in node.items()
+        if key not in _STRIPPED_KEYWORDS
+    }
+    if schema.get("type") == "object" and "properties" in schema:
+        schema["additionalProperties"] = False
+        schema["required"] = list(schema["properties"])
+    return schema
+
+
+def build_strict_json_schema(model: type[BaseModel]) -> dict[str, Any]:
+    """Derive a strict structured-output schema from a Pydantic model.
+
+    Inlines ``$defs``/``$ref``, closes every object
+    (``additionalProperties: false``), marks all properties required, and strips
+    keywords strict mode rejects.
+    """
+    raw = model.model_json_schema(by_alias=True)
+    defs = raw.get("$defs", {})
+    return _strictify(raw, defs)

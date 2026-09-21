@@ -31,18 +31,16 @@ class MediaSource(StrEnum):
 
 
 class SceneRelationType(StrEnum):
+    LEFT_OF = "left_of"
+    RIGHT_OF = "right_of"
     ABOVE = "above"
     BELOW = "below"
-    LEFT_OF = "leftOf"
-    RIGHT_OF = "rightOf"
-    IN_FRONT_OF = "inFrontOf"
-    BEHIND = "behind"
     ON = "on"
-    IN = "in"
     UNDER = "under"
-    HOLDING = "holding"
-    PART_OF = "partOf"
-    NEXT_TO = "nextTo"
+    INSIDE = "inside"
+    IN_FRONT_OF = "in_front_of"
+    BEHIND = "behind"
+    NEXT_TO = "next_to"
     NEAR = "near"
 
 
