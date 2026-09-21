@@ -49,7 +49,6 @@ class CreateSessionRequest(ApiModel):
 
 class GenerateSessionPlanRequest(ApiModel):
     desired_vocabulary_count: Annotated[int, Field(ge=1, le=20)] = 5
-    include_pronunciation: bool = True
     include_grammar: bool = True
     include_syntax: bool = True
     include_sentence_building: bool = True

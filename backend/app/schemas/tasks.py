@@ -88,16 +88,6 @@ class GrammarLessonContent(ApiModel):
     questions: Annotated[list[GrammarLessonQuestion], Field(min_length=1)]
 
 
-class PronunciationPracticeContent(ApiModel):
-    kind: Literal["pronunciationPractice"] = "pronunciationPractice"
-    vocabulary_item_id: UUID
-    prompt: NonEmptyText
-    target_text: NonEmptyText
-    phonetic_text: str | None = None
-    reference_audio_asset_id: UUID | None = None
-    allow_text_fallback: bool = True
-
-
 class GrammarExplanationContent(ApiModel):
     kind: Literal["grammarExplanation"] = "grammarExplanation"
     title: NonEmptyText
@@ -160,7 +150,6 @@ class ReflectionContent(ApiModel):
 type TaskPublicContent = Annotated[
     VocabularyIntroductionContent
     | GrammarLessonContent
-    | PronunciationPracticeContent
     | GrammarExplanationContent
     | GrammarPracticeContent
     | SyntaxExplanationContent

@@ -77,7 +77,7 @@ def make_plan(uploaded=True, language="es"):
 def test_every_task_kind_is_persistable_skippable_and_private(uploaded):
     objects, tasks = make_plan(uploaded)
     # Grammar lessons come from the learning-task generator, not the deterministic plan.
-    expected = set(TaskKind) - {TaskKind.PRONUNCIATION_PRACTICE, TaskKind.GRAMMAR_LESSON}
+    expected = set(TaskKind) - {TaskKind.GRAMMAR_LESSON}
     assert {t.kind for t in tasks} == expected
     assert len(tasks) == len(expected)
     assert all(o.vocabulary_item_id for o in objects)

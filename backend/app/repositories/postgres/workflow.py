@@ -1079,7 +1079,6 @@ def evaluate(task, request):
     allowed = {
         "vocabularyIntroduction": {"vocabularyReview"},
         "grammarLesson": {"vocabularyReview"},
-        "pronunciationPractice": {"text"},
         "grammarPractice": {"text", "multipleChoice"},
         "sentenceBuilding": {"text"},
         "ispyRound": {"objectSelection", "multipleChoice"},

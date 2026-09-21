@@ -5,7 +5,7 @@ import type { SessionTask, TaskContent } from "../src/lib/api.ts";
 
 const contents: TaskContent[] = [
   { kind: "vocabularyIntroduction", title: "Learn a word", targetText: "mesa", translation: "table", partOfSpeech: "noun", exampleSentence: null },
-  { kind: "pronunciationPractice", prompt: "Type mesa", targetText: "mesa" },
+  { kind: "grammarLesson", focus: "genderAgreement", title: "Gender", explanation: "Match the article.", questions: [{ questionId: "q1", prompt: "la ___", options: [{ optionId: "a", label: "mesa" }, { optionId: "b", label: "libro" }] }] },
   { kind: "grammarExplanation", title: "Grammar", explanation: "A noun", examples: ["mesa"] },
   { kind: "grammarPractice", prompt: "Choose", options: ["mesa", "silla"] },
   { kind: "syntaxExplanation", title: "Syntax", sentencePattern: "La mesa", explanation: "Read", examples: ["La mesa"] },

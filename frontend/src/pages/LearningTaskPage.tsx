@@ -62,7 +62,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
   return <div className="stack">
     <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
     <div className="learning-title-row"><h1>{taskTitle(task)}</h1><Button variant="quiet" className="learning-exit" onClick={onClose}>Back to tasks</Button></div>
-    {card && ["vocabularyIntroduction", "pronunciationPractice"].includes(content.kind) ? <div className="flashcard learning-card">
+    {card && content.kind === "vocabularyIntroduction" ? <div className="flashcard learning-card">
       <div className="spread"><span className="label muted">{card.wordClass}{card.gender ? " · " + card.gender : ""}</span>
         <IconButton label={"Hear " + card.word} onClick={() => speak(card.word, scene.languageCode)}><SpeakerIcon /></IconButton></div>
       <div className="learning-card__word"><h2>{card.word}</h2><p className="muted">{card.translation}</p></div>
