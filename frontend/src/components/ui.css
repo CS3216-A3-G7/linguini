@@ -331,7 +331,6 @@
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: auto;
 }
 
 /* Never place object markers over a missing image. */
