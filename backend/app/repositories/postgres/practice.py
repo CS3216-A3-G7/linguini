@@ -65,26 +65,25 @@ class SessionBackedLearningRepository:
         from app.repositories.postgres.language_profiles import language_profiles
         from app.repositories.postgres.scenes import preloaded_scenes
         from app.repositories.postgres.tasks import session_tasks
-        from app.repositories.postgres.vocabulary import vocabulary_encounters, vocabulary_items
+        from app.repositories.postgres.xp import xp_events
         from app.schemas.progress import ScenarioProgress
 
         if user_id != self.user_id:
             return None
         with self.engine.connect() as connection:
             query = (
-                select(func.count())
-                .select_from(vocabulary_encounters)
-                .join(
-                    vocabulary_items,
-                    vocabulary_items.c.id == vocabulary_encounters.c.vocabulary_item_id,
-                )
-                .where(vocabulary_encounters.c.user_id == user_id)
+                select(func.coalesce(func.sum(xp_events.c.amount), 0))
+                .select_from(xp_events)
+                .where(xp_events.c.user_id == user_id)
             )
             if language_code:
-                query = query.where(
-                    func.lower(vocabulary_items.c.language_code) == language_code.lower()
+                query = query.join(
+                    language_profiles,
+                    language_profiles.c.id == xp_events.c.language_profile_id,
+                ).where(
+                    func.lower(language_profiles.c.target_language_code) == language_code.lower()
                 )
-            xp = connection.execute(query).scalar_one() * 5
+            xp = connection.execute(query).scalar_one()
             query = (
                 select(sessions, preloaded_scenes.c.slug, preloaded_scenes.c.title)
                 .join(language_profiles, language_profiles.c.id == sessions.c.language_profile_id)
