@@ -246,7 +246,7 @@ export async function saveJournal(draft: JournalDraft, profileId: string, id?: s
 }
 
 export type TaskContent =
-  | { kind: "vocabularyIntroduction"; title: string; targetText: string; translation: string; partOfSpeech: WordClass; exampleSentence: string | null }
+  | { kind: "vocabularyIntroduction"; title: string; words: VocabularyLearningWord[]; questions: VocabularyQuestion[]; allowTypingPractice: boolean; targetText?: string | null; translation?: string | null; partOfSpeech?: WordClass | null; exampleSentence?: string | null }
   | { kind: "pronunciationPractice"; prompt: string; targetText: string }
   | { kind: "grammarExplanation"; title: string; explanation: string; examples: string[] }
   | { kind: "grammarPractice"; prompt: string; options: string[] }
@@ -273,8 +273,14 @@ export interface PracticeDetail {
   sceneObjectRelations: SceneObjectRelation[];
   vocabulary: { id: string; displayText: string; partOfSpeech: WordClass; gender: string | null; exampleSentence: string | null; languageCode: string }[];
   translations: { vocabularyItemId: string; translatedText: string }[];
+  translationPreview: {
+    objects: TranslatedTerm[];
+    attributes: TranslatedTerm[];
+    relationships: TranslatedTerm[];
+  } | null;
   tasks: SessionTask[]; nextTaskId: string | null; progress: SessionProgress;
 }
+interface TranslatedTerm { key: string; source: string; translation: string }
 export interface SceneObject {
   id: string; sessionId: string; label: string; vocabularyItemId: string | null;
   boundingBox: { x: number | string; y: number | string; width: number | string; height: number | string } | null;
@@ -284,7 +290,14 @@ export interface SceneObjectRelation {
   id: string; subjectSceneObjectId: string; relation: string;
   referenceSceneObjectId: string; sourceRelationKey: string | null;
 }
-export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string };
+export interface VocabularyLearningWord {
+  learningKey: string | null; termType: "object" | "attribute" | "relationship";
+  vocabularyItemId: string | null; sceneObjectId: string | null; targetText: string; translation: string;
+  partOfSpeech: WordClass; gender: string | null; pluralForm: string | null; phoneticText: string | null;
+  pronunciationAudioAssetId: string | null; exampleSentence: string | null;
+}
+export interface VocabularyQuestion { questionId: string; prompt: string; options: { optionId: string; label: string }[] }
+export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string } | { inputMode: "vocabularyReview"; answers: Record<string, string>; typedAnswers: Record<string, string> };
 export interface TaskActionResult {
   task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;
   attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null } | null;

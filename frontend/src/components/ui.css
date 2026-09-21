@@ -706,6 +706,44 @@
   gap: var(--space-3);
 }
 
+.translation-preview {
+  display: grid;
+  gap: var(--space-4);
+  border: 1px solid var(--line);
+  background: #eef7f6;
+}
+
+.translation-preview__group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.translation-preview__group h3 {
+  color: var(--teal-dark);
+  font-size: var(--text-small);
+}
+
+.translation-preview__terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.translation-preview__term {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  color: var(--muted);
+  box-shadow: 0 2px 0 rgba(20, 65, 62, 0.08);
+}
+
+.translation-preview__term strong {
+  color: var(--teal-dark);
+}
+
 .analysis-attribute-fields {
   display: grid;
   gap: var(--space-3);
@@ -2578,6 +2616,35 @@
   color: var(--ink-muted);
   font-size: var(--text-label);
   font-weight: 800;
+}
+
+.vocabulary-learning-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.vocabulary-learning-card {
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+.vocabulary-learning-card .learning-card__word h2 {
+  font-size: clamp(28px, 5vw, 40px);
+  overflow-wrap: anywhere;
+}
+
+.vocabulary-flow__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+@media (max-width: 720px) {
+  .vocabulary-learning-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .flashcard {

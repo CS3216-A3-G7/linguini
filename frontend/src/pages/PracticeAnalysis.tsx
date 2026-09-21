@@ -52,7 +52,7 @@ export function PracticeAnalysis() {
       <div className="analysis-loading__copy"><h2>Still working on your scene...</h2><p className="muted">This is taking longer than usual. You can check again.</p>{practiceError ? <p role="alert">{practiceError}</p> : null}<Button onClick={() => retryProcessing(session.session.id)}>Retry</Button></div>
     </section> : <section className="analysis-loading" aria-live="polite" aria-busy="true">
       <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={scene} items={[]} /><span className="analysis-scan__line" /></div>
-      <div className="analysis-loading__copy"><h2>{session.session.status === "generatingTasks" ? "Preparing your practice..." : "Finding objects in your image..."}</h2><p className="muted">This will only take a moment.</p></div>
+      <div className="analysis-loading__copy"><h2>{session.session.status === "generatingTasks" ? "Translating your scene..." : "Finding objects in your image..."}</h2><p className="muted">{session.session.status === "generatingTasks" ? "Turning your confirmed words into your learning language." : "This will only take a moment."}</p></div>
     </section>}
   </div>;
   const locked = session.tasks.some(task => task.status !== "pending");
