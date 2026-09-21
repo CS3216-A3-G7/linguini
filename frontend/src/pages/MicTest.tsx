@@ -103,7 +103,7 @@ export function MicTest() {
         block
         disabled={state === "idle" || state === "listening"}
         onClick={async () => {
-          await startSession(scene.sessionId);
+          await startSession(scene.sessionId).catch(() => {});
           navigate(`/practice/sessions/${scene.sessionId}/learn`);
         }}
       >

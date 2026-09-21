@@ -715,8 +715,9 @@ class PostgresWorkflowRepository:
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
             # Review ends at ready; the learner starts the session explicitly.
+            # The objects/relations are persisted now, so the draft is dropped.
             if session.status == "generatingTasks":
-                session = self._transition(c, session, "ready")
+                session = self._transition(c, session, "ready", analysis_draft=None)
             return self._detail(c, session)
 
     def start(self, session_id, profile_id):

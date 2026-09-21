@@ -575,7 +575,7 @@ def test_start_moves_ready_to_in_progress_and_is_idempotent(database):
 
 
 def test_confirm_objects_mirrors_review_and_task_action_auto_starts(database):
-    _, _, profile, client = database
+    engine, _, profile, client = database
     sid = create_run(client, profile, "confirm-objects-key")["session"]["id"]
     detail = analyze(client, sid, confirm=False)
     confirmed = client.post(
@@ -585,6 +585,14 @@ def test_confirm_objects_mirrors_review_and_task_action_auto_starts(database):
     assert confirmed.status_code == 200, confirmed.text
     session = confirmed.json()["session"]
     assert session["status"] == "ready" and session["startedAt"] is None
+    with engine.connect() as c:
+        # Persisted objects/relations replace the draft; nothing reads it past ready.
+        assert (
+            c.execute(
+                select(sessions.c.analysis_draft).where(sessions.c.id == UUID(sid))
+            ).scalar_one()
+            is None
+        )
     tasks = confirmed.json()["tasks"]
     assert tasks
     # A first task action defensively auto-starts a ready session.
