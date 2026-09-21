@@ -56,6 +56,7 @@ export function ScenePhoto({
           "scene__marker",
           custom ? "scene__marker--custom" : "",
           active ? "scene__marker--active" : "",
+          item.y < 12 ? "scene__marker--below" : "",
         ]
           .filter(Boolean)
           .join(" ");
@@ -71,11 +72,11 @@ export function ScenePhoto({
             aria-label={`Marker ${item.marker}: ${item.word}`}
             aria-pressed={active}
           >
-            {item.marker}
+            <span className="scene__marker-label">{item.marker}</span>
           </button>
         ) : (
           <span key={item.id} className={className} style={style} aria-hidden="true">
-            {item.marker}
+            <span className="scene__marker-label">{item.marker}</span>
           </span>
         );
       })}

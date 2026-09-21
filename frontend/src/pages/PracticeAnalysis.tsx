@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Button, Card } from "../components/ui";
+import { Button, Card, ComboBox } from "../components/ui";
 import { ArrowRightIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
 import { LeaveSession } from "../components/LeaveSession";
@@ -17,6 +17,7 @@ const RELATION_OPTIONS = [
   ["on", "On"], ["under", "Under"], ["in", "Inside"], ["inFrontOf", "In front of"],
   ["behind", "Behind"], ["nextTo", "Next to"], ["near", "Near"],
 ] as const;
+const RELATION_CHOICES = RELATION_OPTIONS.map(([value, label]) => ({ value, label }));
 type AnalysisPanel = "objects" | "attributes" | "relations";
 
 export function PracticeAnalysis() {
@@ -163,10 +164,9 @@ export function PracticeAnalysis() {
           <div><h2 id="analysis-attributes-title">Visible attributes</h2><p className="muted">Correct only what you can clearly see in the photo.</p></div>
           <Card plain className="analysis-word-card analysis-attribute-card">
             <label className="field__label" htmlFor="attribute-object">Object</label>
-            <select className="input" id="attribute-object" value={activeAttributeObjectId}
-              onChange={event => setAttributeObjectId(event.target.value)}>
-              {relationObjects.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-            </select>
+            <ComboBox id="attribute-object" value={activeAttributeObjectId}
+              options={relationObjects.map(item => ({ value: item.id, label: item.label }))}
+              onChange={setAttributeObjectId} />
             <div className="analysis-attribute-fields">
               {ATTRIBUTE_TYPES.map(type => <label key={type}><span>{type}</span><input className="input" value={attributes[activeAttributeObjectId]?.[type] ?? ""}
                 placeholder={`No ${type}`} disabled={locked || practiceSaving} onChange={event => setAttributes(current => ({ ...current,
@@ -184,11 +184,11 @@ export function PracticeAnalysis() {
                 <div className="analysis-relation-row__flow">
                   <strong>{relationObjects.find(item => item.id === row.subjectSceneObjectId)?.label}</strong>
                   {locked ? <span className="analysis-relation-row__relation">{RELATION_OPTIONS.find(option => option[0] === row.relation)?.[1] ?? row.relation}</span> :
-                    <select className="analysis-relation-row__select" aria-label="Connection" value={row.relation}
-                      onChange={event => setRelations(current => current.map(item => item.id === row.id ? { ...item, relation: event.target.value } : item))}>
-                      {!RELATION_OPTIONS.some(option => option[0] === row.relation) ? <option value={row.relation}>{row.relation}</option> : null}
-                      {RELATION_OPTIONS.map(option => <option key={option[0]} value={option[0]}>{option[1]}</option>)}
-                    </select>}
+                    <ComboBox compact ariaLabel="Connection" value={row.relation}
+                      options={!RELATION_OPTIONS.some(option => option[0] === row.relation)
+                        ? [{ value: row.relation, label: row.relation }, ...RELATION_CHOICES]
+                        : RELATION_CHOICES}
+                      onChange={value => setRelations(current => current.map(item => item.id === row.id ? { ...item, relation: value } : item))} />}
                   <strong>{relationObjects.find(item => item.id === row.referenceSceneObjectId)?.label}</strong>
                 </div>
                 {!locked ? <button type="button" className="analysis-word-row__remove" disabled={practiceSaving} aria-label={`Remove relation ${row.relation}`} onClick={() => setRelations(current => current.filter(item => item.id !== row.id))}><CloseIcon size={18} /></button> : null}
@@ -197,20 +197,15 @@ export function PracticeAnalysis() {
             </div>
             {!locked ? <form className="stack" onSubmit={event => { event.preventDefault(); addRelation(); }}>
               <label className="field__label" htmlFor="relation-subject">Object</label>
-              <select className="input" id="relation-subject" value={subject} disabled={practiceSaving} onChange={event => setSubject(event.target.value)}>
-                <option value="">Choose an object</option>
-                {relationObjects.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
+              <ComboBox id="relation-subject" value={subject} disabled={practiceSaving} placeholder="Choose an object"
+                options={relationObjects.map(item => ({ value: item.id, label: item.label }))} onChange={setSubject} />
               <label className="field__label" htmlFor="relation-text">Connection</label>
-              <select className="input" id="relation-text" value={relationText} disabled={practiceSaving} onChange={event => setRelationText(event.target.value)}>
-                <option value="">Choose a connection</option>
-                {RELATION_OPTIONS.map(option => <option key={option[0]} value={option[0]}>{option[1]}</option>)}
-              </select>
+              <ComboBox id="relation-text" value={relationText} disabled={practiceSaving} placeholder="Choose a connection"
+                options={RELATION_CHOICES} onChange={setRelationText} />
               <label className="field__label" htmlFor="relation-reference">Related object</label>
-              <select className="input" id="relation-reference" value={reference} disabled={practiceSaving} onChange={event => setReference(event.target.value)}>
-                <option value="">Choose another object</option>
-                {relationObjects.filter(item => item.id !== subject).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
+              <ComboBox id="relation-reference" value={reference} disabled={practiceSaving} placeholder="Choose another object"
+                options={relationObjects.filter(item => item.id !== subject).map(item => ({ value: item.id, label: item.label }))}
+                onChange={setReference} />
               <Button type="submit" variant="secondary" disabled={practiceSaving || !relationText.trim() || subject === reference || !selectedIds.has(subject) || !selectedIds.has(reference) || visibleRelations.length >= 100}>Add connection</Button>
             </form> : null}
           </Card>
