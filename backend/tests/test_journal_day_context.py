@@ -8,7 +8,12 @@ import pytest
 from app.repositories.journals import FutureJournalDateError
 from app.repositories.media_assets import SessionImage
 from app.schemas.base import utc_now
-from app.schemas.journals import Journal, JournalDetailResponse, UpsertTodayJournalRequest
+from app.schemas.journals import (
+    Journal,
+    JournalDetailResponse,
+    JournalMedia,
+    UpsertTodayJournalRequest,
+)
 from app.schemas.media import MediaAsset
 from app.services.journals import JournalService
 
@@ -76,6 +81,32 @@ def test_day_context_returns_journal_and_signed_eligible_photos():
         call.args[0] for call in service.private_media_urls.resolve.call_args_list if call.args[0]
     ]
     assert key_calls == [[asset.storage_key]]
+
+
+def test_day_context_does_not_sign_journal_covers():
+    today = datetime.now(ZoneInfo(TIMEZONE)).date()
+    service, user, _ = _service([], media=MagicMock(), signer=MagicMock())
+    journal = Journal(
+        user_id=user.id,
+        language_profile_id=uuid4(),
+        local_date=today,
+        timezone=TIMEZONE,
+    )
+    cover = _asset("users/x/cover.jpg")
+    entry = JournalDetailResponse(
+        journal=journal,
+        media=[JournalMedia(journal_id=journal.id, media_asset_id=cover.id, display_order=0)],
+    )
+    service.repository.read.return_value = [entry]
+    service.media.list_completed_session_images.return_value = []
+
+    context = service.day_context(today)
+
+    # The entry lookup reads rows directly; only eligible photos get signed.
+    service.private_media_urls.resolve.assert_called_once_with([], width=400)
+    assert context.journal == journal
+    assert entry.image_url is None
+    assert entry.media[0].image_url is None
 
 
 def test_day_context_queries_local_midnight_window_in_user_timezone():

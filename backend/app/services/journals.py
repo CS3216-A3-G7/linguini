@@ -105,24 +105,18 @@ class JournalService:
             if self.private_media_urls
             else {key: public_media_url(key, self.media_public_base_url) for key in keys}
         )
-        media = [
-            media.model_copy(
-                update={
-                    "image_url": (
-                        urls.get(asset.storage_key)
-                        if (asset := allowed.get(media.media_asset_id)) is not None
-                        else None
-                    ),
-                    "width": asset.width
-                    if (asset := allowed.get(media.media_asset_id)) is not None
-                    else None,
-                    "height": asset.height
-                    if (asset := allowed.get(media.media_asset_id)) is not None
-                    else None,
-                }
+        media = []
+        for row in entry.media:
+            asset = allowed.get(row.media_asset_id)
+            media.append(
+                row.model_copy(
+                    update={
+                        "image_url": urls.get(asset.storage_key) if asset else None,
+                        "width": asset.width if asset else None,
+                        "height": asset.height if asset else None,
+                    }
+                )
             )
-            for media in entry.media
-        ]
         cover = min(media, key=lambda row: row.display_order) if media else None
         cover_url = (
             urls.get(allowed[cover.media_asset_id].storage_key)
@@ -186,7 +180,16 @@ class JournalService:
         day = day or today
         if day > today:
             raise FutureJournalDateError("Cannot create a journal entry for a future date.")
-        entry = next((row for row in self.list_entries() if row.journal.local_date == day), None)
+        # Look up the day's entry without hydrating media; only eligible photos
+        # need signed URLs here, so list_entries' cover signing would be wasted.
+        entry = next(
+            (
+                row
+                for row in self.repository.read()
+                if row.journal.user_id == user.id and row.journal.local_date == day
+            ),
+            None,
+        )
         eligible_photos: list[JournalPhotoOption] = []
         if self.media is not None:
             start = datetime.combine(day, time.min, tzinfo=tz)

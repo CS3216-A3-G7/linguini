@@ -7,11 +7,10 @@ type Props = {
   width?: number | null;
   height?: number | null;
   loading?: "lazy" | "eager";
-  aspectRatio?: string;
   onError?: () => void;
 };
 
-export function SceneImage({ scene, className, width, height, loading, aspectRatio, onError }: Props) {
+export function SceneImage({ scene, className, width, height, loading, onError }: Props) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   if (!scene.imageUrl || failedUrl === scene.imageUrl) {
     return (
@@ -34,7 +33,6 @@ export function SceneImage({ scene, className, width, height, loading, aspectRat
       decoding="async"
       width={hasDimensions ? width : undefined}
       height={hasDimensions ? height : undefined}
-      style={!hasDimensions && aspectRatio ? { aspectRatio } : undefined}
       onError={() => {
         setFailedUrl(scene.imageUrl);
         onError?.();
