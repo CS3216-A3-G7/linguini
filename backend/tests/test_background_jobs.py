@@ -128,3 +128,36 @@ def test_vocabulary_introduction_questions_always_carry_the_answer():
         assert question.correct_option_id
     for question in introductions[0].public_content.model_dump(mode="json")["questions"]:
         assert question["correctOptionId"]
+
+
+def test_rereview_of_a_pending_inprogress_session_regenerates_in_background(database):
+    engine, owner, profile, client = database
+    runner = DeferringRunner()
+    repo = PostgresWorkflowRepository(engine, owner.id, background=runner)
+    sid = UUID(create_run(client, profile)["session"]["id"])
+    repo.analyze(sid, profile.id)
+    runner.jobs.pop()()
+    objects = repo.get(sid, profile.id).scene_objects
+    repo.review(
+        sid,
+        profile.id,
+        ReviewPracticeRequest(accepted_object_ids=[obj.id for obj in objects]),
+    )
+    runner.jobs.pop()()
+    settled = repo.get(sid, profile.id)
+    assert settled.session.status == "inProgress"
+    assert settled.tasks
+    # A pending inProgress session can be re-reviewed; the rebuild is claimed
+    # on the request and finished by the background job.
+    again = repo.review(
+        sid,
+        profile.id,
+        ReviewPracticeRequest(accepted_object_ids=[objects[0].id]),
+    )
+    assert again.session.status == "generatingTasks"
+    assert not again.tasks
+    assert len(runner.jobs) == 1
+    runner.jobs.pop()()
+    settled = repo.get(sid, profile.id)
+    assert settled.session.status == "inProgress"
+    assert settled.tasks

@@ -162,9 +162,18 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
         yield connection
 
     repo.transaction = transaction
-    repo._session = lambda *args: SimpleNamespace(
-        id=session_id, status="inProgress", started_at=None
+    from app.schemas.sessions import Session
+
+    in_progress = Session(
+        id=session_id,
+        user_id=uuid4(),
+        language_profile_id=profile_id,
+        scene_media_asset_id=uuid4(),
+        status="inProgress",
     )
+    generating = in_progress.model_copy(update={"status": "generatingTasks"})
+    # Phase A claims the rebuild, then the background job reads the session twice.
+    repo._session = MagicMock(side_effect=[in_progress, generating, generating])
     repo._tasks = lambda *args: []
     repo._detail = MagicMock(side_effect=[detail, detail, generated])
     repo.review(session_id, profile_id, ReviewPracticeRequest(accepted_object_ids=[objects[1].id]))

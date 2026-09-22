@@ -41,4 +41,6 @@ class ThreadPoolBackgroundRunner:
         self._pool.submit(fn, *args, **kwargs).add_done_callback(self._report)
 
     def shutdown(self, wait: bool = True) -> None:
-        self._pool.shutdown(wait=wait)
+        # Queued-but-unstarted jobs are dropped; the 15-minute `_reap` of stale
+        # processing sessions is the recovery path for their claimed sessions.
+        self._pool.shutdown(wait=wait, cancel_futures=True)

@@ -63,8 +63,8 @@ ALLOWED_TRANSITIONS = {
     "analyzingScene": {"awaitingObjectReview", "abandoned", "failed"},
     "awaitingObjectReview": {"analyzingScene", "generatingTasks", "abandoned", "failed"},
     "generatingTasks": {"awaitingObjectReview", "ready", "inProgress", "abandoned", "failed"},
-    "ready": {"inProgress", "abandoned", "failed"},
-    "inProgress": {"completed", "abandoned", "failed"},
+    "ready": {"generatingTasks", "inProgress", "abandoned", "failed"},
+    "inProgress": {"generatingTasks", "completed", "abandoned", "failed"},
     "completed": set(),
     "abandoned": set(),
     "failed": set(),
@@ -617,6 +617,9 @@ class PostgresWorkflowRepository:
 
     def _run_scene_analysis(self, session_id, profile_id, claimed, asset, profile, scene):
         """Model round-trip, off the request path. Must never raise to its runner."""
+        # TEMPORARY authorized testing delay; remove after timing/resume checks.
+        import time
+        time.sleep(20)
         try:
             result = self.analyzer.analyze(
                 claimed, asset, profile, scene
@@ -704,6 +707,9 @@ class PostgresWorkflowRepository:
 
     def _run_task_generation(self, session_id, profile_id):
         """Translator + lesson generation, off the request path. Never re-raises."""
+        # TEMPORARY authorized testing delay; remove after timing/resume checks.
+        import time
+        time.sleep(20)
         try:
             self._generate_tasks(session_id, profile_id)
         except Exception:
@@ -830,12 +836,14 @@ class PostgresWorkflowRepository:
                         source_relation_key=source_key,
                     )
                 )
-            if session.status not in {"ready", "inProgress"}:
-                session = self._transition(c, session, "generatingTasks")
+            session = self._transition(c, session, "generatingTasks")
             return self._detail(c, session)
 
     def _generate_tasks(self, session_id, profile_id):
         lessons = []
+        translated_scene = None
+        # Phase 1: read everything the provider calls need, then let go of the
+        # connection before the model round-trips start.
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
             profile = (
@@ -847,8 +855,8 @@ class PostgresWorkflowRepository:
             # Phase A left exactly the accepted objects; rebuild tasks from scratch.
             c.execute(delete(session_tasks).where(session_tasks.c.session_id == session_id))
             objects = list(detail.scene_objects)
-            if self.translator:
-                payload = {
+            payload = (
+                {
                     "targetLanguage": profile["target_language_code"],
                     "sceneTitle": session.session_title or detail.title,
                     "sceneSummary": session.session_summary or "Confirmed scene vocabulary.",
@@ -869,23 +877,35 @@ class PostgresWorkflowRepository:
                         for row in detail.scene_object_relations
                     ],
                 }
-                translated_scene = self.translator.translate(payload)
-                if self.learning_task_generator:
-                    try:
-                        lessons = build_grammar_lessons(
-                            session_id,
-                            self.learning_task_generator.generate(
-                                _learning_task_payload(
-                                    payload, translated_scene, detail.scene_object_relations
-                                )
-                            ),
-                        )
-                    except LearningTaskGenerationError:
-                        raise
-                    except Exception as exc:
-                        raise LearningTaskGenerationError(
-                            "Learning tasks could not be built."
-                        ) from exc
+                if self.translator
+                else None
+            )
+        # Phase 2: provider round-trips with no database connection held.
+        if payload is not None:
+            translated_scene = self.translator.translate(payload)
+            if self.learning_task_generator:
+                try:
+                    lessons = build_grammar_lessons(
+                        session_id,
+                        self.learning_task_generator.generate(
+                            _learning_task_payload(
+                                payload, translated_scene, detail.scene_object_relations
+                            )
+                        ),
+                    )
+                except LearningTaskGenerationError:
+                    raise
+                except Exception as exc:
+                    raise LearningTaskGenerationError(
+                        "Learning tasks could not be built."
+                    ) from exc
+        # Phase 3: bail if the session left generatingTasks while the models ran,
+        # then persist the rebuild in one transaction.
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.status != "generatingTasks":
+                return
+            if translated_scene is not None:
                 translated_objects = {row.key: row for row in translated_scene.objects}
                 for obj in objects:
                     translated = translated_objects[str(obj.id)]
