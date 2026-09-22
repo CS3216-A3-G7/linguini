@@ -253,7 +253,7 @@ export function Vocabulary() {
           </section> : null}
           {sceneGroups.map(({ scene, words }) => (
             <section key={scene.id} className="vocabulary-scene">
-              <SceneVisual scene={scene} className="vocabulary-scene__image" />
+              <SceneVisual scene={scene} className="vocabulary-scene__image" lazy />
               <div className="vocabulary-scene__content">
                 <div className="vocabulary-scene__heading">
                   <h2>{scene.title}</h2>

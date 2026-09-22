@@ -84,7 +84,7 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
         {photos.length ? (
           <div className="photo-strip" aria-label={`${photos.length} photos added`}>
             {photos.map((photo, index) => <div key={photo.mediaAssetId} className="photo-thumb">
-              <MediaImage assetId={photo.mediaAssetId} title={`Journal photo ${index + 1}`} width={320} />
+              <MediaImage assetId={photo.mediaAssetId} title={`Journal photo ${index + 1}`} width={320} lazy />
               <button type="button" className="photo-thumb__remove" aria-label={`Remove photo ${index + 1}`}
                 disabled={journalSaving || uploading}
                 onClick={() => setPhotos(current => current.filter(item => item.mediaAssetId !== photo.mediaAssetId))}>
@@ -105,7 +105,7 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
                 onClick={() => setPhotos(current => selected
                   ? current.filter(photo => photo.mediaAssetId !== option.mediaAssetId)
                   : [...current, { mediaAssetId: option.mediaAssetId, imageUrl: option.imageUrl, displayOrder: current.length }])}>
-                <MediaImage assetId={option.mediaAssetId} title="Photo from your practice session" width={320} />
+                <MediaImage assetId={option.mediaAssetId} title="Photo from your practice session" width={320} lazy />
               </button>;
             })}
           </div>

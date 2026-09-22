@@ -1,13 +1,14 @@
 import { useState } from "react";
 import type { SceneSummary } from "../data/types";
+import { imageLoadingAttrs } from "../lib/imageLoading";
 
 type Props = {
   scene: Pick<SceneSummary, "imageUrl" | "title">;
   className?: string;
-  eager?: boolean;
+  lazy?: boolean;
 };
 
-export function SceneImage({ scene, className, eager }: Props) {
+export function SceneImage({ scene, className, lazy }: Props) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   if (!scene.imageUrl || failedUrl === scene.imageUrl) {
     return (
@@ -26,8 +27,7 @@ export function SceneImage({ scene, className, eager }: Props) {
       alt={scene.title}
       className={`scene-image${className ? ` ${className}` : ""}`}
       decoding="async"
-      loading={eager ? "eager" : "lazy"}
-      fetchPriority={eager ? "high" : undefined}
+      {...imageLoadingAttrs(lazy)}
       onError={() => setFailedUrl(scene.imageUrl)}
     />
   );

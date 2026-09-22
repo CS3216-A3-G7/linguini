@@ -93,7 +93,7 @@ export function PracticeSelect() {
     <div className="grid-2">
       {scenes.map(scene => <button key={scene.id} type="button" className="scene-pick"
         disabled={interactionDisabled || uploading} aria-label={`Choose ${scene.title}`} onClick={() => void start(scene.mediaAssetId)}>
-        <SceneVisual scene={{ ...scene, imageUrl: mediaImageUrl(scene.mediaAssetId, 640) }} />
+        <SceneVisual scene={{ ...scene, imageUrl: mediaImageUrl(scene.mediaAssetId, 640) }} lazy />
         <span className="small items-center justify-center" style={{ fontWeight: 700 }}>{scene.title}</span>
       </button>)}
     </div>

@@ -35,7 +35,7 @@ export function Learn() {
         <p className="muted">Build confidence with each short activity.</p>
       </div>
 
-      <ScenePhoto scene={scene} eager />
+      <ScenePhoto scene={scene} />
       {practiceError ? <p role="alert">{practiceError}</p> : null}
 
       {session.translationPreview ? (
