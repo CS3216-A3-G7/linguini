@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
-import type { PracticeDetail, TaskAnswer, TaskActionResult } from "../lib/api";
+import type { PracticeDetail, SessionStatus, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -15,6 +15,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
   const [practiceError, setError] = useState<string | null>(null);
   const [practiceStalled, setStalled] = useState(false);
   const busy = useRef(false);
+  const completing = useRef(false);
   const learningDirty = useRef(false);
   const [completionError, setCompletionError] = useState<string | null>(null);
   const loadVersion = useRef(0);
@@ -87,41 +88,34 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     }
   }, [onLearningChanged]);
   const completion = useMutation({
-    mutationFn: (sessionId: string) => completePractice(sessionId),
-    // The route guard only sends /summary when status is "completed", so the
-    // optimistic status must land before the caller navigates.
-    onMutate: (sessionId: string) => {
-      const previousStatus = session?.session.id === sessionId ? session.session.status : null;
+    mutationFn: ({ sessionId }: { sessionId: string; previousStatus: SessionStatus }) => completePractice(sessionId),
+    onError: (error, { sessionId, previousStatus }) => {
       setSession(current => current?.session.id === sessionId
-        ? { ...current, session: { ...current.session, status: "completed" } }
+        ? { ...current, session: { ...current.session, status: previousStatus } }
         : current);
-      return { sessionId, previousStatus };
-    },
-    onError: (error, sessionId, context) => {
-      const previousStatus = context?.previousStatus;
-      if (previousStatus) {
-        setSession(current => current?.session.id === sessionId
-          ? { ...current, session: { ...current.session, status: previousStatus } }
-          : current);
-      }
       setCompletionError(error instanceof Error ? error.message : "Unable to complete session.");
     },
-    onSuccess: (_data, sessionId) => {
+    onSuccess: (_data, { sessionId }) => {
       flushLearningChanges();
       void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(sessionId) });
     },
+    onSettled: () => { completing.current = false; },
   });
-  const completeSession = useCallback(() => {
-    if (!session || completion.isPending) return false;
+  const startCompletion = useCallback(() => {
+    if (!session || completing.current) return false;
+    completing.current = true;
     setCompletionError(null);
-    completion.mutate(session.session.id);
+    const previousStatus = session.session.status;
+    // The route guard only sends /summary when status is "completed", so the
+    // optimistic status must land synchronously before the caller navigates.
+    setSession(current => current?.session.id === session.session.id
+      ? { ...current, session: { ...current.session, status: "completed" } }
+      : current);
+    completion.mutate({ sessionId: session.session.id, previousStatus });
     return true;
-  }, [session, completion]);
-  const retryCompletion = useCallback(() => {
-    if (!session || completion.isPending) return;
-    setCompletionError(null);
-    completion.mutate(session.session.id);
-  }, [session, completion]);
+  }, [session, completion.mutate]);
+  const completeSession = startCompletion;
+  const retryCompletion = useCallback(() => { startCompletion(); }, [startCompletion]);
   const saveReview = useCallback(async (review: PracticeReview) => {
     if (!session || busy.current) return false;
     busy.current = true; setSaving(true); setError(null);

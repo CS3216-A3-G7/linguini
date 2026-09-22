@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { languages } from "../config/languages";
 import { createLanguageProfile, getCurrentUser, getLanguageProfiles, updateLanguageProfile, updateUser } from "../lib/api";
@@ -27,21 +27,24 @@ export function useAccount() {
   const { data, isPending: loading, error: queryErrorValue } = useQuery({ queryKey: queryKeys.account, queryFn: ({ signal }) => loadAccount(signal) });
   const error = queryError(queryErrorValue);
   const [profileError, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
   const save = useMutation({
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.account }),
     onError: (reason) => setError(`${reason instanceof Error ? reason.message : "Unable to save profile."} Please retry or reload.`),
+    onSettled: () => { inFlight.current = false; },
   });
   const profileSaving = save.isPending;
   const activeProfile = data?.profiles.find((profile) => profile.isActive) ?? null;
   const option = languages.find((language) => language.code === activeProfile?.targetLanguageCode);
 
   const run = useCallback(async (action: () => Promise<unknown>): Promise<boolean> => {
-    if (save.isPending) return false;
+    if (inFlight.current) return false;
+    inFlight.current = true;
     setError(null);
     try { await save.mutateAsync(action); return true; }
-    catch { return false; }
-  }, [save]);
+    catch { inFlight.current = false; return false; }
+  }, [save.mutateAsync]);
 
   const setLanguage = useCallback((code: string, minutes?: number) => run(async () => {
     const profile = data?.profiles.find((row) => row.targetLanguageCode.toLowerCase() === code && row.sourceLanguageCode === "en");
@@ -54,7 +57,8 @@ export function useAccount() {
   ), [run]);
   // Optimistic variant: patches the cached account so callers can navigate immediately; rolls back on error.
   const startProfileSettingsSave = useCallback((code: string, userPatch: UserPatch, preferences: LanguageProfilePatch): boolean => {
-    if (save.isPending) return false;
+    if (inFlight.current) return false;
+    inFlight.current = true;
     const snapshot = queryClient.getQueryData<Account>(queryKeys.account);
     queryClient.setQueryData<Account>(queryKeys.account, (current) => {
       if (!current) return current;
@@ -77,7 +81,7 @@ export function useAccount() {
       },
     });
     return true;
-  }, [save, queryClient]);
+  }, [save.mutate, queryClient]);
   const activateLanguageProfile = useCallback((id: string) => run(async () => {
     if (!data?.profiles.some((profile) => profile.id === id)) throw new Error("Language profile not found.");
     return updateLanguageProfile(id, { isActive: true });

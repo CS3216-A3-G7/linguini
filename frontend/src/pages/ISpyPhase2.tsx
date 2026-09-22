@@ -26,7 +26,7 @@ export function ISpyPhase2() {
   const task = reflection[index];
   const finish = () => { if (completeSession()) navigate(`${base}/summary`); };
   const alerts = [practiceError, completionError].filter(Boolean);
-  if (!task) return <div className="stack"><TopBar title="Practice complete" />{alerts.map((message, index) => <p key={index} role="alert">{message}</p>)}<Button disabled={completionPending} onClick={finish}>Finish session</Button></div>;
+  if (!task) return <div className="stack"><TopBar title="Practice complete" />{alerts.map((message, alertIndex) => <p key={alertIndex} role="alert">{message}</p>)}<Button disabled={completionPending} onClick={finish}>Finish session</Button></div>;
   return <Reflection key={task.id} task={task} index={index} total={reflection.length} onNext={() => index === reflection.length - 1 ? finish() : setIndex(value => value + 1)} />;
 }
 

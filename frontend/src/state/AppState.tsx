@@ -1,5 +1,5 @@
 import { LoadingScreen } from "../components/LoadingScreen";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { JournalEntry, VocabRecord, VocabStatus } from "../data/types";
@@ -43,7 +43,9 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
         (rows: JournalEntry[] | undefined) => [entry, ...(rows ?? []).filter((row) => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)));
     },
     onError: (error) => setJournalSaveError(`${error instanceof Error ? error.message : "Unable to save journal."} Your text is still here; retry saving.`),
+    onSettled: () => { journalSavingRef.current = false; },
   });
+  const journalSavingRef = useRef(false);
   const [journalSaveError, setJournalSaveError] = useState<string | null>(null);
 
   const setVocabStatus = useCallback((id: string, status: VocabStatus) => {
@@ -52,11 +54,12 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
   }, [queryClient, profileId]);
 
   const saveJournalEntry = useCallback(async (draft: JournalDraft, id?: string, date?: string) => {
-    if (journalSave.isPending) return null;
+    if (journalSavingRef.current) return null;
+    journalSavingRef.current = true;
     setJournalSaveError(null);
     try { return await journalSave.mutateAsync({ draft, id, date }); }
-    catch { return null; }
-  }, [journalSave]);
+    catch { journalSavingRef.current = false; return null; }
+  }, [journalSave.mutateAsync]);
 
   return <AppStateContext.Provider value={{
     ...account, ...practice,
