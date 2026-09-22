@@ -25,10 +25,12 @@ function detail(status: SessionStatus, tasks: SessionTask[] = [], failureCode: P
 }
 
 test("every session status maps to its canonical route", () => {
-  for (const status of ["created", "analyzingScene", "awaitingObjectReview", "generatingTasks"] as const) {
+  for (const status of ["created", "analyzingScene", "awaitingObjectReview"] as const) {
     assert.deepEqual(sessionDestination(detail(status)), { path: "/practice/sessions/s1/analysis", notice: null });
   }
-  assert.deepEqual(sessionDestination(detail("ready")), { path: "/practice/sessions/s1/mic-test", notice: null });
+  for (const status of ["generatingTasks", "ready"] as const) {
+    assert.deepEqual(sessionDestination(detail(status)), { path: "/practice/sessions/s1/mic-test", notice: null });
+  }
   assert.deepEqual(sessionDestination(detail("completed")), { path: "/practice/sessions/s1/summary", notice: null });
   assert.equal(sessionDestination(detail("abandoned")).path, "/practice");
   assert.match(sessionDestination(detail("abandoned")).notice ?? "", /discarded/);
@@ -79,6 +81,11 @@ test("the route guard allows only the canonical destination", () => {
   assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/mic-test"), true);
   assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/learn"), false);
   assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/ispy-1"), false);
+
+  // Task generation runs after the object review; the learner waits on the mic test.
+  assert.equal(isSessionRouteAllowed(detail("generatingTasks"), "/practice/sessions/s1/mic-test"), true);
+  assert.equal(isSessionRouteAllowed(detail("generatingTasks"), "/practice/sessions/s1/learn"), false);
+  assert.equal(isSessionRouteAllowed(detail("generatingTasks"), "/practice/sessions/s1/analysis"), false);
   for (const status of ["abandoned", "failed"] as const) {
     for (const step of ["analysis", "mic-test", "learn", "ispy-1", "ispy-2", "summary"]) {
       assert.equal(isSessionRouteAllowed(detail(status), `/practice/sessions/s1/${step}`), false);

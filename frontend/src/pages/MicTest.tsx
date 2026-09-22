@@ -10,7 +10,10 @@ type MicState = "idle" | "listening" | "working" | "unavailable";
 export function MicTest() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { setMicReady, learner } = useAppState();
+  const { setMicReady, learner, session } = useAppState();
+  // The review's task generation finishes in the background; wait for it here.
+  const preparing = !!session && session.session.id === scene.sessionId
+    && ["analyzingScene", "generatingTasks"].includes(session.session.status);
   const [state, setState] = useState<MicState>(learner.micOn ? "idle" : "unavailable");
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -100,10 +103,10 @@ export function MicTest() {
 
       <Button
         block
-        disabled={state === "idle" || state === "listening"}
+        disabled={state === "idle" || state === "listening" || preparing}
         onClick={() => navigate(`/practice/sessions/${scene.sessionId}/learn`)}
       >
-        Continue <ArrowRightIcon />
+        {preparing ? "Preparing your lesson…" : "Continue"} <ArrowRightIcon />
       </Button>
     </div>
   );
