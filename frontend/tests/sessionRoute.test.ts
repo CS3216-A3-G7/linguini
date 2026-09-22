@@ -25,14 +25,22 @@ function detail(status: SessionStatus, tasks: SessionTask[] = [], failureCode: P
 }
 
 test("every session status maps to its canonical route", () => {
-  for (const status of ["created", "analyzingScene", "awaitingObjectReview", "generatingTasks"] as const) {
+  for (const status of ["created", "analyzingScene", "awaitingObjectReview"] as const) {
     assert.deepEqual(sessionDestination(detail(status)), { path: "/practice/sessions/s1/analysis", notice: null });
   }
-  assert.deepEqual(sessionDestination(detail("ready")), { path: "/practice/sessions/s1/mic-test", notice: null });
+  for (const status of ["generatingTasks", "ready"] as const) {
+    assert.deepEqual(sessionDestination(detail(status)), { path: "/practice/sessions/s1/mic-test", notice: null });
+  }
   assert.deepEqual(sessionDestination(detail("completed")), { path: "/practice/sessions/s1/summary", notice: null });
   assert.equal(sessionDestination(detail("abandoned")).path, "/practice");
   assert.match(sessionDestination(detail("abandoned")).notice ?? "", /discarded/);
   assert.equal(sessionDestination(detail("failed")).path, "/practice");
+});
+
+test("generatingTasks sends the analysis page to the mic check", () => {
+  const generating = detail("generatingTasks");
+  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/mic-test"), true);
+  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/analysis"), false);
 });
 
 test("inProgress resumes at the first unfinished stage", () => {

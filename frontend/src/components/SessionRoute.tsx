@@ -23,10 +23,10 @@ function SessionLoader({ id }: { id: string }) {
   const [detail, setDetail] = useState<PracticeDetail | null>(null);
   const location = useLocation();
   // The guard validates every navigation against the latest canonical
-  // destination, but a page whose session advanced underneath it is not
-  // re-validated while the pathname stays the same — Back/Forward and every
-  // in-app move change the pathname, so they are always checked.
-  const checked = useRef<{ path: string; allowed: boolean } | null>(null);
+  // destination, and re-validates when the session advances underneath a
+  // stable pathname — a session that moves on (e.g. generation finishing)
+  // forwards the learner instead of stranding them on a stale page.
+  const checked = useRef<{ path: string; canonical: string | null; allowed: boolean } | null>(null);
   const queryClient = useQueryClient();
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
     const initial = await getPractice(id);
@@ -57,8 +57,9 @@ function SessionLoader({ id }: { id: string }) {
     ? practiceScene(session, { id: data.mediaAssetId, signedUrl: data.imageUrl ?? "" }, learner.language)
     : data;
   const authoritative = session?.session.id === id ? session : detail;
-  if (authoritative && checked.current?.path !== location.pathname) {
-    checked.current = { path: location.pathname, allowed: isSessionRouteAllowed(authoritative, location.pathname) };
+  const canonical = authoritative ? sessionDestination(authoritative).path : null;
+  if (authoritative && (checked.current?.path !== location.pathname || checked.current.canonical !== canonical)) {
+    checked.current = { path: location.pathname, canonical, allowed: isSessionRouteAllowed(authoritative, location.pathname) };
   }
   if (checked.current && !checked.current.allowed) {
     const dest = sessionDestination(authoritative!);

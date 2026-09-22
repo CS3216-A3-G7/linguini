@@ -242,12 +242,31 @@ test("a completed session redirects every earlier stage to the summary", async (
   }
 });
 
-test("standing on a page is not re-validated when the session advances", async () => {
+test("standing on a page is forwarded when the session advances past it", async () => {
   fixture = detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]);
   await mount(`${BASE}/learn/learn-0`);
   assert.equal(shown(), "page-learn-task");
   await advance(detail("inProgress", [task("learn", "completed", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
-  assert.equal(shown(), "page-learn-task");
-  await go(`${BASE}/learn`);
   assert.equal(shown(), "page-ispy-1");
+});
+
+test("a session leaving the analysis stage forwards the mic check underneath the learner", async () => {
+  fixture = detail("awaitingObjectReview");
+  await mount(`${BASE}/analysis`);
+  assert.equal(shown(), "page-analysis");
+  await advance(detail("generatingTasks"));
+  assert.equal(shown(), "page-mic-test");
+  await advance(detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
+  assert.equal(shown(), "page-mic-test");
+});
+
+test("the analysis page redirects to the mic check once review is submitted", async () => {
+  fixture = detail("generatingTasks");
+  await mount(`${BASE}/analysis`);
+  // Task generation is still in flight, so the session loader polls for up to a
+  // minute before the guard can re-validate and forward to the mic check.
+  for (let i = 0; i < 70 && shown() !== "page-mic-test"; i += 1) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1000)); });
+  }
+  assert.equal(shown(), "page-mic-test");
 });
