@@ -13,6 +13,7 @@ from app.services.learning_tasks import (
     DEFAULT_PROMPT_PATH,
     GENERATION_FORMAT_INSTRUCTION,
     LearningTaskGenerationError,
+    normalize_learning_task_option_ids,
     normalize_learning_task_references,
     required_task_focuses,
     scene_generation_response_model,
@@ -63,6 +64,7 @@ class GeminiLearningTaskGenerator:
                 payload, response_model.model_validate_json(response.text)
             )
             result = normalize_learning_task_references(payload, result)
+            result = normalize_learning_task_option_ids(result)
             validate_learning_tasks(payload, result)
             return result
         except LearningTaskGenerationError:

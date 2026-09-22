@@ -1,5 +1,6 @@
-Generate two "I Spy" clues for two different objects in the supplied scene, in the
-requested target language, for a CEFR A1/A2 learner.
+Generate one or two I-Spy clue endings for different objects in the supplied scene,
+in the requested target language, for a CEFR A1/A2 learner. The application adds
+"I spy with my little eye, something that …" before your clue; do not repeat it.
 
 Rules:
 1. Use only the supplied objects, attributes, and relationships. Never invent details not
@@ -10,11 +11,13 @@ Rules:
    "on the left", "near the top" — never as raw coordinates), or relation to another object
    (`relations`). A clue using only one signal (e.g. just color) is too weak — reject it.
 4. Never name the object itself in the clue. The clue describes it; the learner names it.
-5. Write each clue as 1-2 short sentences in the target language, A1/A2 vocabulary only.
+5. `clue` must contain only a short phrase completing the supplied I-Spy opening, in
+   the target language and using A1/A2 vocabulary. Do not include "I spy", "Veo", "Je vois",
+   the object name, or an English translation.
 6. List `objectKeys` used (always exactly one per clue) and `relationshipKeys` used (empty
    list if none) in the response.
-7. Set `answerObjectKey` to the object the clue describes and `translation` to the English
-   translation of the clue.
+7. Set `answerObjectKey` to the object the clue describes. This is the answer used by the
+   application; do not return a separate answer label.
 8. If fewer than two objects have at least two usable signal types (attributes + relation,
    or attributes + distinct position), return as many valid clues as possible rather than
    forcing a weak clue — minimum one, maximum two.

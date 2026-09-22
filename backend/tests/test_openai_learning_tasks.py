@@ -293,6 +293,25 @@ def test_generation_rejects_an_empty_response(tmp_path):
         provider.generate(INPUT)
 
 
+def test_generation_repairs_duplicate_provider_option_ids(tmp_path):
+    payload = tasks()
+    question = payload["tasks"][0]["questions"][0]
+    question["options"][1]["optionId"] = question["options"][0]["optionId"]
+    question["correctOptionId"] = question["options"][0]["optionId"]
+    provider, _ = generator(tmp_path, LearningTaskResult.model_validate(payload))
+
+    result = provider.generate(INPUT)
+
+    repaired = result.tasks[0].questions[0]
+    assert [choice.option_id for choice in repaired.options] == [
+        "gender-1-option-1",
+        "gender-1-option-2",
+        "gender-1-option-3",
+        "gender-1-option-4",
+    ]
+    assert repaired.correct_option_id == "gender-1-option-1"
+
+
 def test_multiple_choice_ignores_misplaced_sentence_builder_fields(tmp_path):
     payload = tasks()
     payload["tasks"][2]["questions"][0].update(

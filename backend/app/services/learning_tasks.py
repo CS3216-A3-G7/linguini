@@ -146,6 +146,30 @@ def normalize_learning_task_references(
     return result
 
 
+def normalize_learning_task_option_ids(result: LearningTaskResult) -> LearningTaskResult:
+    """Repair opaque model-generated IDs without changing learner-facing choices."""
+    for task in result.tasks:
+        for question in task.questions:
+            option_ids = [option.option_id for option in question.options]
+            if len(option_ids) == len(set(option_ids)):
+                continue
+            correct_index = next(
+                (
+                    index
+                    for index, option_id in enumerate(option_ids)
+                    if option_id == question.correct_option_id
+                ),
+                None,
+            )
+            if correct_index is None:
+                # Preserve this malformed response for the existing clear error.
+                continue
+            for index, option in enumerate(question.options, start=1):
+                option.option_id = f"{question.question_id}-option-{index}"
+            question.correct_option_id = question.options[correct_index].option_id
+    return result
+
+
 def validate_learning_tasks(payload: dict[str, Any], result: LearningTaskResult) -> None:
     expected_focuses = required_task_focuses(payload)
     actual_focuses = tuple(task.focus for task in result.tasks)

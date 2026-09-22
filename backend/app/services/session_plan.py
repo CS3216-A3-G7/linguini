@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.repositories.postgres.vocabulary import vocabulary_items, vocabulary_translations
 from app.repositories.practice import PracticeConflictError
+from app.schemas.ispy_clues import ISpyClueResult
 from app.schemas.media import SceneObject
 from app.schemas.tasks import SessionTask
 from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
@@ -212,6 +213,39 @@ def build_grammar_lessons(session_id, result):
             ),
         )
         for lesson in result.tasks
+    ]
+
+
+def build_ispy_clue_tasks(session_id, result: ISpyClueResult, objects, words):
+    """Make provider-selected Phase 1 clue rounds using server-side answer keys."""
+    by_key = {str(obj.id): (obj, word) for obj, word in zip(objects, words, strict=True)}
+    options = [
+        dict(option_id=str(obj.id), label=word.display_text, scene_object_id=obj.id)
+        for obj, word in zip(objects, words, strict=True)
+    ]
+    return [
+        SessionTask(
+            id=uuid5(session_id, f"ispy-clues-v1:{clue.answer_object_key}"),
+            session_id=session_id,
+            phase="ispy",
+            kind="ispyRound",
+            order_index=0,
+            public_content=dict(
+                kind="ispyRound",
+                clue=clue.clue,
+                interaction_mode="selectObject",
+                options=options,
+                encouragement="Keep looking closely!",
+                hint_available=False,
+            ),
+            answer_key=dict(
+                correct_scene_object_id=by_key[clue.answer_object_key][0].id,
+                correct_option_id=str(by_key[clue.answer_object_key][0].id),
+            ),
+            vocabulary_item_id=by_key[clue.answer_object_key][1].id,
+            scene_object_id=by_key[clue.answer_object_key][0].id,
+        )
+        for clue in result.clues
     ]
 
 
