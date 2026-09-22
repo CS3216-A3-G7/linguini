@@ -19,7 +19,6 @@ model User {
   languageProfiles    LanguageProfile[]
   mediaAssets         MediaAsset[]
   vocabularyProgress  UserVocabularyProgress[]
-  aiRuns              AiGenerationRun[]
   xpEvents            XpEvent[]
 
   @@map("users")
@@ -165,7 +164,6 @@ model Session {
   sceneObjects SceneObject[]
   tasks SessionTask[]
   vocabularyEncounters VocabularyEncounter[]
-  aiRuns AiGenerationRun[]
   xpEvents XpEvent[]
 
   @@unique([id, userId])
@@ -383,8 +381,6 @@ model Journal {
   media             JournalMedia[]
   revisions         JournalRevision[] @relation("JournalHistory")
 
-  aiRuns            AiGenerationRun[]
-
   @@unique([id, userId])
   @@unique([userId, localDate])
   @@index([languageProfileId, userId])
@@ -467,36 +463,4 @@ model JournalWordMention {
   @@index([vocabularyItemId])
   @@index([sourceEncounterId])
   @@map("journal_word_mentions")
-}
-
-
-model AiGenerationRun {
-  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId           String? @map("user_id") @db.Uuid
-  user             User? @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  sessionId        String? @map("session_id") @db.Uuid
-  session          Session? @relation(fields: [sessionId, userId], references: [id, userId], onDelete: Cascade, onUpdate: NoAction, map: "ai_generation_runs_session_owner_fkey")
-  journalId        String? @map("journal_id") @db.Uuid
-  journal          Journal? @relation(fields: [journalId, userId], references: [id, userId], onDelete: Cascade, onUpdate: NoAction, map: "ai_generation_runs_journal_owner_fkey")
-  feature          String @db.VarChar(23)
-  modelName        String @map("model_name") @db.Text
-  promptVersion    String @map("prompt_version") @db.Text
-  schemaVersion    String @map("schema_version") @db.Text
-  status           String @default("pending") @db.VarChar(9)
-  latencyMs        BigInt? @map("latency_ms")
-  inputTokens      BigInt? @map("input_tokens")
-  outputTokens     BigInt? @map("output_tokens")
-  validationPassed Boolean? @map("validation_passed")
-  errorCode        String? @map("error_code") @db.VarChar(100)
-  inputReference   String? @map("input_reference") @db.Text
-  outputReference  String? @map("output_reference") @db.Text
-  completedAt      DateTime? @map("completed_at") @db.Timestamptz(6)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-
-  @@index([userId, createdAt])
-  @@index([sessionId, userId])
-  @@index([journalId, userId])
-  @@index([feature, status, createdAt])
-  @@map("ai_generation_runs")
 }
