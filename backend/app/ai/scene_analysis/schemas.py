@@ -72,10 +72,12 @@ class ModelSceneObject(ApiModel):
 
 class ModelSceneRelation(ApiModel):
     relation_key: NonEmptyText = Field(
+        max_length=64,
         validation_alias=AliasChoices("relationKey", "key"),
         serialization_alias="relationKey",
     )
     subject_object_key: NonEmptyText = Field(
+        max_length=64,
         validation_alias=AliasChoices("subjectObjectKey", "sourceObjectKey"),
         serialization_alias="subjectObjectKey",
     )
@@ -84,6 +86,7 @@ class ModelSceneRelation(ApiModel):
         serialization_alias="relation",
     )
     reference_object_key: NonEmptyText = Field(
+        max_length=64,
         validation_alias=AliasChoices("referenceObjectKey", "targetObjectKey"),
         serialization_alias="referenceObjectKey",
     )

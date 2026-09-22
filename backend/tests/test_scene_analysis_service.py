@@ -30,6 +30,7 @@ from app.ai.vision_gemini import GeminiVisionClient
 from app.schemas.enums import SceneRelationType
 from app.schemas.media import MediaAsset
 from app.schemas.sessions import Session
+from app.services.image_storage import UploadObjectMissing
 from app.services.scene_analysis import SceneAnalysisError
 from app.services.vision_model import (
     VisionImage,
@@ -85,13 +86,13 @@ def session() -> Session:
     )
 
 
-def asset(source: str = "userUpload") -> MediaAsset:
+def asset(source: str = "userUpload", mime_type: str = "image/png") -> MediaAsset:
     return MediaAsset(
         owner_user_id=None if source == "preloaded" else uuid4(),
         media_type="image",
         source=source,
         storage_key=STORAGE_KEY,
-        mime_type="image/png",
+        mime_type=mime_type,
     )
 
 
@@ -306,6 +307,29 @@ def test_prompt_lists_exactly_the_canonical_relation_types() -> None:
         assert legacy not in SCENE_ANALYSIS_SYSTEM_PROMPT
     assert '" in"' not in SCENE_ANALYSIS_SYSTEM_PROMPT
     assert "beside" not in SCENE_ANALYSIS_SYSTEM_PROMPT
+
+
+def _required_property_names(node: dict) -> set:
+    names = set(node.get("required", []))
+    for child in node.get("properties", {}).values():
+        names |= _required_property_names(child)
+    items = node.get("items")
+    if isinstance(items, dict):
+        names |= _required_property_names(items)
+    return names
+
+
+def test_strict_schema_required_properties_appear_in_prompt() -> None:
+    for name in _required_property_names(build_scene_analysis_schema()):
+        assert name in SCENE_ANALYSIS_SYSTEM_PROMPT
+
+
+def test_prompt_output_example_is_valid_json() -> None:
+    title_index = SCENE_ANALYSIS_SYSTEM_PROMPT.index('"suggestedSceneTitle"')
+    start = SCENE_ANALYSIS_SYSTEM_PROMPT.rindex("{", 0, title_index)
+    end = SCENE_ANALYSIS_SYSTEM_PROMPT.rindex("}")
+    example = json.loads(SCENE_ANALYSIS_SYSTEM_PROMPT[start : end + 1])
+    assert "relations" in example and "objects" in example
 
 
 def test_prompt_lists_every_attribute_type_and_serialization_alias() -> None:
@@ -639,9 +663,7 @@ def _gemini_client_returning(response):
 
 
 def test_gemini_timeout_maps_to_provider_timeout() -> None:
-    import httpx as _httpx
-
-    client = _gemini_client_raising(_httpx.ReadTimeout("t"))
+    client = _gemini_client_raising(httpx.ReadTimeout("t"))
     with pytest.raises(VisionModelError) as raised:
         client.generate(_gemini_request())
     assert raised.value.code == VisionModelErrorCode.PROVIDER_TIMEOUT
@@ -698,6 +720,21 @@ def test_gemini_prompt_block_maps_to_refused() -> None:
     assert raised.value.code == VisionModelErrorCode.PROVIDER_REFUSED
 
 
+def test_gemini_text_property_raising_maps_to_response_invalid() -> None:
+    class ExplodingText:
+        prompt_feedback = None
+        candidates = [SimpleNamespace(finish_reason="STOP")]
+        usage_metadata = None
+
+        @property
+        def text(self):
+            raise ValueError("no text parts")
+
+    with pytest.raises(VisionModelError) as raised:
+        _gemini_client_returning(ExplodingText()).generate(_gemini_request())
+    assert raised.value.code == VisionModelErrorCode.PROVIDER_RESPONSE_INVALID
+
+
 def test_gemini_empty_text_maps_to_response_invalid() -> None:
     response = _gemini_response(
         text=None,
@@ -734,3 +771,40 @@ def test_preloaded_assets_stay_deterministic() -> None:
     assert router.analyze(None, asset("preloaded"), {}, None) == "curated-result"
     assert router.analyze(None, asset("userUpload"), {}, None) == "uploaded-result"
     assert calls == ["curated", "uploaded"]
+
+
+# --- Retrieval failure mapping ---
+
+
+def test_download_failure_surfaces_image_unavailable() -> None:
+    class MissingStorage:
+        def download(self, key):
+            raise UploadObjectMissing()
+
+    tracer = RecordingTracer()
+    with pytest.raises(SceneAnalysisError) as raised:
+        analyzer(
+            FakeVisionClient([VALID_OUTPUT]), tracer=tracer, storage=MissingStorage()
+        ).analyze(session(), asset(), {}, None)
+
+    assert isinstance(raised.value, SceneAnalysisModelError)
+    assert raised.value.code == SceneAnalysisModelErrorCode.IMAGE_UNAVAILABLE.value
+    updates = [event[2] for event in tracer.events if event[1] == "update"]
+    assert any(
+        kw.get("error_code") == "imageUnavailable" for kw in updates
+    )
+    recorded = repr(tracer.events)
+    assert STORAGE_KEY not in recorded
+
+
+def test_invalid_image_surfaces_image_invalid() -> None:
+    tracer = RecordingTracer()
+    with pytest.raises(SceneAnalysisError) as raised:
+        analyzer(FakeVisionClient([VALID_OUTPUT]), tracer=tracer).analyze(
+            session(), asset(mime_type="image/gif"), {}, None
+        )
+
+    assert isinstance(raised.value, SceneAnalysisModelError)
+    assert raised.value.code == SceneAnalysisModelErrorCode.IMAGE_INVALID.value
+    recorded = repr(tracer.events)
+    assert STORAGE_KEY not in recorded

@@ -50,6 +50,8 @@ class SceneAnalysisModelErrorCode(StrEnum):
     """Stable application error codes for model-backed scene analysis."""
 
     MODEL_OUTPUT_INVALID = "modelOutputInvalid"
+    IMAGE_UNAVAILABLE = "imageUnavailable"
+    IMAGE_INVALID = "imageInvalid"
 
 
 class SceneAnalysisModelError(SceneAnalysisError):
@@ -97,8 +99,32 @@ class UploadedSceneAnalyzer:
             metadata={"assetSource": asset.source.value},
         ) as root:
             with self._tracer.span("image-retrieval") as retrieval:
-                data = self._storage.download(asset.storage_key)
-                image = VisionImage(data=data, mime_type=asset.mime_type)
+                try:
+                    data = self._storage.download(asset.storage_key)
+                except Exception as error:
+                    retrieval.update(
+                        error_code=SceneAnalysisModelErrorCode.IMAGE_UNAVAILABLE.value
+                    )
+                    root.update(
+                        error_code=SceneAnalysisModelErrorCode.IMAGE_UNAVAILABLE.value
+                    )
+                    raise SceneAnalysisModelError(
+                        SceneAnalysisModelErrorCode.IMAGE_UNAVAILABLE,
+                        "scene image could not be retrieved",
+                    ) from error
+                try:
+                    image = VisionImage(data=data, mime_type=asset.mime_type)
+                except VisionModelError as error:
+                    retrieval.update(
+                        error_code=SceneAnalysisModelErrorCode.IMAGE_INVALID.value
+                    )
+                    root.update(
+                        error_code=SceneAnalysisModelErrorCode.IMAGE_INVALID.value
+                    )
+                    raise SceneAnalysisModelError(
+                        SceneAnalysisModelErrorCode.IMAGE_INVALID,
+                        "scene image is not usable",
+                    ) from error
                 retrieval.update(
                     metadata={
                         "imageByteCount": len(data),

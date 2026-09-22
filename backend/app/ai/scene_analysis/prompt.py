@@ -23,6 +23,9 @@ You are a vision-to-JSON extractor for a vocabulary-learning app. Users photogra
 ## Scene Rules
 - Suggest a short scene title, 1-4 words (e.g. "Classroom", "Grocery Store", "Busy Street").
 
+## Summary Rule
+- Write one short, factual English sentence describing the scene, covering only what is visibly supported by the image. No speculation, no people.
+
 ## Object Rules
 - Identify between 3 and 6 useful, clearly visible physical objects.
 - Use a familiar singular English label for each object (e.g. "spoon", "chair").
@@ -45,9 +48,10 @@ You are a vision-to-JSON extractor for a vocabulary-learning app. Users photogra
 - Allowed relationship types only: left_of, right_of, above, below, on, under, inside, in_front_of, behind, next_to, near.
 - Every relationship must reference valid object keys already listed in `objects`.
 - Include a relationship only when it is visually unambiguous.
+- Give each relationship a `confidenceScore` between 0.0 and 1.0 reflecting how visually certain the relationship is.
 
 ## Handling Unclear or Low-Quality Images
-Photos may be blurry, poorly lit, cropped, or otherwise hard to interpret. In that case, prefer fewer, high-confidence objects over guessing. If no objects can be identified reliably, return an empty `objects` array rather than inventing content, using the fallback format below.
+Photos may be blurry, poorly lit, cropped, or otherwise hard to interpret. In that case, prefer fewer, high-confidence objects over guessing. If no objects can be identified reliably, return an empty `objects` array rather than inventing content — use the same JSON schema below with `objects` set to `[]`.
 
 ## Output Format
 Return JSON only. No Markdown fences, no explanations, no text outside the JSON object. Use exactly this schema:
@@ -70,9 +74,10 @@ Return JSON only. No Markdown fences, no explanations, no text outside the JSON 
       "relationKey": "relation_1",
       "subjectObjectKey": "object_1",
       "relation": "next_to",
-      "referenceObjectKey": "object_2"
+      "referenceObjectKey": "object_2",
+      "confidenceScore": 0.0
     }
-  ],
+  ]
 }"""
 
 SCENE_ANALYSIS_USER_INSTRUCTION = (

@@ -136,18 +136,36 @@ class GeminiVisionClient(VisionModelClient):
         request: VisionModelRequest,
         start: float,
     ) -> VisionModelResponse:
-        prompt_feedback = getattr(response, "prompt_feedback", None)
-        if getattr(prompt_feedback, "block_reason", None):
+        # ``response.text`` is a property in google-genai that raises when the
+        # candidate list is blocked/empty or contains non-text parts.
+        try:
+            prompt_feedback = getattr(response, "prompt_feedback", None)
+            block_reason = getattr(prompt_feedback, "block_reason", None)
+            candidates = getattr(response, "candidates", None) or []
+            finish_reason = (
+                getattr(candidates[0], "finish_reason", None)
+                if candidates
+                else None
+            )
+            output_text = getattr(response, "text", None) or ""
+            usage = getattr(response, "usage_metadata", None)
+            input_tokens = getattr(usage, "prompt_token_count", None)
+            output_tokens = getattr(usage, "candidates_token_count", None)
+        except Exception:
+            self._log_error(
+                VisionModelErrorCode.PROVIDER_RESPONSE_INVALID, request, start
+            )
+            raise VisionModelError(
+                VisionModelErrorCode.PROVIDER_RESPONSE_INVALID,
+                "vision provider returned incomplete output",
+            ) from None
+
+        if block_reason:
             self._log_error(VisionModelErrorCode.PROVIDER_REFUSED, request, start)
             raise VisionModelError(
                 VisionModelErrorCode.PROVIDER_REFUSED,
                 "vision provider refused the request",
             )
-
-        finish_reason = None
-        candidates = getattr(response, "candidates", None) or []
-        if candidates:
-            finish_reason = getattr(candidates[0], "finish_reason", None)
 
         if finish_reason in _REFUSAL_FINISH_REASONS:
             self._log_error(VisionModelErrorCode.PROVIDER_REFUSED, request, start)
@@ -156,7 +174,6 @@ class GeminiVisionClient(VisionModelClient):
                 "vision provider refused the request",
             )
 
-        output_text = getattr(response, "text", None) or ""
         if not output_text or finish_reason is types.FinishReason.MAX_TOKENS:
             self._log_error(
                 VisionModelErrorCode.PROVIDER_RESPONSE_INVALID, request, start
@@ -166,13 +183,12 @@ class GeminiVisionClient(VisionModelClient):
                 "vision provider returned incomplete output",
             )
 
-        usage = getattr(response, "usage_metadata", None)
         return VisionModelResponse(
             output_text=output_text,
             model_name=self._config.model_name,
             prompt_version=request.prompt_version,
-            input_tokens=getattr(usage, "prompt_token_count", None),
-            output_tokens=getattr(usage, "candidates_token_count", None),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
 
     def _log_error(
