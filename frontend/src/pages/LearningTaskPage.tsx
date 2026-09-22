@@ -22,7 +22,7 @@ export function LearningTaskPage() {
   if (!task || ["abandoned", "failed"].includes(session.session.status)) return <Navigate to={`${base}/learn`} replace />;
   const next = tasks[index + 1];
   return <div className="stack learning-task-page"><LearningTaskContent key={task.id} task={task} index={index} total={tasks.length}
-    onNext={() => navigate(next ? `${base}/learn/${next.id}` : `${base}/learn`)} onClose={() => navigate(`${base}/learn`)} /></div>;
+    onNext={() => navigate(next ? `${base}/learn/${next.id}` : `${base}/ispy-1`)} onClose={() => navigate(`${base}/learn`)} /></div>;
 }
 
 function LearningTaskContent({ task, index, total, onNext, onClose }: { task: SessionTask; index: number; total: number; onNext: () => void; onClose: () => void }) {
@@ -83,7 +83,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
     {!reading && content.kind !== "grammarPractice" ? <div className="field"><label className="field__label" htmlFor="task-answer">Your answer</label><input id="task-answer" className="input" value={text} maxLength={2000} disabled={terminal || practiceSaving} onChange={event => setText(event.target.value)} /></div> : null}
     {feedback ? <Feedback><p role="status">{feedback}</p></Feedback> : null}
     {practiceError ? <p role="alert">{practiceError}</p> : null}
-    {terminal ? <Button block disabled={practiceSaving} onClick={onNext}>{index < total - 1 ? "Next task" : "Back to tasks"}</Button> : <>
+    {terminal ? <Button block disabled={practiceSaving} onClick={onNext}>{index < total - 1 ? "Next task" : "Go to I-Spy"}</Button> : <>
       <Button block disabled={practiceSaving || (!reading && !(content.kind === "grammarPractice" ? choice : text.trim()))} onClick={() => void submit()}>{reading ? "Mark complete" : "Submit answer"}</Button>
       <Button variant="quiet" block disabled={practiceSaving} onClick={async () => { if (await actOnTask(task.id, "skip")) onNext(); }}>Skip task</Button>
     </>}
@@ -164,7 +164,7 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
     </div></Card> : null}
     {feedback ? <Feedback><p role="status">{feedback}</p></Feedback> : null}
     {practiceError ? <p role="alert">{practiceError}</p> : null}
-    {terminal ? <Button block onClick={onNext}>{index < total - 1 ? "Next task" : "Back to tasks"}</Button> : null}
+    {terminal ? <Button block onClick={onNext}>{index < total - 1 ? "Next task" : "Go to I-Spy"}</Button> : null}
   </div>;
 }
 
@@ -217,7 +217,7 @@ function GrammarLessonFlow({ task, index, total, onNext, onClose }: { task: Sess
     </div></Card>)}
     {feedback ? <Feedback><p role="status">{feedback}</p></Feedback> : null}
     {practiceError ? <p role="alert">{practiceError}</p> : null}
-    {terminal ? <Button block onClick={onNext}>{index < total - 1 ? "Next task" : "Back to tasks"}</Button> : <>
+    {terminal ? <Button block onClick={onNext}>{index < total - 1 ? "Next task" : "Go to I-Spy"}</Button> : <>
       <Button block disabled={!answered || practiceSaving} onClick={() => void submit()}>Submit answers</Button>
       <Button variant="quiet" block disabled={practiceSaving} onClick={async () => { if (await actOnTask(task.id, "skip")) onNext(); }}>Skip task</Button>
     </>}
