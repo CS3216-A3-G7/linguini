@@ -52,12 +52,14 @@ from app.schemas.vocabulary import (
 )
 from app.services.background import InlineBackgroundRunner
 from app.services.ispy_clues import ISpyClueGenerationError
+from app.services.ispy_guess import ISpyGuessError
 from app.services.learning_tasks import required_task_focuses
 from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.session_plan import (
     bootstrap_word,
     build_grammar_lessons,
     build_ispy_clue_tasks,
+    build_ispy_description_tasks,
     build_tasks,
 )
 
@@ -150,6 +152,21 @@ def _ispy_clue_payload(translation_payload, translated_scene, objects, scene_rel
     return payload
 
 
+def _ispy_guess_context(translation_payload, translated_scene, objects, scene_relations=()):
+    """Persist translated scene facts; never persist or send a selected target."""
+    payload = _ispy_clue_payload(
+        translation_payload, translated_scene, objects, scene_relations
+    )
+    return {
+        "targetLanguage": payload["targetLanguage"],
+        "sceneObjects": {
+            "objects": payload["objects"],
+            "attributes": payload["attributes"],
+            "relations": payload["relationships"],
+        },
+    }
+
+
 def parse_session(row):
     return Session.model_validate({k: row[k] for k in Session.model_fields})
 
@@ -179,6 +196,7 @@ class PostgresWorkflowRepository:
         translator=None,
         learning_task_generator=None,
         ispy_clue_generator=None,
+        ispy_guess_generator=None,
         background=None,
     ):
         self.engine, self.user_id = engine, user_id
@@ -186,6 +204,7 @@ class PostgresWorkflowRepository:
         self.translator = translator
         self.learning_task_generator = learning_task_generator
         self.ispy_clue_generator = ispy_clue_generator
+        self.ispy_guess_generator = ispy_guess_generator
         self.background = background or InlineBackgroundRunner()
 
     @contextmanager
@@ -863,6 +882,7 @@ class PostgresWorkflowRepository:
     def _generate_tasks(self, session_id, profile_id):
         lessons = []
         ispy_clues = []
+        ispy_descriptions = []
         translated_scene = None
         # Phase 1: read everything the provider calls need, then let go of the
         # connection before the model round-trips start.
@@ -981,6 +1001,15 @@ class PostgresWorkflowRepository:
                 # A clue is additive. Keep the deterministic round instead of
                 # failing a learner's complete practice session.
                 logger.exception("I-Spy clue generation failed for session %s.", session_id)
+        if self.ispy_guess_generator and translated_scene is not None:
+            ispy_descriptions = build_ispy_description_tasks(
+                session_id,
+                objects,
+                clue_words,
+                _ispy_guess_context(
+                    payload, translated_scene, objects, detail.scene_object_relations
+                ),
+            )
         # Phase 5: re-check the claim, then build and insert the rebuilt plan.
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
@@ -1004,18 +1033,19 @@ class PostgresWorkflowRepository:
                 False,
                 getattr(detail, "translation_preview", None),
             )
+            learning = [
+                task for task in rebuilt if task.kind not in {"ispyRound", "reflection"}
+            ]
+            clues = ispy_clues or [task for task in rebuilt if task.kind == "ispyRound"]
+            descriptions = ispy_descriptions or [
+                task for task in rebuilt if task.kind == "reflection"
+            ]
             if lessons:
-                # Generated lessons replace the deterministic grammar/syntax/sentence tasks.
-                rebuilt = [
-                    *[task for task in rebuilt if task.kind == "vocabularyIntroduction"],
-                    *lessons,
-                    *[task for task in rebuilt if task.kind in {"ispyRound", "reflection"}],
-                ]
-            if ispy_clues:
-                rebuilt = [
-                    *[task for task in rebuilt if task.kind != "ispyRound"],
-                    *ispy_clues,
-                ]
+                # Generated lessons replace deterministic grammar/syntax exercises.
+                learning = [
+                    task for task in learning if task.kind == "vocabularyIntroduction"
+                ] + lessons
+            rebuilt = [*learning, *clues, *descriptions]
             for index, task in enumerate(rebuilt):
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
@@ -1096,7 +1126,7 @@ class PostgresWorkflowRepository:
                 select(task_attempts.c.is_correct)
                 .join(session_tasks, session_tasks.c.id == task_attempts.c.session_task_id)
                 .where(
-                    session_tasks.c.session_id == session_id, session_tasks.c.kind == "ispyRound"
+                    session_tasks.c.session_id == session_id, session_tasks.c.phase == "ispy"
                 )
             )
             .scalars()
@@ -1201,17 +1231,39 @@ class PostgresWorkflowRepository:
                     if task.kind == "vocabularyIntroduction":
                         self._encounter(c, task, task.id, "completed", introduced=True)
                 elif action == "attempt":
-                    correct = evaluate(task, request)
                     evaluation_details = None
-                    feedback_message = (
-                        "Reflection recorded."
-                        if correct is None
-                        else (
-                            "Correct."
-                            if correct
-                            else "Not quite. Review this word and try it in another session."
+                    if (
+                        task.kind == "reflection"
+                        and task.answer_key
+                        and task.answer_key.scene_description_context
+                        and self.ispy_guess_generator
+                    ):
+                        if request.input_mode != "text":
+                            raise PracticeConflictError(
+                                "I-Spy descriptions must be submitted as text."
+                            )
+                        try:
+                            guess = self.ispy_guess_generator.guess(
+                                task.answer_key.scene_description_context, request.text
+                            )
+                            correct = guess.guessed_object_key == str(task.scene_object_id)
+                            feedback_message = guess.feedback
+                            evaluation_details = guess.model_dump(mode="json", by_alias=True)
+                        except ISpyGuessError:
+                            logger.exception("I-Spy description guess failed for task %s.", task.id)
+                            correct = None
+                            feedback_message = "Your description was saved. Keep using scene words."
+                    else:
+                        correct = evaluate(task, request)
+                        feedback_message = (
+                            "Reflection recorded."
+                            if correct is None
+                            else (
+                                "Correct."
+                                if correct
+                                else "Not quite. Review this word and try it in another session."
+                            )
                         )
-                    )
                     if request.input_mode == "vocabularyReview":
                         question_results = {
                             question.question_id: _lesson_answer_is_correct(
@@ -1238,7 +1290,7 @@ class PostgresWorkflowRepository:
                         evaluation_details=evaluation_details,
                     )
                     c.execute(insert(task_attempts).values(**entity_values(attempt)))
-                    if correct is True and task.kind == "ispyRound":
+                    if correct is True and task.phase == "ispy":
                         award(
                             c,
                             user_id=self.user_id,
