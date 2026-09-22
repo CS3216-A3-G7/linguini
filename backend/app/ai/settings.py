@@ -40,7 +40,7 @@ class FeatureModelConfig(BaseModel):
     feature: AiFeature
     provider: AiProvider
     model_name: str = ""
-    timeout_seconds: float = Field(gt=0)
+    timeout_seconds: int = Field(gt=0)
     max_output_tokens: int | None = Field(default=None, gt=0)
     max_retries: int = Field(default=0, ge=0)
 
@@ -184,23 +184,23 @@ def _parse_provider(env: Mapping[str, str], feature: AiFeature, stem: str) -> Ai
         ) from exc
 
 
-def _parse_float(
+def _parse_timeout(
     env: Mapping[str, str], feature: AiFeature, stem: str
-) -> float:
+) -> int:
     spec = _LEGACY_SPECS[feature]
     canonical = f"AI_{stem}_TIMEOUT_SECONDS"
     raw = _read(env, canonical) or _read(env, spec.timeout_var) or spec.timeout_default
     try:
-        value = float(raw)
+        value = int(raw)
     except ValueError as exc:
         raise AiConfigurationError(
             f"Invalid timeout for {feature.value}: {raw!r} "
-            f"({canonical} must be a positive number of seconds)"
+            f"({canonical} must be a positive integer number of seconds)"
         ) from exc
     if value <= 0:
         raise AiConfigurationError(
             f"Invalid timeout for {feature.value}: {raw!r} "
-            f"({canonical} must be a positive number of seconds)"
+            f"({canonical} must be a positive integer number of seconds)"
         )
     return value
 
@@ -248,7 +248,7 @@ def _load_feature(
             feature=feature,
             provider=provider,
             model_name=_parse_model(env, feature, stem, provider),
-            timeout_seconds=_parse_float(env, feature, stem),
+            timeout_seconds=_parse_timeout(env, feature, stem),
             max_output_tokens=max_output_tokens,
             max_retries=0 if max_retries is None else max_retries,
         )

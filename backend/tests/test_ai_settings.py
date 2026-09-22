@@ -115,6 +115,10 @@ def test_invalid_provider_mode_and_timeout_raise_configuration_error():
         load_ai_settings(env={"AI_MODE": "bogus"})
     with pytest.raises(AiConfigurationError, match="sceneAnalysis"):
         load_ai_settings(env={"AI_SCENE_ANALYSIS_TIMEOUT_SECONDS": "soon"})
+    # Non-integer timeouts are rejected even though they parse as floats:
+    # provider constructors take int seconds.
+    with pytest.raises(AiConfigurationError, match="sceneAnalysis"):
+        load_ai_settings(env={"AI_SCENE_ANALYSIS_TIMEOUT_SECONDS": "60.5"})
 
 
 def test_real_mode_requires_key_and_model_for_enabled_features():
