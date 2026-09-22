@@ -389,16 +389,17 @@
   content: "";
   position: absolute;
   left: 50%;
-  bottom: calc(50% + 4px);
-  width: 2px;
-  height: 7px;
-  transform: translateX(-50%);
+  bottom: calc(50% + 2px);
+  width: 13px;
+  height: 2px;
+  transform: rotate(-45deg);
+  transform-origin: left center;
   background: currentColor;
 }
 
 .scene__marker-label {
   position: absolute;
-  left: 50%;
+  left: calc(50% + 8px);
   bottom: calc(50% + 10px);
   display: inline-flex;
   align-items: center;
@@ -406,7 +407,7 @@
   min-width: 27px;
   height: 27px;
   padding: 0 6px;
-  transform: translateX(-50%);
+  transform: none;
   border: 2px solid currentColor;
   border-radius: var(--radius-pill);
   background: #fffaf2;
@@ -414,6 +415,18 @@
   font-size: var(--text-label);
   font-weight: 800;
   box-shadow: 0 2px 5px rgba(20, 65, 62, 0.16);
+}
+
+.scene__marker--left .scene__marker-label {
+  right: calc(50% + 8px);
+  left: auto;
+}
+
+.scene__marker--left::after {
+  right: 50%;
+  left: auto;
+  transform: rotate(45deg);
+  transform-origin: right center;
 }
 
 .scene__marker--active {
@@ -435,8 +448,13 @@
 }
 
 .scene__marker--below::after {
-  top: calc(50% + 4px);
+  top: calc(50% + 2px);
   bottom: auto;
+  transform: rotate(45deg);
+}
+
+.scene__marker--below.scene__marker--left::after {
+  transform: rotate(-45deg);
 }
 
 .scene__marker--below .scene__marker-label {
@@ -761,6 +779,34 @@
   font-size: var(--text-small);
   font-weight: 800;
   text-transform: capitalize;
+}
+
+.analysis-attribute-fields .input.is-filled {
+  border-color: var(--teal);
+  background: #e4f4ef;
+  color: var(--teal-dark);
+  font-weight: 700;
+}
+
+.analysis-location-action {
+  display: block;
+  width: fit-content;
+  margin-top: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--teal-dark);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.analysis-location-action:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .analysis-word-row__marker {

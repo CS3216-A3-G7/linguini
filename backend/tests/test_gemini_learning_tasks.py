@@ -13,7 +13,7 @@ from tests.test_openai_learning_tasks import INPUT, tasks
 
 def generator(tmp_path: Path, payload: str):
     prompt = tmp_path / "learning_tasks.txt"
-    prompt.write_text("Generate three short learning tasks.", encoding="utf-8")
+    prompt.write_text("Generate learning tasks.", encoding="utf-8")
     client = SimpleNamespace(
         models=SimpleNamespace(
             generate_content=MagicMock(return_value=SimpleNamespace(text=payload))
@@ -24,14 +24,14 @@ def generator(tmp_path: Path, payload: str):
     ), client
 
 
-def test_generation_returns_the_three_required_tasks(tmp_path):
+def test_generation_returns_the_required_tasks_for_one_relationship(tmp_path):
     provider, client = generator(tmp_path, json.dumps(tasks()))
 
     result = provider.generate(INPUT)
 
     assert [task.focus for task in result.tasks] == [
-        "genderAgreement",
-        "singularPlural",
+        "genderNumberAgreement",
+        "prepositionRelation",
         "sceneDescription",
     ]
     call = client.models.generate_content.call_args.kwargs

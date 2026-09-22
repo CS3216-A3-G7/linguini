@@ -43,9 +43,17 @@ def normalize_learning_task_references(
 
 
 def validate_learning_tasks(payload: dict[str, Any], result: LearningTaskResult) -> None:
-    if tuple(task.focus for task in result.tasks) != REQUIRED_TASK_FOCUS_ORDER:
+    relationship_count = len(payload.get("relationships", []))
+    expected_focuses = (
+        REQUIRED_TASK_FOCUS_ORDER
+        if relationship_count >= 2
+        else REQUIRED_TASK_FOCUS_ORDER[:3]
+        if relationship_count == 1
+        else REQUIRED_TASK_FOCUS_ORDER[:1]
+    )
+    if tuple(task.focus for task in result.tasks) != expected_focuses:
         raise LearningTaskGenerationError(
-            "Learning tasks must be the three required tasks in order."
+            "Learning tasks do not match the relationships available in this scene."
         )
     supplied = {
         field: {row["key"] for row in payload.get(field, [])} for field in KEY_FIELDS
@@ -73,7 +81,25 @@ def validate_learning_tasks(payload: dict[str, Any], result: LearningTaskResult)
                 raise LearningTaskGenerationError(
                     "Every question must reuse vocabulary supplied by the scene."
                 )
-            if task.focus == "sceneDescription" and not (question.translation or "").strip():
+            if task.focus in {"sceneDescription", "chainedDescription"} and not (
+                question.translation or ""
+            ).strip():
                 raise LearningTaskGenerationError(
-                    "Scene-description questions need an English translation."
+                    "Description questions need an English translation."
                 )
+            if task.focus in {"prepositionRelation", "sceneDescription"} and not keys_for(
+                question, "relationship_keys"
+            ):
+                raise LearningTaskGenerationError(
+                    "Relation tasks must reference a supplied relationship."
+                )
+            if task.focus == "chainedDescription" and len(
+                keys_for(question, "relationship_keys")
+            ) < 2:
+                raise LearningTaskGenerationError(
+                    "Chained-description questions must reference two relationships."
+                )
+
+
+def keys_for(question, attribute: str) -> set[str]:
+    return set(getattr(question, attribute))

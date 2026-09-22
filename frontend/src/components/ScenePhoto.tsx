@@ -57,6 +57,7 @@ export function ScenePhoto({
           custom ? "scene__marker--custom" : "",
           active ? "scene__marker--active" : "",
           item.y < 12 ? "scene__marker--below" : "",
+          item.x > 86 ? "scene__marker--left" : "",
         ]
           .filter(Boolean)
           .join(" ");

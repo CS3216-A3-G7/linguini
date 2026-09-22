@@ -6,12 +6,18 @@ from pydantic import Field
 
 from app.schemas.base import ApiModel, NonEmptyText
 
-type LearningTaskFocus = Literal["genderAgreement", "singularPlural", "sceneDescription"]
+type LearningTaskFocus = Literal[
+    "genderNumberAgreement",
+    "prepositionRelation",
+    "sceneDescription",
+    "chainedDescription",
+]
 
 REQUIRED_TASK_FOCUS_ORDER: tuple[str, ...] = (
-    "genderAgreement",
-    "singularPlural",
+    "genderNumberAgreement",
+    "prepositionRelation",
     "sceneDescription",
+    "chainedDescription",
 )
 
 
@@ -41,5 +47,5 @@ class GeneratedLearningTask(ApiModel):
 class LearningTaskResult(ApiModel):
     tasks: Annotated[
         list[GeneratedLearningTask],
-        Field(min_length=len(REQUIRED_TASK_FOCUS_ORDER), max_length=len(REQUIRED_TASK_FOCUS_ORDER)),
+        Field(min_length=1, max_length=len(REQUIRED_TASK_FOCUS_ORDER)),
     ]

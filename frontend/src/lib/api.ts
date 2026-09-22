@@ -284,6 +284,7 @@ interface TranslatedTerm { key: string; source: string; translation: string }
 export interface SceneObject {
   id: string; sessionId: string; label: string; vocabularyItemId: string | null;
   boundingBox: { x: number | string; y: number | string; width: number | string; height: number | string } | null;
+  anchorPoint: { x: number | string; y: number | string } | null;
   attributes: Record<string, unknown> | null; confidenceScore: number | string | null; sourceObjectKey: string | null;
 }
 export interface SceneObjectRelation {
@@ -296,12 +297,12 @@ export interface VocabularyLearningWord {
   partOfSpeech: WordClass; gender: string | null; pluralForm: string | null; phoneticText: string | null;
   pronunciationAudioAssetId: string | null; exampleSentence: string | null;
 }
-export interface VocabularyQuestion { questionId: string; prompt: string; options: { optionId: string; label: string }[] }
+export interface VocabularyQuestion { questionId: string; prompt: string; options: { optionId: string; label: string }[]; correctOptionId?: string | null }
 export interface GrammarLessonQuestion extends VocabularyQuestion { translation?: string | null }
 export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string } | { inputMode: "vocabularyReview"; answers: Record<string, string>; typedAnswers: Record<string, string> };
 export interface TaskActionResult {
   task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;
-  attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null } | null;
+  attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null; evaluationDetails?: { questionResults?: Record<string, boolean> } | null } | null;
 }
 export const getMedia = (id: string) => request<UploadedImage>(`/api/v1/media/${id}`);
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
@@ -318,6 +319,8 @@ export const createPractice = (profileId: string, assetId: string, key: string) 
   languageProfileId: profileId, mediaAssetId: assetId, idempotencyKey: key,
 });
 export const taskAction = (id: string, action: "start" | "complete" | "skip" | "attempts", body: unknown = {}) => write<TaskActionResult>(`/api/v1/tasks/${id}/${action}`, "POST", body);
+export const checkVocabularyAnswer = (id: string, questionId: string, optionId: string) =>
+  write<{ questionId: string; isCorrect: boolean }>(`/api/v1/tasks/${id}/check-vocabulary-answer`, "POST", { questionId, optionId });
 export const completePractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/complete`, "POST", {});
 export const abandonPractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/abandon`, "POST", {});
 export const getPracticeSummary = (id: string) => request<{ progress: SessionProgress; learnedVocabularyIds: string[]; xpEarned: number; ispyCorrectCount: number; ispyAttemptCount: number }>(`/api/v1/sessions/${id}/summary`);

@@ -14,8 +14,8 @@ def test_generated_lessons_become_private_grammar_lesson_tasks():
 
     assert [task.kind for task in lessons] == ["grammarLesson"] * 3
     assert [task.public_content.focus for task in lessons] == [
-        "genderAgreement",
-        "singularPlural",
+        "genderNumberAgreement",
+        "prepositionRelation",
         "sceneDescription",
     ]
     assert all(task.phase == "learning" for task in lessons)

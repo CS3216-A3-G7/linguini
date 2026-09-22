@@ -273,15 +273,23 @@ def build_tasks(session_id, objects, words, translations, uploaded, translated_s
             *learning_words[question_index + 1 :],
             *learning_words[:question_index],
         ]
-        choices = list(dict.fromkeys(candidate["target_text"] for candidate in ordered))[:3]
-        if len(choices) < 2:
-            choices.append("I'm not sure yet")
+        choices = list(dict.fromkeys(candidate["target_text"] for candidate in ordered))[:4]
+        fallback_choices = {
+            "es": ["No sé", "No estoy seguro"],
+            "fr": ["Je ne sais pas", "Je ne suis pas sûr"],
+        }.get(words[0].language_code.lower(), ["I'm not sure", "Something else"])
+        for choice in fallback_choices:
+            if len(choices) >= 4:
+                break
+            if choice not in choices:
+                choices.append(choice)
         question_id = f"word-{learning_word['learning_key']}"
         questions.append(
             dict(
                 question_id=question_id,
                 prompt=f'Which word means "{learning_word["translation"]}"?',
                 options=[dict(option_id=choice, label=choice) for choice in choices],
+                correct_option_id=learning_word["target_text"],
             )
         )
         correct_option_ids[question_id] = learning_word["target_text"]

@@ -36,6 +36,7 @@ from app.schemas.enums import SessionStatus
 from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
 from app.schemas.tasks import (
+    CheckVocabularyAnswerResponse,
     SessionProgress,
     SessionTask,
     SessionTaskPublic,
@@ -200,6 +201,42 @@ class PostgresWorkflowRepository:
                 .order_by(session_tasks.c.order_index)
             ).mappings()
         ]
+
+    def check_vocabulary_answer(self, task_id, question_id, option_id):
+        """Evaluate one vocabulary choice without recording or completing the task."""
+        with self.read_connection() as c:
+            row = (
+                c.execute(
+                    select(session_tasks)
+                    .join(sessions, sessions.c.id == session_tasks.c.session_id)
+                    .join(
+                        language_profiles,
+                        language_profiles.c.id == sessions.c.language_profile_id,
+                    )
+                    .where(
+                        session_tasks.c.id == task_id,
+                        sessions.c.user_id == self.user_id,
+                        language_profiles.c.is_active.is_(True),
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if row is None:
+                raise PracticeNotFoundError("Task not found.")
+            task = SessionTask.model_validate(dict(row))
+            if task.kind != "vocabularyIntroduction" or not task.answer_key:
+                raise PracticeConflictError("This task does not support answer checking.")
+            question = next(
+                (item for item in task.public_content.questions if item.question_id == question_id),
+                None,
+            )
+            if question is None or option_id not in {item.option_id for item in question.options}:
+                raise PracticeConflictError("Choose one of the offered answers.")
+            return CheckVocabularyAnswerResponse(
+                question_id=question_id,
+                is_correct=task.answer_key.correct_option_ids.get(question_id) == option_id,
+            )
 
     def _detail(self, c, session):
         asset = MediaAsset.model_validate(

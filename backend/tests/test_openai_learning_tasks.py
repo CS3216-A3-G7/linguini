@@ -18,7 +18,13 @@ INPUT = {
 }
 
 
-def question(question_id: str, *, object_keys=("object_1",), translation=None):
+def question(
+    question_id: str,
+    *,
+    object_keys=("object_1",),
+    relationship_keys=(),
+    translation=None,
+):
     return {
         "questionId": question_id,
         "prompt": "La tasse est ___.",
@@ -30,7 +36,7 @@ def question(question_id: str, *, object_keys=("object_1",), translation=None):
         "translation": translation,
         "objectKeys": list(object_keys),
         "attributeKeys": [],
-        "relationshipKeys": [],
+        "relationshipKeys": list(relationship_keys),
     }
 
 
@@ -38,24 +44,35 @@ def tasks(*, scene_translation="The cup is red."):
     return {
         "tasks": [
             {
-                "focus": "genderAgreement",
-                "title": "Gender agreement",
+                "focus": "genderNumberAgreement",
+                "title": "Gender and number agreement",
                 "explanation": "Adjectives match the noun.",
                 "questions": [question("gender-1"), question("gender-2")],
             },
             {
-                "focus": "singularPlural",
-                "title": "Singular and plural",
-                "explanation": "Most nouns add -s.",
-                "questions": [question("plural-1"), question("plural-2")],
+                "focus": "prepositionRelation",
+                "title": "Prepositions in the scene",
+                "explanation": "Use the relationship shown in the scene.",
+                "questions": [
+                    question("relation-1", relationship_keys=("relation_1",)),
+                    question("relation-2", relationship_keys=("relation_1",)),
+                ],
             },
             {
                 "focus": "sceneDescription",
                 "title": "Describe the scene",
                 "explanation": "Build one full sentence.",
                 "questions": [
-                    question("scene-1", translation=scene_translation),
-                    question("scene-2", translation=scene_translation),
+                    question(
+                        "scene-1",
+                        relationship_keys=("relation_1",),
+                        translation=scene_translation,
+                    ),
+                    question(
+                        "scene-2",
+                        relationship_keys=("relation_1",),
+                        translation=scene_translation,
+                    ),
                 ],
             },
         ]
@@ -64,7 +81,7 @@ def tasks(*, scene_translation="The cup is red."):
 
 def generator(tmp_path: Path, result: LearningTaskResult | None):
     prompt = tmp_path / "learning_tasks.txt"
-    prompt.write_text("Generate three short learning tasks.", encoding="utf-8")
+    prompt.write_text("Generate learning tasks.", encoding="utf-8")
     client = SimpleNamespace(
         responses=SimpleNamespace(
             parse=MagicMock(return_value=SimpleNamespace(output_parsed=result))
@@ -98,12 +115,45 @@ def test_generation_rejects_keys_outside_the_supplied_scene(tmp_path):
 
 def test_generation_ignores_an_unknown_relationship_metadata_key(tmp_path):
     payload = tasks()
-    payload["tasks"][2]["questions"][0]["relationshipKeys"] = ["on"]
+    payload["tasks"][0]["questions"][0]["relationshipKeys"] = ["on"]
     provider, _ = generator(tmp_path, LearningTaskResult.model_validate(payload))
 
     result = provider.generate(INPUT)
 
-    assert result.tasks[2].questions[0].relationship_keys == []
+    assert result.tasks[0].questions[0].relationship_keys == []
+
+
+def test_generation_requires_a_relationship_for_relation_tasks(tmp_path):
+    payload = tasks()
+    payload["tasks"][1]["questions"][0]["relationshipKeys"] = []
+    provider, _ = generator(tmp_path, LearningTaskResult.model_validate(payload))
+
+    with pytest.raises(LearningTaskGenerationError):
+        provider.generate(INPUT)
+
+
+def test_generation_requires_chained_descriptions_for_two_relationships(tmp_path):
+    payload = tasks()
+    two_relation_input = {
+        **INPUT,
+        "relationships": [
+            *INPUT["relationships"],
+            {"key": "relation_2", "source": "next_to", "translation": "à côté de"},
+        ],
+    }
+    provider, _ = generator(tmp_path, LearningTaskResult.model_validate(payload))
+
+    with pytest.raises(LearningTaskGenerationError):
+        provider.generate(two_relation_input)
+
+
+def test_generation_allows_only_an_agreement_task_without_relationships(tmp_path):
+    payload = tasks()
+    payload["tasks"] = payload["tasks"][:1]
+    no_relation_input = {**INPUT, "relationships": []}
+    provider, _ = generator(tmp_path, LearningTaskResult.model_validate(payload))
+
+    assert provider.generate(no_relation_input).tasks[0].focus == "genderNumberAgreement"
 
 
 def test_generation_requires_a_translated_scene_sentence(tmp_path):

@@ -6,7 +6,7 @@ import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { practiceStages, taskDone, taskTitle } from "../lib/practiceTasks";
 import { speak } from "../lib/speech";
-import type { SessionTask, TaskAnswer, VocabularyLearningWord } from "../lib/api";
+import { checkVocabularyAnswer, type SessionTask, type TaskAnswer, type VocabularyLearningWord } from "../lib/api";
 
 export function LearningTaskPage() {
   const { taskId } = useParams();
@@ -100,6 +100,8 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
   const [typingIndex, setTypingIndex] = useState(0);
   const [typedAnswers, setTypedAnswers] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [questionResults, setQuestionResults] = useState<Record<string, boolean>>({});
+  const [checkingQuestion, setCheckingQuestion] = useState(false);
   const requestKey = useRef(crypto.randomUUID());
   const content = task.publicContent;
   if (content.kind !== "vocabularyIntroduction") return null;
@@ -111,10 +113,29 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
   const typingKey = typingWord ? typingWord.learningKey ?? typingWord.vocabularyItemId ?? typingWord.targetText : "";
   const submit = async () => {
     const result = await actOnTask(task.id, "attempts", { inputMode: "vocabularyReview", answers, typedAnswers }, requestKey.current);
-    if (result) setFeedback(result.attempt?.feedback?.message ?? "Vocabulary practice saved.");
+    if (result) {
+      setFeedback("Vocabulary practice saved.");
+      setQuestionResults(result.attempt?.evaluationDetails?.questionResults ?? {});
+    }
   };
   const finishReview = () => page < pageCount - 1 ? setPage(value => value + 1) : setStage("quiz");
   const finishQuestion = () => questionIndex < content.questions.length - 1 ? setQuestionIndex(value => value + 1) : setStage("typing");
+  const chooseAnswer = async (optionId: string) => {
+    if (!question || answers[question.questionId] || checkingQuestion) return;
+    if (question.correctOptionId) {
+      setAnswers(value => ({ ...value, [question.questionId]: optionId }));
+      setQuestionResults(value => ({ ...value, [question.questionId]: question.correctOptionId === optionId }));
+      return;
+    }
+    setCheckingQuestion(true);
+    try {
+      const result = await checkVocabularyAnswer(task.id, question.questionId, optionId);
+      setAnswers(value => ({ ...value, [question.questionId]: optionId }));
+      setQuestionResults(value => ({ ...value, [question.questionId]: result.isCorrect }));
+    } finally {
+      setCheckingQuestion(false);
+    }
+  };
   return <div className="stack vocabulary-flow">
     <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
     <div className="learning-title-row"><h1>{content.title}</h1><Button variant="quiet" className="learning-exit" onClick={onClose}>Back to tasks</Button></div>
@@ -126,7 +147,13 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
     </> : null}
     {!terminal && stage === "quiz" && question ? <Card plain><div className="stack">
       <span className="label muted">Question {questionIndex + 1} of {content.questions.length}</span><h2>{question.prompt}</h2>
-      <div className="choice-grid">{question.options.map(option => <button key={option.optionId} className="choice" aria-pressed={answers[question.questionId] === option.optionId} onClick={() => setAnswers(value => ({ ...value, [question.questionId]: option.optionId }))}>{answers[question.questionId] === option.optionId ? <CheckIcon size={16} /> : null}{option.label}</button>)}</div>
+      <div className="choice-grid">{question.options.map(option => {
+        const selected = answers[question.questionId] === option.optionId;
+        const result = questionResults[question.questionId];
+        const state = result === undefined || !selected ? "" : result ? " choice--correct" : " choice--incorrect";
+        return <button key={option.optionId} className={`choice${state}`} aria-pressed={selected} disabled={!!answers[question.questionId] || checkingQuestion || !!feedback} onClick={() => void chooseAnswer(option.optionId)}>{selected ? <CheckIcon size={16} /> : null}{option.label}</button>;
+      })}</div>
+      {answers[question.questionId] ? <Feedback tone={questionResults[question.questionId] ? "good" : "warn"}><p role="status">{questionResults[question.questionId] ? "Correct!" : "Not quite — keep going."}</p></Feedback> : null}
       <Button block disabled={!answers[question.questionId]} onClick={finishQuestion}>{questionIndex < content.questions.length - 1 ? "Next question" : "Continue"}</Button>
     </div></Card> : null}
     {!terminal && stage === "typing" && typingWord ? <Card plain><div className="stack">

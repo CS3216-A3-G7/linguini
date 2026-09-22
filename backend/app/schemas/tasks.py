@@ -42,6 +42,9 @@ class VocabularyQuestion(ApiModel):
     question_id: NonEmptyText
     prompt: NonEmptyText
     options: Annotated[list[VocabularyChoice], Field(min_length=2)]
+    # Vocabulary recognition is a low-stakes learning interaction, so clients
+    # may evaluate its choices immediately without a network round trip.
+    correct_option_id: NonEmptyText | None = None
 
 
 class VocabularyIntroductionContent(ApiModel):
@@ -293,6 +296,16 @@ class SubmitVocabularyReviewAttemptRequest(ApiModel):
         if not self.answers:
             raise ValueError("answers cannot be empty")
         return self
+
+
+class CheckVocabularyAnswerRequest(ApiModel):
+    question_id: NonEmptyText
+    option_id: NonEmptyText
+
+
+class CheckVocabularyAnswerResponse(ApiModel):
+    question_id: NonEmptyText
+    is_correct: bool
 
 
 type SubmitTaskAttemptRequest = Annotated[
