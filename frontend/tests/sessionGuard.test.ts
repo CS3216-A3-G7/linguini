@@ -242,12 +242,24 @@ test("a completed session redirects every earlier stage to the summary", async (
   }
 });
 
-test("standing on a page is forwarded when the session advances past it", async () => {
+test("standing on a page is not re-validated when the session advances", async () => {
   fixture = detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]);
   await mount(`${BASE}/learn/learn-0`);
   assert.equal(shown(), "page-learn-task");
   await advance(detail("inProgress", [task("learn", "completed", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
+  assert.equal(shown(), "page-learn-task");
+  await go(`${BASE}/learn`);
   assert.equal(shown(), "page-ispy-1");
+});
+
+test("finishing the last learning task keeps the task page showing its feedback", async () => {
+  fixture = detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]);
+  await mount(`${BASE}/learn/learn-0`);
+  assert.equal(shown(), "page-learn-task");
+  // Answering the last unfinished learning task flips the canonical step to
+  // I-Spy, but the learner is reading their result — no auto-forward.
+  await advance(detail("inProgress", [task("learn", "completed", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
+  assert.equal(shown(), "page-learn-task");
 });
 
 test("a session leaving the analysis stage forwards the mic check underneath the learner", async () => {
@@ -259,6 +271,7 @@ test("a session leaving the analysis stage forwards the mic check underneath the
   await advance(detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
   assert.equal(shown(), "page-mic-test");
 });
+
 
 test("the analysis page redirects to the mic check once review is submitted", async () => {
   fixture = detail("generatingTasks");

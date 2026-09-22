@@ -4,7 +4,7 @@ import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMedia, getPractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
-import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
+import { isPreTaskStep, isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
@@ -23,9 +23,10 @@ function SessionLoader({ id }: { id: string }) {
   const [detail, setDetail] = useState<PracticeDetail | null>(null);
   const location = useLocation();
   // The guard validates every navigation against the latest canonical
-  // destination, and re-validates when the session advances underneath a
-  // stable pathname — a session that moves on (e.g. generation finishing)
-  // forwards the learner instead of stranding them on a stale page.
+  // destination. Task pages are not re-validated while the pathname stays the
+  // same — a learner reading their answer feedback must keep it — but the
+  // pre-task steps (analysis, mic check) forward automatically when the
+  // session advances so nobody is stranded on a stale waiting screen.
   const checked = useRef<{ path: string; canonical: string | null; allowed: boolean } | null>(null);
   const queryClient = useQueryClient();
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
@@ -58,7 +59,9 @@ function SessionLoader({ id }: { id: string }) {
     : data;
   const authoritative = session?.session.id === id ? session : detail;
   const canonical = authoritative ? sessionDestination(authoritative).path : null;
-  if (authoritative && (checked.current?.path !== location.pathname || checked.current.canonical !== canonical)) {
+  const revalidate = checked.current?.path !== location.pathname
+    || (checked.current.canonical !== canonical && isPreTaskStep(location.pathname));
+  if (authoritative && revalidate) {
     checked.current = { path: location.pathname, canonical, allowed: isSessionRouteAllowed(authoritative, location.pathname) };
   }
   if (checked.current && !checked.current.allowed) {

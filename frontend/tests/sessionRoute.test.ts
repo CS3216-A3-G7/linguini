@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../src/lib/sessionRoute.ts";
+import { isPreTaskStep, isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../src/lib/sessionRoute.ts";
 import type { PracticeDetail, SessionStatus, SessionTask, TaskContent } from "../src/lib/api.ts";
 
 const contents: Record<string, TaskContent> = {
@@ -35,6 +35,15 @@ test("every session status maps to its canonical route", () => {
   assert.equal(sessionDestination(detail("abandoned")).path, "/practice");
   assert.match(sessionDestination(detail("abandoned")).notice ?? "", /discarded/);
   assert.equal(sessionDestination(detail("failed")).path, "/practice");
+});
+
+test("isPreTaskStep marks only the pre-task steps as auto-forwardable", () => {
+  assert.equal(isPreTaskStep("/practice/sessions/s1/analysis"), true);
+  assert.equal(isPreTaskStep("/practice/sessions/s1/mic-test"), true);
+  for (const step of ["learn", "learn/learn-0", "ispy-1", "ispy-2", "summary"]) {
+    assert.equal(isPreTaskStep(`/practice/sessions/s1/${step}`), false, step);
+  }
+  assert.equal(isPreTaskStep("/practice"), false);
 });
 
 test("generatingTasks sends the analysis page to the mic check", () => {
