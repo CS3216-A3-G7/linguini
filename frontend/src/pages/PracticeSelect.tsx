@@ -11,11 +11,13 @@ import { sessionDestination } from "../lib/sessionRoute";
 import { queryKeys } from "../lib/queryKeys";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppState } from "../state/useAppState";
+import { useScenesQuery } from "../state/queries";
 
 export function PracticeSelect() {
   const navigate = useNavigate();
   const notice = (useLocation().state as { practiceNotice?: string } | null)?.practiceNotice;
-  const { scenes, learner, activeProfile } = useAppState();
+  const { learner, activeProfile } = useAppState();
+  const { scenes } = useScenesQuery();
   const activeProfileId = activeProfile?.id;
   const [uploading, setUploading] = useState(false);
   const [selected, setSelected] = useState(false);

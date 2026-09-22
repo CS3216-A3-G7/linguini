@@ -6,6 +6,7 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import type { VocabStatus, WordClass } from "../data/types";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
+import { useScenesQuery, useVocabularyQuery } from "../state/queries";
 
 const statusLabels: { id: VocabStatus; label: string }[] = [
   { id: "new", label: "New" },
@@ -15,7 +16,9 @@ const statusLabels: { id: VocabStatus; label: string }[] = [
 ];
 
 export function Vocabulary() {
-  const { vocabulary, vocabularyLoading, vocabularyError, scenes, scenesLoading, scenesError, learner } = useAppState();
+  const { learner } = useAppState();
+  const { vocabulary, vocabularyLoading, vocabularyError } = useVocabularyQuery();
+  const { scenes, scenesLoading, scenesError } = useScenesQuery();
   const wordClasses: (WordClass | "all")[] = ["all", ...new Set(vocabulary.map(item => item.wordClass))];
   const [view, setView] = useState<"scenes" | "list">("scenes");
   const [status, setStatus] = useState<VocabStatus>("learning");

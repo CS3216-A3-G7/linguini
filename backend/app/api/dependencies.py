@@ -240,6 +240,7 @@ def get_practice_repository(
         analyzer=analyzer,
         translator=translator,
         learning_task_generator=learning_task_generator,
+        background=getattr(request.app.state, "background_runner", None),
     )
 
 

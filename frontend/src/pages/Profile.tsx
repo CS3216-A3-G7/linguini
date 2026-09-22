@@ -1,11 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
 import { useAppState } from "../state/useAppState";
+import { useJournalsQuery, useVocabularyQuery } from "../state/queries";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { learner, vocabulary, journal, user, activeProfile, progress, progressLoading, progressError,
-    vocabularyLoading, vocabularyError, journalLoading, journalError, profileError } = useAppState();
+  const { learner, user, activeProfile, progress, progressLoading, progressError, profileError } = useAppState();
+  const { vocabulary, vocabularyLoading, vocabularyError } = useVocabularyQuery();
+  const { journal, journalLoading, journalError } = useJournalsQuery();
   const metrics = [
     { value: vocabularyLoading || vocabularyError ? "--" : vocabulary.length, label: "Words" },
     { value: vocabularyLoading || vocabularyError ? "--" : vocabulary.filter(word => word.status === "mastered").length, label: "Mastered" },

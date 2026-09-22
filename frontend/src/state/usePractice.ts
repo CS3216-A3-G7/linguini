@@ -8,7 +8,7 @@ import { queryKeys } from "../lib/queryKeys";
 
 const PROCESSING = ["analyzingScene", "generatingTasks"];
 
-export function usePractice(_userId: string, profileId: string, onLearningChanged: () => void) {
+export function usePractice(_userId: string, profileId: string, onLearningChanged: (scope: "task" | "session") => void) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<PracticeDetail | null>(null);
   const [practiceSaving, setSaving] = useState(false);
@@ -37,7 +37,8 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
         data = await getPractice(id);
       }
     }
-    for (let attempt = 0; attempt < 20 && PROCESSING.includes(data.session.status); attempt += 1) {
+    // Scene analysis can take ~60s, so poll for up to a minute before stalling.
+    for (let attempt = 0; attempt < 40 && PROCESSING.includes(data.session.status); attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       if (version !== loadVersion.current) break;
       data = await getPractice(id);
@@ -84,7 +85,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
   const flushLearningChanges = useCallback(() => {
     if (learningDirty.current) {
       learningDirty.current = false;
-      onLearningChanged();
+      onLearningChanged("session");
     }
   }, [onLearningChanged]);
   const completion = useMutation({
@@ -95,7 +96,10 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
         : current);
       setCompletionError(error instanceof Error ? error.message : "Unable to complete session.");
     },
-    onSuccess: (_data, { sessionId }) => {
+    onSuccess: (completed, { sessionId }) => {
+      setSession(current => current?.session.id === completed.id
+        ? { ...current, session: { ...current.session, status: completed.status as SessionStatus } }
+        : current);
       flushLearningChanges();
       void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(sessionId) });
     },
@@ -126,12 +130,15 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     try {
       const detail = await reviewPractice(session.session.id, review);
       setSession(current => current?.session.id === detail.session.id ? detail : current);
+      // Task generation now runs off the request path; start draining it while
+      // `proceed` navigates — SessionRoute reuses this in-flight load.
+      if (PROCESSING.includes(detail.session.status)) void loadSession(session.session.id);
       return true;
     } catch (error) {
       setSession(current => current?.session.id === previous.session.id ? previous : current);
       setError(error instanceof Error ? error.message : "Unable to save your words.");
       return false;
     } finally { busy.current = false; setSaving(false); }
-  }, [session]);
+  }, [session, loadSession]);
   return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, retryProcessing, actOnTask, completeSession, completionPending: completion.isPending, completionError, retryCompletion, flushLearningChanges, saveReview, micReady, setMicReady };
 }

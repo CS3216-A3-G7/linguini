@@ -25,7 +25,8 @@ def test_analyzer_runs_once_and_review_state_never_reanalyzes(database, monkeypa
     sid = create_run(client, profile)["session"]["id"]
     first = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert first.status_code == 200, first.text
-    assert first.json()["session"]["status"] == "awaitingObjectReview"
+    # Analysis is claimed on the request and finished in the background job.
+    assert first.json()["session"]["status"] == "analyzingScene"
     repeat = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert repeat.status_code == 200, repeat.text
     assert repeat.json()["session"]["status"] == "awaitingObjectReview"
@@ -35,7 +36,8 @@ def test_analyzer_runs_once_and_review_state_never_reanalyzes(database, monkeypa
 def test_repeated_analysis_returns_identical_draft(database):
     _, _, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
-    first = client.post(f"/api/v1/sessions/{sid}/analyze").json()
+    assert client.post(f"/api/v1/sessions/{sid}/analyze").status_code == 200
+    first = client.get(f"/api/v1/sessions/{sid}").json()
     repeat = client.post(f"/api/v1/sessions/{sid}/analyze").json()
     assert repeat["session"]["status"] == "awaitingObjectReview"
     assert repeat["sceneObjects"] == first["sceneObjects"]
@@ -97,7 +99,9 @@ def test_analyze_is_scoped_to_the_owner(database, monkeypatch):
 def test_analyze_persists_title_summary_and_draft(database):
     _, _, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
-    detail = client.post(f"/api/v1/sessions/{sid}/analyze").json()
+    claimed = client.post(f"/api/v1/sessions/{sid}/analyze").json()
+    assert claimed["session"]["status"] == "analyzingScene"
+    detail = client.get(f"/api/v1/sessions/{sid}").json()
     objects = detail["sceneObjects"]
     relations = detail["sceneObjectRelations"]
     assert objects and relations
@@ -119,9 +123,10 @@ def test_analyzer_failure_marks_session_failed(database, monkeypatch):
         raise RuntimeError("provider exploded")
 
     monkeypatch.setattr(DeterministicSceneAnalyzer, "analyze", fail)
+    # A provider failure surfaces as a failed session, not a request error.
     response = client.post(f"/api/v1/sessions/{sid}/analyze")
-    assert response.status_code == 502
-    assert response.json()["detail"]["code"] == "scene_analysis_failed"
+    assert response.status_code == 200, response.text
+    assert response.json()["session"]["status"] == "analyzingScene"
     session = client.get(f"/api/v1/sessions/{sid}").json()["session"]
     assert session["status"] == "failed"
     assert session["failureCode"] == "sceneAnalysisFailed"
@@ -131,12 +136,13 @@ def test_analyzer_failure_marks_session_failed(database, monkeypatch):
 def test_analyze_rejects_sessions_past_review(database):
     engine, _, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
-    detail = client.post(f"/api/v1/sessions/{sid}/analyze").json()
+    assert client.post(f"/api/v1/sessions/{sid}/analyze").status_code == 200
+    detail = client.get(f"/api/v1/sessions/{sid}").json()
     accepted = [obj["id"] for obj in detail["sceneObjects"]]
     reviewed = client.put(f"/api/v1/sessions/{sid}/review", json={"acceptedObjectIds": accepted})
     assert reviewed.status_code == 200, reviewed.text
     assert client.post(f"/api/v1/sessions/{sid}/analyze").status_code == 409
-    for task in reviewed.json()["tasks"]:
+    for task in client.get(f"/api/v1/sessions/{sid}").json()["tasks"]:
         assert client.post(f"/api/v1/tasks/{task['id']}/skip", json={}).status_code == 200
     assert client.post(f"/api/v1/sessions/{sid}/complete").status_code == 200
     assert client.post(f"/api/v1/sessions/{sid}/analyze").status_code == 409

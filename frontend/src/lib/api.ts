@@ -171,7 +171,7 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
   const items: DailyVocabularyItem[] = [];
   let cursor: string | null = null;
   do {
-    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    const query = cursor ? `?limit=500&cursor=${encodeURIComponent(cursor)}` : "?limit=500";
     const page: { items: DailyVocabularyItem[]; nextCursor: string | null } =
       await request(`/api/v1/me/vocabulary${query}`, signal);
     items.push(...page.items);
@@ -197,6 +197,7 @@ interface JournalRecord {
 interface JournalDetail {
   media: { mediaAssetId: string; displayOrder: number }[];
   imageUrl?: string | null;
+  imageUrls?: Record<string, string | null>;
   journal: JournalRecord;
   revisions: { id: string; content: string }[];
 }
@@ -204,7 +205,7 @@ function journalEntry(detail: JournalDetail): JournalEntry {
   const row = detail.journal;
   const media = [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder);
   return { id: row.id, languageProfileId: row.languageProfileId, date: row.localDate,
-    photos: media.map((photo, index) => ({ ...photo, imageUrl: index === 0 ? detail.imageUrl ?? null : null })),
+    photos: media.map((photo, index) => ({ ...photo, imageUrl: detail.imageUrls?.[photo.mediaAssetId] ?? (index === 0 ? detail.imageUrl ?? null : null) })),
     title: row.title, mediaAssetId: [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.mediaAssetId ?? null, imageUrl: detail.imageUrl ?? null, wordsUsed: row.selectedWords,
     body: detail.revisions.find((revision) => revision.id === row.currentRevisionId)?.content ?? "" };
 }

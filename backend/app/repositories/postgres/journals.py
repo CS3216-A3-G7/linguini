@@ -1,6 +1,7 @@
 """Five relational journal entities, written atomically under a per-user lock."""
 
 from collections.abc import Callable
+from datetime import date
 from uuid import UUID
 
 from pydantic import TypeAdapter, ValidationError
@@ -139,15 +140,29 @@ class PostgresJournalRepository:
         self.engine = engine
         self.user_id = user_id
 
-    def _read(self, connection: Connection) -> list[JournalDetailResponse]:
+    def _read(
+        self,
+        connection: Connection,
+        *,
+        journal_ids: list[UUID] | None = None,
+        local_date: date | None = None,
+        limit: int | None = None,
+    ) -> list[JournalDetailResponse]:
+        statement = select(journals).where(journals.c.user_id == self.user_id)
+        if journal_ids is not None:
+            statement = statement.where(journals.c.id.in_(journal_ids))
+        if local_date is not None:
+            statement = statement.where(journals.c.local_date == local_date)
+        statement = statement.order_by(journals.c.local_date.desc())
+        if limit is not None:
+            statement = statement.limit(limit)
         entries = {
             row["id"]: JournalDetailResponse(journal=Journal.model_validate(dict(row)))
-            for row in connection.execute(
-                select(journals)
-                .where(journals.c.user_id == self.user_id)
-                .order_by(journals.c.local_date.desc())
-            ).mappings()
+            for row in connection.execute(statement).mappings()
         }
+        if not entries:
+            return []
+        ids = list(entries)
         revision_owners = {}
         for name, table, model, order in CHILDREN:
             if table is journal_word_mentions:
@@ -155,13 +170,12 @@ class PostgresJournalRepository:
                     select(table)
                     .join(journal_revisions, table.c.journal_revision_id == journal_revisions.c.id)
                     .join(journals, journal_revisions.c.journal_id == journals.c.id)
+                    .where(journals.c.id.in_(ids))
                 )
             else:
-                statement = select(table).join(journals, table.c.journal_id == journals.c.id)
+                statement = select(table).where(table.c.journal_id.in_(ids))
             for row in connection.execute(
-                statement.where(journals.c.user_id == self.user_id).order_by(
-                    table.c[order], table.c.id
-                )
+                statement.order_by(table.c[order], table.c.id)
             ).mappings():
                 record = model.model_validate(dict(row))
                 owner = (
@@ -182,6 +196,35 @@ class PostgresJournalRepository:
                 isolation_level="REPEATABLE READ"
             ) as connection:
                 return self._read(connection)
+        except (SQLAlchemyError, ValueError) as exc:
+            raise JournalStorageError("Unable to read journals.") from exc
+
+    def read_for_user(self, limit: int | None = None) -> list[JournalDetailResponse]:
+        try:
+            with self.engine.connect().execution_options(
+                isolation_level="REPEATABLE READ"
+            ) as connection:
+                return self._read(connection, limit=limit)
+        except (SQLAlchemyError, ValueError) as exc:
+            raise JournalStorageError("Unable to read journals.") from exc
+
+    def read_one(self, journal_id: UUID) -> JournalDetailResponse | None:
+        try:
+            with self.engine.connect().execution_options(
+                isolation_level="REPEATABLE READ"
+            ) as connection:
+                rows = self._read(connection, journal_ids=[journal_id])
+                return rows[0] if rows else None
+        except (SQLAlchemyError, ValueError) as exc:
+            raise JournalStorageError("Unable to read journals.") from exc
+
+    def read_for_date(self, local_date: date) -> JournalDetailResponse | None:
+        try:
+            with self.engine.connect().execution_options(
+                isolation_level="REPEATABLE READ"
+            ) as connection:
+                rows = self._read(connection, local_date=local_date)
+                return rows[0] if rows else None
         except (SQLAlchemyError, ValueError) as exc:
             raise JournalStorageError("Unable to read journals.") from exc
 

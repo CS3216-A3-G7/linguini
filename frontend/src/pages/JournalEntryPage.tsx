@@ -10,6 +10,7 @@ import { Button, Card, IconButton, TopBar } from "../components/ui";
 import { ChevronLeftIcon, ChevronRightIcon } from "../components/icons";
 import { MediaImage } from "../components/MediaImage";
 import { useAppState } from "../state/useAppState";
+import { useVocabularyQuery } from "../state/queries";
 
 export function JournalEntryPage() {
   const { entryId } = useParams();
@@ -18,7 +19,8 @@ export function JournalEntryPage() {
 
 function JournalEntryDetail({ entryId }: { entryId: string }) {
   const navigate = useNavigate();
-  const { vocabulary, activeProfile } = useAppState();
+  const { activeProfile } = useAppState();
+  const { vocabulary } = useVocabularyQuery();
   const queryClient = useQueryClient();
   const { data: entry, isPending: loading, error: queryErrorValue } = useQuery({
     queryKey: queryKeys.journal(entryId),

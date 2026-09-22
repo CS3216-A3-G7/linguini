@@ -4,7 +4,8 @@ import { Button, Card, IconButton } from "../components/ui";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { JournalImage } from "../components/JournalImage";
 import { LoadingScreen } from "../components/LoadingScreen";
-import { useAppState } from "../state/useAppState";
+import { useJournalsQuery } from "../state/queries";
+import type { JournalEntry } from "../data/types";
 
 function formatDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
@@ -38,13 +39,13 @@ function wordCount(text: string) {
 }
 
 export function Journal() {
-  const { journal, journalLoading, journalError } = useAppState();
+  const { journal, journalLoading, journalError } = useJournalsQuery();
   if (journalLoading) return <LoadingScreen label="Loading journal history..." />;
   if (journalError) return <p role="alert">{journalError} Reload to retry.</p>;
   return <JournalMonths journal={journal} />;
 }
 
-function JournalMonths({ journal }: { journal: ReturnType<typeof useAppState>["journal"] }) {
+function JournalMonths({ journal }: { journal: JournalEntry[] }) {
   const navigate = useNavigate();
   const [visibleMonth, setVisibleMonth] = useState(() =>
     monthStart(journal.length ? dateFromEntry(journal[0].date) : new Date()),
