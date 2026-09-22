@@ -14,7 +14,6 @@ test("keys are stable and serialisable", () => {
   assert.deepEqual(queryKeys.scenes, ["scenes"]);
   assert.deepEqual(queryKeys.journal("j1"), ["journal", "j1"]);
   assert.deepEqual(queryKeys.journalDayContext("2026-01-02"), ["journal", "day", "2026-01-02"]);
-  assert.deepEqual(queryKeys.media("m1"), ["media", "m1"]);
   assert.deepEqual(queryKeys.sessionScene("s1"), ["session", "s1", "scene"]);
   assert.deepEqual(queryKeys.sessionSummary("s1"), ["session", "s1", "summary"]);
   for (const key of [queryKeys.account, queryKeys.vocabulary("p"), queryKeys.activeSession("p"), queryKeys.sessionScene("s")]) {

@@ -113,7 +113,7 @@ export function PracticeAnalysis() {
             <span>Tap where you see <strong>{pending.label}</strong></span>
             <button type="button" onClick={() => setPending(null)}>Cancel</button>
           </div> : null}
-          <ScenePhoto scene={scene} items={[...kept, ...custom]} onLocationSelect={pending ? place : undefined}
+          <ScenePhoto scene={scene} items={[...kept, ...custom]} eager onLocationSelect={pending ? place : undefined}
             locationLabel={pending ? `Choose the location of ${pending.label}` : undefined} />
         </div>
         <div className="analysis-panel-tabs" role="tablist" aria-label="Scene analysis details">

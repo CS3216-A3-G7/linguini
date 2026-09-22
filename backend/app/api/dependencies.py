@@ -29,6 +29,7 @@ from app.repositories.users import UserRepository
 from app.services.gemini_learning_tasks import GeminiLearningTaskGenerator
 from app.services.gemini_scene_analysis import GeminiSceneAnalyzer, RoutedSceneAnalyzer
 from app.services.gemini_translation import GeminiSceneTranslator
+from app.services.image_derivatives import ImageDerivatives
 from app.services.image_storage import ImageStorage
 from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
@@ -113,6 +114,22 @@ def get_media_asset_repository(request: Request) -> MediaAssetRepository:
     return PostgresMediaAssetRepository(request.app.state.database_engine)
 
 
+# One shared derivative cache per process so its LRU survives across requests.
+_IMAGE_DERIVATIVES: ImageDerivatives | None = None
+
+
+def get_image_derivatives() -> ImageDerivatives:
+    global _IMAGE_DERIVATIVES
+    if _IMAGE_DERIVATIVES is None:
+        _IMAGE_DERIVATIVES = ImageDerivatives(
+            ImageStorage(
+                os.getenv("SUPABASE_URL", "").strip(),
+                os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+            )
+        )
+    return _IMAGE_DERIVATIVES
+
+
 def get_media_asset_service(
     repository: Annotated[MediaAssetRepository, Depends(get_media_asset_repository)],
     users: Annotated[UserService, Depends(get_user_service)],
@@ -124,14 +141,14 @@ def get_media_asset_service(
             os.getenv("SUPABASE_URL", "").strip(),
             os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
         ),
+        get_image_derivatives(),
     )
 
 
 def get_scene_service(
     repository: Annotated[SceneRepository, Depends(get_scene_repository)],
-    media: Annotated[MediaAssetRepository, Depends(get_media_asset_repository)],
 ) -> SceneService:
-    return SceneService(repository, media, get_media_public_base_url(), get_private_media_urls())
+    return SceneService(repository, get_media_public_base_url(), get_private_media_urls())
 
 
 def get_practice_repository(

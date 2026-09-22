@@ -9,6 +9,7 @@ type Props = {
   onMarkerClick?: (item: LanguageItem) => void;
   onLocationSelect?: (position: { x: number; y: number }) => void;
   locationLabel?: string;
+  eager?: boolean;
 };
 
 export function ScenePhoto({
@@ -18,6 +19,7 @@ export function ScenePhoto({
   onMarkerClick,
   onLocationSelect,
   locationLabel,
+  eager,
 }: Props) {
   const markers = items ?? scene.items;
 
@@ -48,7 +50,7 @@ export function ScenePhoto({
       tabIndex={onLocationSelect ? 0 : undefined}
       aria-label={onLocationSelect ? locationLabel ?? "Choose a location in the scene" : undefined}
     >
-      <SceneVisual scene={scene} className="scene__art" />
+      <SceneVisual scene={scene} className="scene__art" eager={eager} />
       {markers.map((item) => {
         const active = item.id === activeItemId;
         const custom = item.id.startsWith("custom-");

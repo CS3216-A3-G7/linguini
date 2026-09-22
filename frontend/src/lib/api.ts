@@ -15,16 +15,59 @@ export interface UploadedImage {
   height: number;
 }
 
+export function mediaImageUrl(assetId: string, width: 320 | 640 | 1280): string {
+  return `${apiBaseUrl ?? ""}/api/v1/media/${encodeURIComponent(assetId)}/image?width=${width}`;
+}
+
+const MAX_UPLOAD_EDGE = 1600;
+
+export function shouldDownscale(bytes: number, width: number, height: number): boolean {
+  return bytes > 600_000 || Math.max(width, height) > MAX_UPLOAD_EDGE;
+}
+
+async function downscale(file: File): Promise<File> {
+  try {
+    if (typeof createImageBitmap !== "function" || typeof document === "undefined") return file;
+    const canvas = document.createElement("canvas");
+    if (typeof canvas.getContext !== "function") return file;
+    // from-image keeps phone EXIF rotation instead of baking a sideways bitmap.
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    try {
+      if (!shouldDownscale(file.size, bitmap.width, bitmap.height)) return file;
+      const scale = MAX_UPLOAD_EDGE / Math.max(bitmap.width, bitmap.height);
+      canvas.width = Math.max(1, Math.round(bitmap.width * Math.min(1, scale)));
+      canvas.height = Math.max(1, Math.round(bitmap.height * Math.min(1, scale)));
+      const context = canvas.getContext("2d");
+      if (!context) return file;
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    } finally {
+      bitmap.close();
+    }
+    const toBlob = (type: string, quality: number) =>
+      new Promise<Blob | null>(resolve => canvas.toBlob(resolve, type, quality));
+    const webp = await toBlob("image/webp", 0.82);
+    const blob = webp ?? (await toBlob("image/jpeg", 0.85));
+    const type = webp ? "image/webp" : "image/jpeg";
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name, { type });
+  } catch {
+    // A failed optimisation must never break the upload itself.
+    return file;
+  }
+}
+
 export async function uploadImage(file: File, source: "camera" | "userUpload", onPhase: (phase: string) => void): Promise<UploadedImage> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Choose a JPEG, PNG or WebP image.");
   if (!file.size || file.size > 10 * 1024 * 1024) throw new Error("Choose an image between 1 byte and 10 MB.");
+  onPhase("Optimising imageâ€¦");
+  const prepared = await downscale(file);
   onPhase("Preparing uploadâ€¦");
   const upload = await write<{ assetId: string; storageKey: string; uploadUrl: string }>("/api/v1/media/upload-url", "POST", {
-    fileName: file.name, fileSize: file.size, mimeType: file.type, source,
+    fileName: file.name, fileSize: prepared.size, mimeType: prepared.type, source,
   });
   onPhase("Uploading imageâ€¦");
   const response = await fetch(upload.uploadUrl, {
-    method: "PUT", headers: { "Content-Type": file.type, "x-upsert": "false" }, body: file,
+    method: "PUT", headers: { "Content-Type": prepared.type, "x-upsert": "false" }, body: prepared,
   });
   if (!response.ok) throw new Error("Image upload failed. Please try again.");
   onPhase("Checking imageâ€¦");
@@ -319,7 +362,6 @@ export interface TaskActionResult {
   task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;
   attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null; evaluationDetails?: { questionResults?: Record<string, boolean> } | null } | null;
 }
-export const getMedia = (id: string) => request<UploadedImage>(`/api/v1/media/${id}`);
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
 export interface PracticeReview {
   acceptedObjectIds: string[];

@@ -4,9 +4,10 @@ import type { SceneSummary } from "../data/types";
 type Props = {
   scene: Pick<SceneSummary, "imageUrl" | "title">;
   className?: string;
+  eager?: boolean;
 };
 
-export function SceneImage({ scene, className }: Props) {
+export function SceneImage({ scene, className, eager }: Props) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   if (!scene.imageUrl || failedUrl === scene.imageUrl) {
     return (
@@ -24,6 +25,9 @@ export function SceneImage({ scene, className }: Props) {
       src={scene.imageUrl}
       alt={scene.title}
       className={`scene-image${className ? ` ${className}` : ""}`}
+      decoding="async"
+      loading={eager ? "eager" : "lazy"}
+      fetchPriority={eager ? "high" : undefined}
       onError={() => setFailedUrl(scene.imageUrl)}
     />
   );

@@ -1,8 +1,8 @@
 import { practiceScene } from "../lib/practiceScene";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getMedia, getPractice } from "../lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { getPractice, mediaImageUrl } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
 import { isPreTaskStep, isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
@@ -28,16 +28,13 @@ function SessionLoader({ id }: { id: string }) {
   // pre-task steps (analysis, mic check) forward automatically when the
   // session advances so nobody is stranded on a stale waiting screen.
   const checked = useRef<{ path: string; canonical: string | null; allowed: boolean } | null>(null);
-  const queryClient = useQueryClient();
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
     const initial = await getPractice(id);
-    const media = await getMedia(initial.mediaAsset.id);
-    queryClient.setQueryData(queryKeys.media(initial.mediaAsset.id), media.signedUrl);
-    if (!signal?.aborted) setPreview(practiceScene(initial, media, learner.language));
+    if (!signal?.aborted) setPreview(practiceScene(initial, mediaImageUrl(initial.mediaAsset.id, 1280), learner.language));
     const loaded = await loadSession(id, initial);
     setDetail(loaded);
-    return practiceScene(loaded, media, learner.language);
-  }, [id, loadSession, learner.language, queryClient]);
+    return practiceScene(loaded, mediaImageUrl(loaded.mediaAsset.id, 1280), learner.language);
+  }, [id, loadSession, learner.language]);
   // Side-effecting session resolution: never served from or retained in cache.
   const { data, isPending: loading, error: queryErrorValue } = useQuery({
     queryKey: queryKeys.sessionScene(id),
@@ -55,7 +52,7 @@ function SessionLoader({ id }: { id: string }) {
   </div> : <LoadingScreen label={copy.heading} />;
   if (!data || error) return <div className="stack"><p role="alert">{error ?? "Session unavailable."}</p><button onClick={() => window.location.reload()}>Retry</button><Link to="/practice">Choose an image</Link></div>;
   const current = session?.session.id === id
-    ? practiceScene(session, { id: data.mediaAssetId, signedUrl: data.imageUrl ?? "" }, learner.language)
+    ? practiceScene(session, mediaImageUrl(session.mediaAsset.id, 1280), learner.language)
     : data;
   const authoritative = session?.session.id === id ? session : detail;
   const canonical = authoritative ? sessionDestination(authoritative).path : null;

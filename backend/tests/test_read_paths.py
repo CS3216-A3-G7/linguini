@@ -76,6 +76,7 @@ def test_request_statement_counts(database):
         ("/api/v1/me", 1),
         ("/api/v1/me/progress", 4),
         ("/api/v1/journals", 6),
+        ("/api/v1/preloaded-scenes", 3),
     ]:
         _, statements = count_request_statements(lambda path=path: client.get(path))
         assert len(statements) <= limit, (path, len(statements), statements)

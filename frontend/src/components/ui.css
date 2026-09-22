@@ -1732,6 +1732,7 @@
 
 .thumb svg,
 .thumb img,
+.thumb .scene-image,
 .thumb .scene-image--error {
   width: 100%;
   height: 100%;
@@ -1771,7 +1772,8 @@
 }
 
 .photo-thumb img,
-.photo-thumb svg {
+.photo-thumb svg,
+.photo-strip .scene-image {
   display: block;
   width: 100%;
   height: 100%;
@@ -1882,6 +1884,7 @@
 
 .scene-pick svg,
 .scene-pick img,
+.scene-pick .scene-image,
 .scene-pick .scene-image--error {
   width: 100%;
   border-radius: var(--radius-sm);

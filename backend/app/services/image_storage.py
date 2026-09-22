@@ -74,6 +74,25 @@ class ImageStorage:
         except (httpx.HTTPError, ValueError) as exc:
             raise MediaUrlError("Unable to inspect uploaded image.") from exc
 
+    def put(self, key: str, data: bytes, content_type: str) -> None:
+        # Derivatives are regenerable, so overwrite is safe here unlike user uploads.
+        self._check()
+        try:
+            response = httpx.post(
+                f"{self.url}/object/media-assets/{quote(key, safe='/')}",
+                headers={
+                    **self.headers,
+                    "content-type": content_type,
+                    "x-upsert": "true",
+                    "cache-control": "31536000",
+                },
+                content=data,
+                timeout=15,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise MediaUrlError("Unable to store derived image.") from exc
+
     def delete(self, key: str) -> None:
         self._check()
         try:
