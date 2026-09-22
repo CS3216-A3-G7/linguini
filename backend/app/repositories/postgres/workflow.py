@@ -721,10 +721,11 @@ class PostgresWorkflowRepository:
                     id=object_id,
                     session_id=session_id,
                     label=added.label,
-                    # User-added labels are source-language words and may not
-                    # exist in the catalogue yet. Translation below creates or
-                    # reuses the target-language vocabulary record.
-                    vocabulary_item_id=None,
+                    # With a translator, new labels are linked after translation.
+                    # Offline practice reuses an existing catalogue translation.
+                    vocabulary_item_id=(
+                        None if self.translator else self._catalog_word(c, profile, added.label).id
+                    ),
                     bounding_box={"x": added.x, "y": added.y, "width": 0.01, "height": 0.01},
                     attributes=request.object_attributes.get(added.id) or None,
                 )
