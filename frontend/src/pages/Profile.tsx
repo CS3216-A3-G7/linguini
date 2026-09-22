@@ -5,7 +5,7 @@ import { useJournalsQuery, useVocabularyQuery } from "../state/queries";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { learner, user, activeProfile, progress, progressLoading, progressError } = useAppState();
+  const { learner, user, activeProfile, progress, progressLoading, progressError, profileError } = useAppState();
   const { vocabulary, vocabularyLoading, vocabularyError } = useVocabularyQuery();
   const { journal, journalLoading, journalError } = useJournalsQuery();
   const metrics = [
@@ -46,6 +46,7 @@ export function Profile() {
 
       {progressLoading || vocabularyLoading || journalLoading ? <p role="status">Loading your progress...</p> : null}
       {[progressError, vocabularyError, journalError].filter(Boolean).map((error, index) => <p key={index} role="alert">{error} Reload to retry.</p>)}
+      {profileError ? <p role="alert">{profileError}</p> : null}
       <section className="profile-section">
         <div className="profile-section__heading">
           <h2>Your progress</h2>

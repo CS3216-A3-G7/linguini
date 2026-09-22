@@ -2,7 +2,10 @@ import type { LeaderboardRow, ScenarioProgress, VocabRecord, VocabStatus, WordCl
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
+// The Node test runner has no import.meta.env; read process.env there.
+const envBaseUrl = import.meta.env?.VITE_API_BASE_URL
+  ?? (globalThis as { process?: { env?: { VITE_API_BASE_URL?: string } } }).process?.env?.VITE_API_BASE_URL;
+const apiBaseUrl = envBaseUrl?.replace(/\/+$/, "");
 
 export interface UploadedImage {
   id: string;
@@ -232,16 +235,20 @@ export async function saveJournal(draft: JournalDraft, profileId: string, id?: s
     const current = await getJournal(row.id);
     // Remove changed positions first; the API requires unique positions and asset IDs.
     // Reading persisted attachments on every retry also recovers from a partial save.
+    let touched = false;
     for (const photo of current.photos) {
       if (desired[photo.displayOrder] !== photo.mediaAssetId) {
         await request<void>(`/api/v1/journals/${row.id}/media/${photo.mediaAssetId}`, undefined, { method: "DELETE" });
+        touched = true;
       }
     }
     for (const [displayOrder, mediaAssetId] of desired.entries()) {
       if (!current.photos.some(photo => photo.mediaAssetId === mediaAssetId && photo.displayOrder === displayOrder)) {
         await write(`/api/v1/journals/${row.id}/media`, "POST", { mediaAssetId, displayOrder });
+        touched = true;
       }
     }
+    if (!touched) return current;
   }
   return getJournal(row.id);
 }

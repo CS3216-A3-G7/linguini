@@ -7,7 +7,7 @@ import type { ProgressResponse } from "../lib/api";
 
 export type Learner = ReturnType<typeof useAccount>["learner"];
 
-export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof useAccount>, "user" | "activeProfile" | "languageProfiles" | "activateLanguageProfile" | "profileSaving" | "profileError" | "setLanguage" | "saveUser" | "saveProfileSettings" | "saveLanguageProfile" | "completeOnboarding"> & {
+export type AppState = ReturnType<typeof usePractice> & Pick<ReturnType<typeof useAccount>, "user" | "activeProfile" | "languageProfiles" | "activateLanguageProfile" | "profileSaving" | "profileError" | "setLanguage" | "saveUser" | "saveProfileSettings" | "startProfileSettingsSave" | "saveLanguageProfile" | "completeOnboarding"> & {
   progress: ProgressResponse | null;
   progressError: string | null;
   progressLoading: boolean;

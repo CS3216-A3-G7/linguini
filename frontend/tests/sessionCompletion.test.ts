@@ -28,19 +28,13 @@ globals.IS_REACT_ACT_ENVIRONMENT = true;
 const SESSION_ID = "s1";
 const BASE = `/practice/sessions/${SESSION_ID}`;
 
-const contents: Record<string, SessionTask["publicContent"]> = {
-  learn: { kind: "vocabularyIntroduction", title: "Learn a word", targetText: "mesa", translation: "table", partOfSpeech: "noun", exampleSentence: null },
-  clues: { kind: "ispyRound", clue: "Find the table", options: [{ optionId: "table", label: "mesa", sceneObjectId: "object" }] },
-  reflection: { kind: "reflection", prompt: "Reflect on your words" },
-};
-
-function task(kind: keyof typeof contents, status: SessionTask["status"], orderIndex: number): SessionTask {
-  const publicContent = contents[kind];
-  return { id: `${kind}-${orderIndex}`, kind: publicContent.kind, phase: kind === "clues" ? "ispy" : "learning",
+function task(kind: string, status: SessionTask["status"], orderIndex: number): SessionTask {
+  const publicContent = { kind: "reflection" as const, prompt: "Reflect on your words" };
+  return { id: `${kind}-${orderIndex}`, kind: publicContent.kind, phase: "ispy",
     status, isSkippable: true, orderIndex, publicContent, vocabularyItemId: null, sceneObjectId: null };
 }
 
-let fixture = detail("inProgress");
+const fixture = detail("inProgress", [task("learn", "completed", 0), task("clues", "completed", 1), task("reflection", "completed", 2)]);
 
 function detail(status: PracticeDetail["session"]["status"], tasks: SessionTask[] = []): PracticeDetail {
   return {
@@ -60,9 +54,12 @@ const apiFixtures: Record<string, unknown> = {
   "/api/v1/journals": [],
 };
 
+let resolveComplete: ((response: Response) => void) | null = null;
+
 globals.fetch = async (input: unknown) => {
   const url = typeof input === "string" ? input : (input as Request).url;
   const path = url.replace(/^https?:\/\/[^/]+/, "");
+  if (path === `/api/v1/sessions/${SESSION_ID}/complete`) return new Promise<Response>(resolve => { resolveComplete = resolve; });
   if (path === `/api/v1/sessions/${SESSION_ID}`) return Response.json(fixture);
   if (path === "/api/v1/media/asset") {
     return Response.json({ id: "asset", signedUrl: "http://test.local/img.jpg", mimeType: "image/jpeg", width: 100, height: 100 });
@@ -74,15 +71,16 @@ globals.fetch = async (input: unknown) => {
 // .tsx sources can't run under node --experimental-strip-types, so the mounted
 // surface is bundled once with rolldown (the vite bundler already in devDeps).
 const here = dirname(fileURLToPath(import.meta.url));
-const workdir = mkdtempSync(join(tmpdir(), "session-guard-"));
+const workdir = mkdtempSync(join(tmpdir(), "session-completion-"));
 // The entry must live under frontend/ so bare imports resolve node_modules here.
-const entryPath = join(here, ".sessionGuard.entry.ts");
+const entryPath = join(here, ".sessionCompletion.entry.ts");
 writeFileSync(entryPath, [
   'export { createElement as h, act } from "react";',
   'export { createRoot } from "react-dom/client";',
-  'export { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";',
+  'export { MemoryRouter, Route, Routes } from "react-router-dom";',
   'export { QueryClient, QueryClientProvider } from "@tanstack/react-query";',
   `export { SessionRoute } from "${join(here, "../src/components/SessionRoute")}";`,
+  `export { ISpyPhase2 } from "${join(here, "../src/pages/ISpyPhase2")}";`,
   `export { AppStateProvider } from "${join(here, "../src/state/AppState")}";`,
   `export { useAppState } from "${join(here, "../src/state/useAppState")}";`,
 ].join("\n"));
@@ -116,8 +114,8 @@ try {
   rmSync(workdir, { recursive: true, force: true });
 }
 const {
-  h, act, createRoot, MemoryRouter, Route, Routes, useNavigate,
-  QueryClient, QueryClientProvider, SessionRoute, AppStateProvider, useAppState,
+  h, act, createRoot, MemoryRouter, Route, Routes,
+  QueryClient, QueryClientProvider, SessionRoute, ISpyPhase2, AppStateProvider, useAppState,
 } = bundled as Record<string, never> as {
   h: typeof import("react").createElement;
   act: typeof import("react").act;
@@ -125,22 +123,20 @@ const {
   MemoryRouter: typeof import("react-router-dom").MemoryRouter;
   Route: typeof import("react-router-dom").Route;
   Routes: typeof import("react-router-dom").Routes;
-  useNavigate: typeof import("react-router-dom").useNavigate;
   QueryClient: typeof import("@tanstack/react-query").QueryClient;
   QueryClientProvider: typeof import("@tanstack/react-query").QueryClientProvider;
   SessionRoute: typeof import("../src/components/SessionRoute.tsx").SessionRoute;
+  ISpyPhase2: typeof import("../src/pages/ISpyPhase2.tsx").ISpyPhase2;
   AppStateProvider: typeof import("../src/state/AppState.tsx").AppStateProvider;
   useAppState: typeof import("../src/state/useAppState").useAppState;
 };
 
-const controls: { navigate: (to: string | number) => void; loadSession: (id: string) => Promise<unknown> } = {
-  navigate: () => { throw new Error("not mounted"); },
-  loadSession: () => Promise.reject(new Error("not mounted")),
+const controls: { completeSession: () => boolean } = {
+  completeSession: () => { throw new Error("not mounted"); },
 };
 
 function Probe() {
-  controls.navigate = useNavigate() as (to: string | number) => void;
-  controls.loadSession = useAppState().loadSession;
+  controls.completeSession = useAppState().completeSession;
   return null;
 }
 
@@ -150,13 +146,13 @@ function stub(name: string) {
   };
 }
 
-const flush = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); });
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const flush = () => act(async () => { await sleep(30); });
 const shown = () => dom.window.document.querySelector("[data-testid]")?.getAttribute("data-testid");
 let mountedRoot: ReturnType<typeof createRoot> | null = null;
 const mountedClients: InstanceType<typeof QueryClient>[] = [];
 
 test.after(async () => {
-  if (mountedRoot) await act(async () => { mountedRoot!.unmount(); });
   for (const client of mountedClients) client.clear();
   dom.window.close();
   for (const handle of (process as unknown as { _getActiveHandles(): { unref?: () => void }[] })._getActiveHandles()) {
@@ -164,9 +160,7 @@ test.after(async () => {
   }
 });
 
-async function mount(path: string) {
-  if (mountedRoot) await act(async () => { mountedRoot!.unmount(); });
-  dom.window.document.body.innerHTML = "";
+test("finishing a session lands on /summary while the completion write is still in flight", async () => {
   const container = dom.window.document.createElement("div");
   dom.window.document.body.appendChild(container);
   const root = createRoot(container);
@@ -177,20 +171,15 @@ async function mount(path: string) {
     root.render(
       h(QueryClientProvider, { client },
         h(AppStateProvider, null,
-          h(MemoryRouter, { initialEntries: [path] },
+          h(MemoryRouter, { initialEntries: [`${BASE}/ispy-2`] },
             h(Probe),
             h(Routes, null,
               h(Route, { path: "/practice/sessions/:sessionId", element: h(SessionRoute) },
-                h(Route, { path: "analysis", element: h(stub("analysis")) }),
-                h(Route, { path: "mic-test", element: h(stub("mic-test")) }),
-                h(Route, { path: "learn", element: h(stub("learn")) }),
-                h(Route, { path: "learn/:taskId", element: h(stub("learn-task")) }),
                 h(Route, { path: "ispy-1", element: h(stub("ispy-1")) }),
-                h(Route, { path: "ispy-2", element: h(stub("ispy-2")) }),
+                h(Route, { path: "ispy-2", element: h(ISpyPhase2) }),
                 h(Route, { path: "summary", element: h(stub("summary")) }),
               ),
               h(Route, { path: "/practice", element: h(stub("practice")) }),
-              h(Route, { path: "*", element: h(stub("not-found")) }),
             ),
           ),
         ),
@@ -198,56 +187,18 @@ async function mount(path: string) {
     );
   });
   await flush();
-  return root;
-}
-
-const go = async (to: string | number) => {
-  await act(async () => { controls.navigate(to); });
+  const finish = [...dom.window.document.querySelectorAll("button")]
+    .find(button => button.textContent?.includes("Finish session"));
+  assert.ok(finish, "expected a Finish session button on the real ISpyPhase2 page");
+  // The click fires completeSession() then navigate(); both run inside act so the
+  // synchronous optimistic status reaches the route guard before /summary mounts.
+  await act(async () => { finish.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true })); });
   await flush();
-};
-const advance = async (next: PracticeDetail) => {
-  fixture = next;
-  await act(async () => { await controls.loadSession(SESSION_ID); });
-};
-
-test("back into a stage that is no longer canonical redirects forward", async () => {
-  fixture = detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]);
-  await mount(`${BASE}/learn`);
-  assert.equal(shown(), "page-learn");
-  await advance(detail("inProgress", [task("learn", "completed", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
-  await go(`${BASE}/mic-test`);
-  assert.equal(shown(), "page-ispy-1");
-  await go(-1);
-  assert.equal(shown(), "page-ispy-1");
-});
-
-test("clue stage redirects back to reflection once clues are done", async () => {
-  fixture = detail("inProgress", [task("learn", "completed", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]);
-  await mount(`${BASE}/ispy-1`);
-  assert.equal(shown(), "page-ispy-1");
-  await advance(detail("inProgress", [task("learn", "completed", 0), task("clues", "completed", 1), task("reflection", "pending", 2)]));
-  await go(`${BASE}/ispy-2`);
-  assert.equal(shown(), "page-ispy-2");
-  await go(-1);
-  assert.equal(shown(), "page-ispy-2");
-});
-
-test("a completed session redirects every earlier stage to the summary", async () => {
-  fixture = detail("completed", [task("learn", "completed", 0), task("clues", "completed", 1), task("reflection", "completed", 2)]);
-  await mount(`${BASE}/summary`);
   assert.equal(shown(), "page-summary");
-  for (const step of ["analysis", "mic-test", "learn", "ispy-1", "ispy-2"]) {
-    await go(`${BASE}/${step}`);
-    assert.equal(shown(), "page-summary", step);
-  }
-});
-
-test("standing on a page is not re-validated when the session advances", async () => {
-  fixture = detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]);
-  await mount(`${BASE}/learn/learn-0`);
-  assert.equal(shown(), "page-learn-task");
-  await advance(detail("inProgress", [task("learn", "completed", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
-  assert.equal(shown(), "page-learn-task");
-  await go(`${BASE}/learn`);
-  assert.equal(shown(), "page-ispy-1");
+  await flush();
+  assert.equal(shown(), "page-summary");
+  // Settle the deferred write inside act so the post-mutation render is captured.
+  await act(async () => { resolveComplete?.(Response.json({ id: SESSION_ID, status: "completed" })); await sleep(50); });
+  await flush();
+  assert.equal(shown(), "page-summary");
 });

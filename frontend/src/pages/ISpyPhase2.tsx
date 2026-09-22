@@ -11,7 +11,7 @@ import type { SessionTask } from "../lib/api";
 export function ISpyPhase2() {
   const scene = useScene();
   const navigate = useNavigate();
-  const { session, completeSession, practiceSaving, practiceError } = useAppState();
+  const { session, completeSession, completionPending, completionError, practiceError } = useAppState();
   const [index, setIndex] = useState(() => {
     const tasks = practiceStages(session?.tasks ?? []).reflection;
     const next = tasks.findIndex(task => !taskDone(task));
@@ -24,9 +24,10 @@ export function ISpyPhase2() {
   if (!learning.every(taskDone) || ["abandoned", "failed"].includes(session.session.status)) return <Navigate to={`${base}/learn`} replace />;
   if (!clues.every(taskDone)) return <Navigate to={`${base}/ispy-1`} replace />;
   const task = reflection[index];
-  const finish = async () => { if (await completeSession()) navigate(`${base}/summary`); };
-  if (!task) return <div className="stack"><TopBar title="Practice complete" />{practiceError ? <p role="alert">{practiceError}</p> : null}<Button disabled={practiceSaving} onClick={() => void finish()}>Finish session</Button></div>;
-  return <Reflection key={task.id} task={task} index={index} total={reflection.length} onNext={() => index === reflection.length - 1 ? void finish() : setIndex(value => value + 1)} />;
+  const finish = () => { if (completeSession()) navigate(`${base}/summary`); };
+  const alerts = [practiceError, completionError].filter(Boolean);
+  if (!task) return <div className="stack"><TopBar title="Practice complete" />{alerts.map((message, alertIndex) => <p key={alertIndex} role="alert">{message}</p>)}<Button disabled={completionPending} onClick={finish}>Finish session</Button></div>;
+  return <Reflection key={task.id} task={task} index={index} total={reflection.length} onNext={() => index === reflection.length - 1 ? finish() : setIndex(value => value + 1)} />;
 }
 
 function Reflection({ task, index, total, onNext }: { task: SessionTask; index: number; total: number; onNext: () => void }) {

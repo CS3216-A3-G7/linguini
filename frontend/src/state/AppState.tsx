@@ -1,7 +1,7 @@
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { JournalEntry, VocabRecord, VocabStatus } from "../data/types";
 import { AppStateContext } from "./context";
 import { useAccount } from "./useAccount";
@@ -34,9 +34,21 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
   }, [queryClient, profileId]);
 
   const practice = usePractice(account.user?.id ?? "", profileId, onLearningChanged);
-  const [journalSaving, setJournalSaving] = useState(false);
+  const journalSave = useMutation({
+    mutationFn: ({ draft, id, date }: { draft: JournalDraft; id?: string; date?: string }) => {
+      if (!account.activeProfile && !id) throw new Error("Choose a language first.");
+      return saveJournal(draft, account.activeProfile?.id ?? "", id, date);
+    },
+    onSuccess: async (entry) => {
+      queryClient.setQueryData(queryKeys.journals(profileId),
+        (rows: JournalEntry[] | undefined) => rows ? [entry, ...rows.filter(row => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)) : undefined);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.journals(profileId) });
+    },
+    onError: (error) => setJournalSaveError(`${error instanceof Error ? error.message : "Unable to save journal."} Your text is still here; retry saving.`),
+    onSettled: () => { journalSavingRef.current = false; },
+  });
+  const journalSavingRef = useRef(false);
   const [journalSaveError, setJournalSaveError] = useState<string | null>(null);
-  const saving = useRef(false);
 
   const setVocabStatus = useCallback((id: string, status: VocabStatus) => {
     queryClient.setQueryData(queryKeys.vocabulary(profileId),
@@ -44,28 +56,18 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
   }, [queryClient, profileId]);
 
   const saveJournalEntry = useCallback(async (draft: JournalDraft, id?: string, date?: string) => {
-    if (saving.current) return null;
-    saving.current = true;
-    setJournalSaving(true);
+    if (journalSavingRef.current) return null;
+    journalSavingRef.current = true;
     setJournalSaveError(null);
-    try {
-      if (!account.activeProfile && !id) throw new Error("Choose a language first.");
-      const entry = await saveJournal(draft, account.activeProfile?.id ?? "", id, date);
-      queryClient.setQueryData(queryKeys.journals(profileId),
-        (rows: JournalEntry[] | undefined) => rows ? [entry, ...rows.filter(row => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)) : undefined);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.journals(profileId) });
-      return entry;
-    } catch (error) {
-      setJournalSaveError(`${error instanceof Error ? error.message : "Unable to save journal."} Your text is still here; retry saving.`);
-      return null;
-    } finally { saving.current = false; setJournalSaving(false); }
-  }, [account.activeProfile, profileId, queryClient]);
+    try { return await journalSave.mutateAsync({ draft, id, date }); }
+    catch { journalSavingRef.current = false; return null; }
+  }, [journalSave.mutateAsync]);
 
   return <AppStateContext.Provider value={{
     ...account, ...practice,
     setVocabStatus,
     progress: progress.data ?? null, progressLoading: progress.isPending, progressError: queryError(progress.error),
     xp: progress.data?.xp ?? 0,
-    journalSaving, journalSaveError, saveJournalEntry,
+    journalSaving: journalSave.isPending, journalSaveError, saveJournalEntry,
   }}>{children}</AppStateContext.Provider>;
 }
