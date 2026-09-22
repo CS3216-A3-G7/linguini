@@ -171,14 +171,23 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
 function GrammarLessonFlow({ task, index, total, onNext, onClose }: { task: SessionTask; index: number; total: number; onNext: () => void; onClose: () => void }) {
   const { actOnTask, practiceSaving, practiceError } = useAppState();
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [builtTokenIndexes, setBuiltTokenIndexes] = useState<Record<string, number[]>>({});
   const [feedback, setFeedback] = useState<string | null>(null);
   const requestKey = useRef(crypto.randomUUID());
   const content = task.publicContent;
   if (content.kind !== "grammarLesson") return null;
   const terminal = taskDone(task);
-  const answered = content.questions.every(question => answers[question.questionId]);
+  const sentence = (tokens: string[]) => tokens.reduce((value, token) => {
+    const joinsPrevious = /^[,.;:!?…]$/.test(token) || value.endsWith("'");
+    return value ? `${value}${joinsPrevious ? "" : " "}${token}` : token;
+  }, "");
+  const answerFor = (question: typeof content.questions[number]) => question.interactionType === "sentenceBuilding"
+    ? sentence((builtTokenIndexes[question.questionId] ?? []).map(index => question.tokenBank[index]))
+    : answers[question.questionId] ?? "";
+  const answered = content.questions.every(question => Boolean(answerFor(question)));
   const submit = async () => {
-    const result = await actOnTask(task.id, "attempts", { inputMode: "vocabularyReview", answers, typedAnswers: {} }, requestKey.current);
+    const taskAnswers = Object.fromEntries(content.questions.map(question => [question.questionId, answerFor(question)]));
+    const result = await actOnTask(task.id, "attempts", { inputMode: "vocabularyReview", answers: taskAnswers, typedAnswers: {} }, requestKey.current);
     if (result) setFeedback(result.attempt?.feedback?.message ?? "Grammar practice saved.");
   };
   return <div className="stack vocabulary-flow">
@@ -187,10 +196,24 @@ function GrammarLessonFlow({ task, index, total, onNext, onClose }: { task: Sess
     <div className="panel-note">{content.explanation}</div>
     {content.questions.map((question, position) => <Card key={question.questionId} plain><div className="stack">
       <span className="label muted">Question {position + 1} of {content.questions.length}</span>
-      <h2>{question.prompt}</h2>
-      {question.translation ? <p className="muted">{question.translation}</p> : null}
-      <div className="choice-grid">{question.options.map(option => <button key={option.optionId} className="choice" aria-pressed={answers[question.questionId] === option.optionId} disabled={terminal || practiceSaving}
-        onClick={() => setAnswers(value => ({ ...value, [question.questionId]: option.optionId }))}>{answers[question.questionId] === option.optionId ? <CheckIcon size={16} /> : null}{option.label}</button>)}</div>
+      {question.interactionType === "sentenceBuilding" ? <>
+        {question.translation ? <h2>{question.translation}</h2> : null}
+        <p className="muted">{question.prompt}</p>
+        <div className="sentence-builder__answer" aria-label="Your sentence">
+          {(builtTokenIndexes[question.questionId] ?? []).length ? (builtTokenIndexes[question.questionId] ?? []).map((tokenIndex, tokenPosition) => <button key={`${tokenIndex}-${tokenPosition}`} className="sentence-builder__token" disabled={terminal || practiceSaving}
+            onClick={() => setBuiltTokenIndexes(value => ({ ...value, [question.questionId]: (value[question.questionId] ?? []).filter((_, index) => index !== tokenPosition) }))}>{question.tokenBank[tokenIndex]}</button>) : <span className="muted">Choose the words to build your sentence.</span>}
+        </div>
+        <div className="chip-row" aria-label="Sentence building words">{question.tokenBank.map((token, tokenIndex) => {
+          const used = (builtTokenIndexes[question.questionId] ?? []).includes(tokenIndex);
+          return <button key={`${token}-${tokenIndex}`} className="chip" disabled={used || terminal || practiceSaving}
+            onClick={() => setBuiltTokenIndexes(value => ({ ...value, [question.questionId]: [...(value[question.questionId] ?? []), tokenIndex] }))}>{token}</button>;
+        })}</div>
+      </> : <>
+        <h2>{question.prompt}</h2>
+        {question.translation ? <p className="muted">{question.translation}</p> : null}
+        <div className="choice-grid">{question.options.map(option => <button key={option.optionId} className="choice" aria-pressed={answers[question.questionId] === option.optionId} disabled={terminal || practiceSaving}
+          onClick={() => setAnswers(value => ({ ...value, [question.questionId]: option.optionId }))}>{answers[question.questionId] === option.optionId ? <CheckIcon size={16} /> : null}{option.label}</button>)}</div>
+      </>}
     </div></Card>)}
     {feedback ? <Feedback><p role="status">{feedback}</p></Feedback> : null}
     {practiceError ? <p role="alert">{practiceError}</p> : null}

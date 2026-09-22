@@ -12,17 +12,18 @@ def test_generated_lessons_become_private_grammar_lesson_tasks():
 
     lessons = build_grammar_lessons(session_id, result)
 
-    assert [task.kind for task in lessons] == ["grammarLesson"] * 3
+    assert [task.kind for task in lessons] == ["grammarLesson"] * 4
     assert [task.public_content.focus for task in lessons] == [
         "genderNumberAgreement",
-        "prepositionRelation",
+        "pluralNounForm",
         "sceneDescription",
+        "chainedDescription",
     ]
     assert all(task.phase == "learning" for task in lessons)
     assert [task.id for task in build_grammar_lessons(session_id, result)] == [
         task.id for task in lessons
     ]
-    scene = lessons[-1]
+    scene = lessons[2]
     assert scene.public_content.questions[0].translation == "The cup is red."
     assert scene.answer_key.correct_option_ids == {"scene-1": "scene-1-a", "scene-2": "scene-2-a"}
     public = SessionTaskPublic.from_internal(scene).model_dump(mode="json")

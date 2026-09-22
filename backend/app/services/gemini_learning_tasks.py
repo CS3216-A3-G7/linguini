@@ -11,8 +11,12 @@ from google.genai import types
 from app.schemas.learning_tasks import LearningTaskResult
 from app.services.learning_tasks import (
     DEFAULT_PROMPT_PATH,
+    GENERATION_FORMAT_INSTRUCTION,
     LearningTaskGenerationError,
+    generation_response_model,
     normalize_learning_task_references,
+    required_task_focuses,
+    unpack_generated_tasks,
     validate_learning_tasks,
 )
 
@@ -39,20 +43,25 @@ class GeminiLearningTaskGenerator:
         )
 
     def generate(self, payload: dict[str, Any]) -> LearningTaskResult:
+        focuses = required_task_focuses(payload)
+        payload = {**payload, "requiredTaskFocuses": list(focuses)}
+        response_model = generation_response_model(focuses)
         try:
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=json.dumps(payload, ensure_ascii=False),
                 config=types.GenerateContentConfig(
-                    system_instruction=self.prompt,
+                    system_instruction=self.prompt + GENERATION_FORMAT_INSTRUCTION,
                     temperature=0,
                     response_mime_type="application/json",
-                    response_json_schema=LearningTaskResult.model_json_schema(by_alias=True),
+                    response_json_schema=response_model.model_json_schema(by_alias=True),
                 ),
             )
             if not response.text:
                 raise LearningTaskGenerationError("Gemini returned no learning tasks.")
-            result = LearningTaskResult.model_validate_json(response.text)
+            result = unpack_generated_tasks(
+                payload, response_model.model_validate_json(response.text)
+            )
             result = normalize_learning_task_references(payload, result)
             validate_learning_tasks(payload, result)
             return result

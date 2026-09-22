@@ -193,10 +193,12 @@ def build_grammar_lessons(session_id, result):
                     dict(
                         question_id=question.question_id,
                         prompt=question.prompt,
+                        interaction_type=question.interaction_type,
                         options=[
                             dict(option_id=option.option_id, label=option.label)
                             for option in question.options
                         ],
+                        token_bank=question.token_bank,
                         translation=question.translation,
                     )
                     for question in lesson.questions
@@ -204,7 +206,7 @@ def build_grammar_lessons(session_id, result):
             ),
             answer_key=dict(
                 correct_option_ids={
-                    question.question_id: question.correct_option_id
+                    question.question_id: question.correct_option_id or question.correct_text
                     for question in lesson.questions
                 }
             ),

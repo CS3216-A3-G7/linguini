@@ -298,7 +298,14 @@ export interface VocabularyLearningWord {
   pronunciationAudioAssetId: string | null; exampleSentence: string | null;
 }
 export interface VocabularyQuestion { questionId: string; prompt: string; options: { optionId: string; label: string }[]; correctOptionId?: string | null }
-export interface GrammarLessonQuestion extends VocabularyQuestion { translation?: string | null }
+export interface GrammarLessonQuestion {
+  questionId: string;
+  prompt: string;
+  interactionType: "multipleChoice" | "sentenceBuilding";
+  options: { optionId: string; label: string }[];
+  tokenBank: string[];
+  translation?: string | null;
+}
 export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string } | { inputMode: "vocabularyReview"; answers: Record<string, string>; typedAnswers: Record<string, string> };
 export interface TaskActionResult {
   task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;

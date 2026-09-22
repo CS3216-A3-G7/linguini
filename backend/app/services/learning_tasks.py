@@ -1,9 +1,17 @@
 """Provider-neutral grammar learning-task contract and validation."""
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Protocol
 
-from app.schemas.learning_tasks import REQUIRED_TASK_FOCUS_ORDER, LearningTaskResult
+from pydantic import create_model
+
+from app.schemas.base import ApiModel
+from app.schemas.learning_tasks import (
+    REQUIRED_TASK_FOCUS_ORDER,
+    GeneratedLearningTask,
+    LearningTaskResult,
+)
 from app.services.scene_analysis import SceneAnalysisError
 
 DEFAULT_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "learning_tasks.txt"
@@ -23,37 +31,81 @@ class LearningTaskGenerator(Protocol):
     def generate(self, payload: dict[str, Any]) -> LearningTaskResult: ...
 
 
+def required_task_focuses(payload: dict[str, Any]) -> tuple[str, ...]:
+    """Return the one valid task sequence for the scene's relation count."""
+    relationship_count = len(payload.get("relationships", []))
+    return (
+        REQUIRED_TASK_FOCUS_ORDER
+        if relationship_count >= 1
+        else REQUIRED_TASK_FOCUS_ORDER[:2] + REQUIRED_TASK_FOCUS_ORDER[3:]
+    )
+
+
+@lru_cache(maxsize=3)
+def generation_response_model(focuses: tuple[str, ...]) -> type[ApiModel]:
+    """Require one named field per lesson so omissions/duplicates cannot parse."""
+    return create_model(
+        f"RequiredLearningTasks{len(focuses)}",
+        __base__=ApiModel,
+        **{focus: (GeneratedLearningTask, ...) for focus in focuses},
+    )
+
+
+def unpack_generated_tasks(payload: dict[str, Any], response: ApiModel) -> LearningTaskResult:
+    # The enclosing field owns the focus and order, not model-written metadata.
+    return LearningTaskResult(tasks=[
+        getattr(response, focus).model_copy(update={"focus": focus})
+        for focus in required_task_focuses(payload)
+    ])
+
+
+GENERATION_FORMAT_INSTRUCTION = (
+    "\nReturn an object with one required field for each requiredTaskFocuses entry, "
+    "using that focus as the field name and its complete task as the value. "
+    "Do not return a tasks array. Populate every required field with 2–4 questions."
+)
+
+
 def normalize_learning_task_references(
     payload: dict[str, Any], result: LearningTaskResult
 ) -> LearningTaskResult:
-    """Discard non-semantic relationship metadata a model may echo incorrectly.
+    """Repair unambiguous relation labels without guessing a spatial relationship."""
+    rows = payload.get("relationships", [])
+    relationship_keys = {row["key"] for row in rows}
+    def label(value):
+        return " ".join(value.casefold().replace("_", " ").split())
 
-    Relationship keys are opaque database IDs, unlike the translated relationship
-    words shown in a lesson. Keeping an unknown key would not change lesson text,
-    so remove it before validation while retaining strict object and attribute
-    provenance checks.
-    """
-    relationship_keys = {row["key"] for row in payload.get("relationships", [])}
     for task in result.tasks:
         for question in task.questions:
-            question.relationship_keys = [
-                key for key in question.relationship_keys if key in relationship_keys
-            ]
+            resolved = []
+            for key in question.relationship_keys:
+                if key in relationship_keys:
+                    resolved.append(key)
+                    continue
+                matches = [row for row in rows if label(key) in {
+                    label(row.get("source", "")), label(row.get("translation", ""))
+                }]
+                if len(matches) > 1:
+                    objects = set(question.object_keys)
+                    matches = [row for row in matches if
+                        row.get("subjectObjectKey") in objects
+                        and row.get("referenceObjectKey") in objects]
+                if len(matches) == 1:
+                    resolved.append(matches[0]["key"])
+                else:
+                    # Preserve invalid references so validation can report them.
+                    resolved.append(key)
+            question.relationship_keys = list(dict.fromkeys(resolved))
     return result
 
 
 def validate_learning_tasks(payload: dict[str, Any], result: LearningTaskResult) -> None:
-    relationship_count = len(payload.get("relationships", []))
-    expected_focuses = (
-        REQUIRED_TASK_FOCUS_ORDER
-        if relationship_count >= 2
-        else REQUIRED_TASK_FOCUS_ORDER[:3]
-        if relationship_count == 1
-        else REQUIRED_TASK_FOCUS_ORDER[:1]
-    )
-    if tuple(task.focus for task in result.tasks) != expected_focuses:
+    expected_focuses = required_task_focuses(payload)
+    actual_focuses = tuple(task.focus for task in result.tasks)
+    if actual_focuses != expected_focuses:
         raise LearningTaskGenerationError(
-            "Learning tasks do not match the relationships available in this scene."
+            "Learning tasks must be "
+            f"{', '.join(expected_focuses)}; received {', '.join(actual_focuses) or 'none'}."
         )
     supplied = {
         field: {row["key"] for row in payload.get(field, [])} for field in KEY_FIELDS
@@ -65,9 +117,14 @@ def validate_learning_tasks(payload: dict[str, Any], result: LearningTaskResult)
             option_ids = [option.option_id for option in question.options]
             if len(set(option_ids)) != len(option_ids):
                 raise LearningTaskGenerationError("Option ids must be unique within a question.")
-            if question.correct_option_id not in option_ids:
+            if question.interaction_type == "multipleChoice":
+                if len(question.options) != 4 or question.correct_option_id not in option_ids:
+                    raise LearningTaskGenerationError(
+                        "Every multiple-choice question needs four options and one correct answer."
+                    )
+            elif task.focus != "chainedDescription":
                 raise LearningTaskGenerationError(
-                    "Every question needs exactly one correct option it offers."
+                    "Only chained-description tasks may use sentence building."
                 )
             referenced = 0
             for field, attribute in KEY_FIELDS.items():
@@ -87,17 +144,19 @@ def validate_learning_tasks(payload: dict[str, Any], result: LearningTaskResult)
                 raise LearningTaskGenerationError(
                     "Description questions need an English translation."
                 )
-            if task.focus in {"prepositionRelation", "sceneDescription"} and not keys_for(
-                question, "relationship_keys"
+            if task.focus == "sceneDescription" and len(
+                keys_for(question, "relationship_keys")
+            ) < 1:
+                raise LearningTaskGenerationError(
+                    f"Question {question.question_id} has no resolvable scene relationship."
+                )
+            if task.focus == "chainedDescription" and (
+                question.interaction_type != "sentenceBuilding"
+                or len(keys_for(question, "relationship_keys"))
+                < min(2, len(supplied["relationships"]))
             ):
                 raise LearningTaskGenerationError(
-                    "Relation tasks must reference a supplied relationship."
-                )
-            if task.focus == "chainedDescription" and len(
-                keys_for(question, "relationship_keys")
-            ) < 2:
-                raise LearningTaskGenerationError(
-                    "Chained-description questions must reference two relationships."
+                    "Sentence building must use the relationships available in the scene."
                 )
 
 

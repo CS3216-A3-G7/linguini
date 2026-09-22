@@ -79,8 +79,20 @@ class VocabularyIntroductionContent(ApiModel):
 class GrammarLessonQuestion(ApiModel):
     question_id: NonEmptyText
     prompt: NonEmptyText
-    options: Annotated[list[VocabularyChoice], Field(min_length=2)]
+    interaction_type: Literal["multipleChoice", "sentenceBuilding"] = "multipleChoice"
+    options: list[VocabularyChoice] = Field(default_factory=list)
+    token_bank: list[NonEmptyText] = Field(default_factory=list)
     translation: str | None = None
+
+    @model_validator(mode="after")
+    def validate_interaction(self) -> GrammarLessonQuestion:
+        if self.interaction_type == "multipleChoice" and len(self.options) < 2:
+            raise ValueError("multiple-choice questions require answer options")
+        if self.interaction_type == "sentenceBuilding" and not self.token_bank:
+            raise ValueError("sentence-building questions require a token bank")
+        if self.interaction_type == "sentenceBuilding" and self.options:
+            raise ValueError("sentence-building questions cannot have answer options")
+        return self
 
 
 class GrammarLessonContent(ApiModel):

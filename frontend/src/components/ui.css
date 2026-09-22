@@ -1186,6 +1186,28 @@
   background: #fde7de;
 }
 
+.sentence-builder__answer {
+  align-items: center;
+  background: var(--cream);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-height: 4rem;
+  padding: 0.8rem;
+}
+
+.sentence-builder__token {
+  background: var(--paper);
+  border: 1px solid var(--teal);
+  border-radius: 999px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.35rem 0.65rem;
+}
+
 /* Inputs */
 .field {
   display: flex;

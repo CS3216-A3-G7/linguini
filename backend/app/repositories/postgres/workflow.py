@@ -49,7 +49,7 @@ from app.schemas.vocabulary import (
     VocabularyItem,
     VocabularyTranslation,
 )
-from app.services.learning_tasks import LearningTaskGenerationError
+from app.services.learning_tasks import LearningTaskGenerationError, required_task_focuses
 from app.services.scene_analysis import DeterministicSceneAnalyzer, SceneAnalysisError
 from app.services.session_plan import bootstrap_word, build_grammar_lessons, build_tasks
 
@@ -69,6 +69,22 @@ READ_TASKS = {"vocabularyIntroduction", "grammarExplanation", "syntaxExplanation
 ANALYSIS_TIMEOUT = timedelta(minutes=15)
 
 
+def _normalize_answer(value):
+    return " ".join(value.casefold().strip().split()).rstrip(".!?\u3002")
+
+
+def _lesson_answer_is_correct(task, question_id, answer):
+    question = next(
+        item for item in task.public_content.questions if item.question_id == question_id
+    )
+    expected = task.answer_key.correct_option_ids.get(question_id)
+    return (
+        _normalize_answer(answer) == _normalize_answer(expected)
+        if getattr(question, "interaction_type", "multipleChoice") == "sentenceBuilding"
+        else answer == expected
+    )
+
+
 def task_progress(tasks):
     complete = sum(t.status == "completed" for t in tasks)
     skipped = sum(t.status == "skipped" for t in tasks)
@@ -80,9 +96,9 @@ def task_progress(tasks):
     )
 
 
-def _learning_task_payload(translation_payload, translated_scene):
+def _learning_task_payload(translation_payload, translated_scene, scene_relations=()):
     """Reuse the translator payload, carrying the target-language terms it produced."""
-    return {
+    payload = {
         "targetLanguage": translation_payload["targetLanguage"],
         "sceneTitle": translation_payload["sceneTitle"],
         "sceneSummary": translation_payload["sceneSummary"],
@@ -94,6 +110,15 @@ def _learning_task_payload(translation_payload, translated_scene):
             for field in ("objects", "attributes", "relationships")
         },
     }
+    relation_links = {str(row.id): row for row in scene_relations}
+    for term in payload["relationships"]:
+        if row := relation_links.get(term["key"]):
+            term["subjectObjectKey"] = str(row.subject_scene_object_id)
+            term["referenceObjectKey"] = str(row.reference_scene_object_id)
+    for term in payload["attributes"]:
+        term["objectKey"] = term["key"].rsplit(":", 1)[0]
+    payload["requiredTaskFocuses"] = list(required_task_focuses(payload))
+    return payload
 
 
 def parse_session(row):
@@ -793,7 +818,9 @@ class PostgresWorkflowRepository:
                         lessons = build_grammar_lessons(
                             session_id,
                             self.learning_task_generator.generate(
-                                _learning_task_payload(payload, translated_scene)
+                                _learning_task_payload(
+                                    payload, translated_scene, detail.scene_object_relations
+                                )
                             ),
                         )
                     except LearningTaskGenerationError:
@@ -1056,8 +1083,11 @@ class PostgresWorkflowRepository:
                     )
                     if request.input_mode == "vocabularyReview":
                         question_results = {
-                            question.question_id: request.answers.get(question.question_id)
-                            == task.answer_key.correct_option_ids.get(question.question_id)
+                            question.question_id: _lesson_answer_is_correct(
+                                task,
+                                question.question_id,
+                                request.answers.get(question.question_id, ""),
+                            )
                             for question in task.public_content.questions
                         }
                         correct_count = sum(question_results.values())
@@ -1157,15 +1187,16 @@ def evaluate(task, request):
     if key is None:
         raise PracticeConflictError("Task has no evaluation key.")
     if mode == "vocabularyReview":
-        offered_questions = {
-            question.question_id: {option.option_id for option in question.options}
-            for question in task.public_content.questions
+        questions_by_id = {
+            question.question_id: question for question in task.public_content.questions
         }
-        if set(request.answers) != set(offered_questions):
+        if set(request.answers) != set(questions_by_id):
             raise PracticeConflictError("Answer every question in this lesson once.")
         if any(
-            answer not in offered_questions[question_id]
+            getattr(question, "interaction_type", "multipleChoice") == "multipleChoice"
+            and answer not in {option.option_id for option in question.options}
             for question_id, answer in request.answers.items()
+            for question in [questions_by_id[question_id]]
         ):
             raise PracticeConflictError("Select only choices offered by this lesson.")
         if not set(request.typed_answers).issubset(
@@ -1173,7 +1204,7 @@ def evaluate(task, request):
         ):
             raise PracticeConflictError("Typing practice contains an unknown word.")
         return all(
-            answer == key.correct_option_ids.get(question_id)
+            _lesson_answer_is_correct(task, question_id, answer)
             for question_id, answer in request.answers.items()
         )
     if mode == "objectSelection":
@@ -1187,7 +1218,6 @@ def evaluate(task, request):
             raise PracticeConflictError("Select one of the offered choices.")
         return request.option_id == key.correct_option_id
 
-    def normalize(value):
-        return " ".join(value.casefold().strip().split()).rstrip(".!?\u3002")  # noqa: B005
-
-    return normalize(request.text) in {normalize(a) for a in key.accepted_text_answers}
+    return _normalize_answer(request.text) in {
+        _normalize_answer(answer) for answer in key.accepted_text_answers
+    }
