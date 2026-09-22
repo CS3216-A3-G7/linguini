@@ -251,3 +251,29 @@ test("standing on a page is not re-validated when the session advances", async (
   await go(`${BASE}/learn`);
   assert.equal(shown(), "page-ispy-1");
 });
+
+test("a status change that keeps the page allowed does not redirect", async () => {
+  // Same shape as generatingTasks -> inProgress on /mic-test: canonical flips
+  // to /learn, which still permits the mic test the learner is standing on.
+  fixture = detail("ready");
+  await mount(`${BASE}/mic-test`);
+  assert.equal(shown(), "page-mic-test");
+  await advance(detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
+  assert.equal(shown(), "page-mic-test");
+});
+
+test("a session that fails while a page is open redirects with a notice", async () => {
+  fixture = detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]);
+  await mount(`${BASE}/learn`);
+  assert.equal(shown(), "page-learn");
+  await advance(detail("failed"));
+  assert.equal(shown(), "page-practice");
+});
+
+test("an abandoned session reroutes an open page to the session picker", async () => {
+  fixture = detail("awaitingObjectReview");
+  await mount(`${BASE}/analysis`);
+  assert.equal(shown(), "page-analysis");
+  await advance(detail("abandoned"));
+  assert.equal(shown(), "page-practice");
+});

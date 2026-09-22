@@ -57,6 +57,9 @@ test("sessions with no task rows resume at analysis", () => {
 test("the route guard allows only the canonical destination", () => {
   assert.equal(isSessionRouteAllowed(detail("created"), "/practice/sessions/s1/learn"), false);
   assert.equal(isSessionRouteAllowed(detail("created"), "/practice/sessions/s1/analysis"), true);
+  // Analysis finishing keeps the learner on the analysis page.
+  assert.equal(isSessionRouteAllowed(detail("analyzingScene"), "/practice/sessions/s1/analysis"), true);
+  assert.equal(isSessionRouteAllowed(detail("awaitingObjectReview"), "/practice/sessions/s1/analysis"), true);
 
   const pendingLearn = [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)];
   assert.equal(isSessionRouteAllowed(detail("inProgress", pendingLearn), "/practice/sessions/s1/learn"), true);
