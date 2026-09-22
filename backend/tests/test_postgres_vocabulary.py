@@ -734,6 +734,28 @@ def test_scene_and_topic_derived_from_latest_encounter(database, encounter_task)
         )
     items = {row.vocabulary.id: row for row in repository.list_vocabulary(owner.id)}
     assert items[ids[2]].scene_id is None and items[ids[2]].topic is None
+    assert len(items[ids[2]].scenes) == 1
+    assert items[ids[2]].scenes[0].media_asset_id == asset.id
+    assert items[ids[2]].scenes[0].title == "Your photo"
+    assert items[ids[1]].scenes == []
+    assert items[ids[0]].scenes[0].scene_id == slug
+
+    # Repeated practice in the uploaded image retains one photo association,
+    # and a word encountered in two images remains linked to both.
+    for _ in range(2):
+        repository.record_encounter(
+            VocabularyEncounter(
+                user_id=owner.id,
+                vocabulary_item_id=ids[0],
+                session_id=upload_session,
+                session_task_id=upload_task,
+                encounter_type="practised",
+                outcome="correct",
+            )
+        )
+    items = {row.vocabulary.id: row for row in repository.list_vocabulary(owner.id)}
+    assert len(items[ids[0]].scenes) == 2
+    assert {scene.scene_id for scene in items[ids[0]].scenes} == {slug, None}
     with engine.begin() as connection:
         connection.execute(delete(sessions).where(sessions.c.id == upload_session))
         connection.execute(delete(media_assets).where(media_assets.c.id == asset.id))

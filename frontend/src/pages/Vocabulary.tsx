@@ -4,6 +4,8 @@ import { BookIcon, CloseIcon, FilterIcon, SpeakerIcon } from "../components/icon
 import { SceneVisual } from "../components/SceneVisual";
 import { LoadingScreen } from "../components/LoadingScreen";
 import type { VocabStatus, WordClass } from "../data/types";
+import { mediaImageUrl } from "../lib/api";
+import { groupVocabularyByPhoto } from "../lib/vocabularyGroups";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
 import { useScenesQuery, useVocabularyQuery } from "../state/queries";
@@ -44,16 +46,9 @@ export function Vocabulary() {
   );
 
   const sceneGroups = useMemo(
-    () =>
-      scenes
-        .map((scene) => ({
-          scene,
-          words: vocabulary.filter((item) => item.sceneId === scene.id),
-        }))
-        .filter((group) => group.words.length > 0),
+    () => groupVocabularyByPhoto(vocabulary, scenes, (id) => mediaImageUrl(id, 640)).sceneGroups,
     [vocabulary, scenes],
   );
-  const ungrouped = vocabulary.filter(item => !scenes.some(scene => scene.id === item.sceneId));
 
   const openFilters = () => {
     setDraftWordClass(wordClass);
@@ -104,7 +99,7 @@ export function Vocabulary() {
       <div className="vocabulary-page__header">
         <div>
           <h1>Vocabulary</h1>
-          <p className="small muted">Words collected from the places you explored.</p>
+          <p className="small muted">Words learned from your photos and the scenes you explored.</p>
         </div>
       </div>
 
@@ -117,7 +112,7 @@ export function Vocabulary() {
         <span className="vocabulary-page__view-icon" aria-hidden="true">
           <BookIcon size={22} />
         </span>
-        <span>{view === "scenes" ? "View Vocabulary List" : "View Words by Scene"}</span>
+        <span>{view === "scenes" ? "View Vocabulary List" : "View Words by Photo"}</span>
       </Button>
 
       {view === "list" ? (
@@ -242,15 +237,6 @@ export function Vocabulary() {
           {scenesLoading ? <p role="status">Loading scenes...</p> : null}
           {scenesError ? <p role="alert">{scenesError} Your words are still available below.</p> : null}
           {!vocabulary.length ? <Card><p>No saved words yet. Practise a scene to collect words.</p></Card> : null}
-          {ungrouped.length ? <section className="vocabulary-scene">
-            <div className="vocabulary-scene__content">
-              <h2>Other collected words</h2>
-              <div className="vocabulary-scene__words">{ungrouped.map(item => <div key={item.id} className="vocabulary-scene__word">
-                <span><strong>{item.word}</strong><small>{item.translation}</small></span>
-                <IconButton label={`Hear ${item.word}`} onClick={() => speak(item.word, learner.languageCode)}><SpeakerIcon size={18} /></IconButton>
-              </div>)}</div>
-            </div>
-          </section> : null}
           {sceneGroups.map(({ scene, words }) => (
             <section key={scene.id} className="vocabulary-scene">
               <SceneVisual scene={scene} className="vocabulary-scene__image" lazy />

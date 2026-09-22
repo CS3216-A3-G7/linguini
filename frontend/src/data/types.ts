@@ -43,6 +43,12 @@ export type ScenarioProgress = {
   level: string;
 };
 
+export type VocabularyScene = {
+  mediaAssetId: string;
+  title: string;
+  sceneId: string | null;
+};
+
 export type VocabRecord = {
   id: string;
   word: string;
@@ -53,6 +59,7 @@ export type VocabRecord = {
   topic: string;
   sceneId: string;
   example: string;
+  scenes?: VocabularyScene[];
 };
 
 export type JournalEntry = {
