@@ -1,5 +1,5 @@
 import { Navigate, useNavigate } from "react-router-dom";
-import { Button } from "../components/ui";
+import { Button, Card } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
 import { useScene } from "../state/useScene";
@@ -37,6 +37,31 @@ export function Learn() {
 
       <ScenePhoto scene={scene} />
       {practiceError ? <p role="alert">{practiceError}</p> : null}
+
+      {session.translationPreview ? (
+        <Card plain className="translation-preview">
+          <div>
+            <h2>Translation preview</h2>
+            <p className="small muted">Temporary testing view</p>
+          </div>
+          {([
+            ["Objects", session.translationPreview.objects],
+            ["Attributes", session.translationPreview.attributes],
+            ["Relationships", session.translationPreview.relationships],
+          ] as const).map(([label, terms]) => terms.length ? (
+            <section key={label} className="translation-preview__group">
+              <h3>{label}</h3>
+              <div className="translation-preview__terms">
+                {terms.map(term => (
+                  <span className="translation-preview__term" key={term.key}>
+                    <span>{term.source}</span><strong>{term.translation}</strong>
+                  </span>
+                ))}
+              </div>
+            </section>
+          ) : null)}
+        </Card>
+      ) : null}
 
       <div className="task-list" aria-label="Learning tasks">
         {tasks.map((task, index) => {

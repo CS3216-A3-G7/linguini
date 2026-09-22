@@ -26,11 +26,17 @@ from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
 from app.repositories.scenes import SceneRepository
 from app.repositories.users import UserRepository
+from app.services.gemini_learning_tasks import GeminiLearningTaskGenerator
+from app.services.gemini_scene_analysis import GeminiSceneAnalyzer, RoutedSceneAnalyzer
+from app.services.gemini_translation import GeminiSceneTranslator
 from app.services.image_storage import ImageStorage
 from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
+from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
+from app.services.openai_scene_analysis import OpenAISceneAnalyzer
+from app.services.openai_translation import OpenAISceneTranslator
 from app.services.practice import PracticeService
 from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.scenes import SceneService
@@ -132,9 +138,108 @@ def get_practice_repository(
     request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
 ) -> PostgresWorkflowRepository:
     engine = request.app.state.database_engine
-    # The only place a different scene-analysis provider gets swapped in.
+    deterministic = DeterministicSceneAnalyzer(engine)
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    scene_provider = os.getenv("SCENE_ANALYSIS_PROVIDER", "gemini").strip().casefold()
+    scene_timeout = int(os.getenv("SCENE_ANALYSIS_TIMEOUT_SECONDS", "120").strip())
+    translation_provider = os.getenv("TRANSLATION_PROVIDER", "gemini").strip().casefold()
+    analyzer = deterministic
+    storage = ImageStorage(
+        os.getenv("SUPABASE_URL", "").strip(),
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+    )
+    if scene_provider == "openai":
+        openai_scene_model = os.getenv("OPENAI_SCENE_MODEL", "gpt-4o").strip()
+        uploaded_analyzer = (
+            OpenAISceneAnalyzer(
+                storage,
+                openai_key,
+                openai_scene_model,
+                timeout_seconds=scene_timeout,
+            )
+            if openai_key and openai_scene_model
+            else None
+        )
+    elif scene_provider == "gemini":
+        gemini_model = os.getenv("GEMINI_SCENE_MODEL", "").strip()
+        uploaded_analyzer = (
+            GeminiSceneAnalyzer(
+                storage,
+                gemini_key,
+                gemini_model,
+                timeout_seconds=scene_timeout,
+            )
+            if gemini_key and gemini_model
+            else None
+        )
+    else:
+        raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_provider}")
+    if uploaded_analyzer:
+        analyzer = RoutedSceneAnalyzer(deterministic, uploaded_analyzer)
+
+    translation_timeout = int(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "60"))
+    if translation_provider == "openai":
+        openai_model = os.getenv("OPENAI_TRANSLATION_MODEL", "gpt-4o-mini").strip()
+        translator = (
+            OpenAISceneTranslator(
+                openai_key,
+                openai_model,
+                timeout_seconds=translation_timeout,
+            )
+            if openai_key and openai_model
+            else None
+        )
+    elif translation_provider == "gemini":
+        translation_model = os.getenv(
+            "GEMINI_TRANSLATION_MODEL", "gemini-3.5-flash-lite"
+        ).strip()
+        translator = (
+            GeminiSceneTranslator(
+                gemini_key,
+                translation_model,
+                timeout_seconds=translation_timeout,
+            )
+            if gemini_key and translation_model
+            else None
+        )
+    else:
+        raise ValueError(f"Unsupported TRANSLATION_PROVIDER: {translation_provider}")
+
+    learning_task_provider = os.getenv("LEARNING_TASK_PROVIDER", "openai").strip().casefold()
+    learning_task_timeout = int(os.getenv("LEARNING_TASK_TIMEOUT_SECONDS", "60"))
+    if learning_task_provider == "openai":
+        openai_learning_model = os.getenv("OPENAI_LEARNING_TASK_MODEL", "gpt-4o-mini").strip()
+        learning_task_generator = (
+            OpenAILearningTaskGenerator(
+                openai_key,
+                openai_learning_model,
+                timeout_seconds=learning_task_timeout,
+            )
+            if openai_key and openai_learning_model
+            else None
+        )
+    elif learning_task_provider == "gemini":
+        gemini_learning_model = os.getenv(
+            "GEMINI_LEARNING_TASK_MODEL", "gemini-3.5-flash-lite"
+        ).strip()
+        learning_task_generator = (
+            GeminiLearningTaskGenerator(
+                gemini_key,
+                gemini_learning_model,
+                timeout_seconds=learning_task_timeout,
+            )
+            if gemini_key and gemini_learning_model
+            else None
+        )
+    else:
+        raise ValueError(f"Unsupported LEARNING_TASK_PROVIDER: {learning_task_provider}")
     return PostgresWorkflowRepository(
-        engine, demo_user_id, analyzer=DeterministicSceneAnalyzer(engine)
+        engine,
+        demo_user_id,
+        analyzer=analyzer,
+        translator=translator,
+        learning_task_generator=learning_task_generator,
     )
 
 

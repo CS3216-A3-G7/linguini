@@ -158,30 +158,150 @@ def build_objects(connection, session, asset, profile, scene):
     return objects, words, translations
 
 
-def build_tasks(session_id, objects, words, translations, uploaded):
+def _display_source(value):
+    """Turn relationship keys such as nextTo/next_to into learner-facing English."""
+    result = []
+    for character in value.replace("_", " "):
+        if character.isupper() and result and result[-1] != " ":
+            result.append(" ")
+        result.append(character.lower())
+    return "".join(result)
+
+
+def _with_article(text, translated_term):
+    if not translated_term or not translated_term.article:
+        return text
+    separator = "" if translated_term.article.endswith("'") else " "
+    return f"{translated_term.article}{separator}{text}"
+
+
+def build_grammar_lessons(session_id, result):
+    """Turn generated grammar lessons into tasks; the caller assigns their order."""
+    return [
+        SessionTask(
+            id=uuid5(session_id, "learning-tasks-v1:" + lesson.focus),
+            session_id=session_id,
+            phase="learning",
+            kind="grammarLesson",
+            order_index=0,
+            public_content=dict(
+                kind="grammarLesson",
+                focus=lesson.focus,
+                title=lesson.title,
+                explanation=lesson.explanation,
+                questions=[
+                    dict(
+                        question_id=question.question_id,
+                        prompt=question.prompt,
+                        interaction_type=question.interaction_type,
+                        options=[
+                            dict(option_id=option.option_id, label=option.label)
+                            for option in question.options
+                        ],
+                        token_bank=question.token_bank,
+                        translation=question.translation,
+                    )
+                    for question in lesson.questions
+                ],
+            ),
+            answer_key=dict(
+                correct_option_ids={
+                    question.question_id: question.correct_option_id or question.correct_text
+                    for question in lesson.questions
+                }
+            ),
+        )
+        for lesson in result.tasks
+    ]
+
+
+def build_tasks(session_id, objects, words, translations, uploaded, translated_scene=None):
     # Two sets choose different focus objects and context, with the same public contract.
     index = min(1, len(words) - 1) if uploaded else 0
     word, translation, obj = words[index], translations[index], objects[index]
     focus = word.display_text
     context = "photo sample" if uploaded else "ready scene"
     example = word.example_sentence or focus
-    related = [word.id]
+    related = [item.id for item in words]
+    translated_objects = (
+        {term.key: term for term in translated_scene.objects} if translated_scene else {}
+    )
+    learning_words = [
+        dict(
+            learning_key=str(item.id),
+            term_type="object",
+            vocabulary_item_id=item.id,
+            scene_object_id=scene_object.id,
+            target_text=_with_article(
+                item.display_text, translated_objects.get(str(scene_object.id))
+            ),
+            translation=translated.translated_text,
+            part_of_speech=item.part_of_speech,
+            gender=item.gender,
+            example_sentence=item.example_sentence,
+        )
+        for scene_object, item, translated in zip(objects, words, translations, strict=True)
+    ]
+    if translated_scene:
+        supplemental_terms = [
+            (term, "attribute", "adjective") for term in translated_scene.attributes
+        ] + [
+            (term, "relationship", "preposition")
+            for term in translated_scene.relationships
+        ]
+        seen_terms = {
+            (entry["target_text"].casefold(), entry["translation"].casefold())
+            for entry in learning_words
+        }
+        for term, term_type, part_of_speech in supplemental_terms:
+            identity = (term.translation.casefold(), term.source.casefold())
+            if identity in seen_terms:
+                continue
+            seen_terms.add(identity)
+            learning_words.append(
+                dict(
+                    learning_key=f"{term_type}:{term.key}",
+                    term_type=term_type,
+                    target_text=term.translation,
+                    translation=_display_source(term.source),
+                    part_of_speech=part_of_speech,
+                )
+            )
+    questions = []
+    correct_option_ids = {}
+    for question_index, learning_word in enumerate(learning_words):
+        ordered = [
+            learning_word,
+            *learning_words[question_index + 1 :],
+            *learning_words[:question_index],
+        ]
+        choices = list(dict.fromkeys(candidate["target_text"] for candidate in ordered))[:4]
+        fallback_choices = {
+            "es": ["No sé", "No estoy seguro"],
+            "fr": ["Je ne sais pas", "Je ne suis pas sûr"],
+        }.get(words[0].language_code.lower(), ["I'm not sure", "Something else"])
+        for choice in fallback_choices:
+            if len(choices) >= 4:
+                break
+            if choice not in choices:
+                choices.append(choice)
+        question_id = f"word-{learning_word['learning_key']}"
+        questions.append(
+            dict(
+                question_id=question_id,
+                prompt=f'Which word means "{learning_word["translation"]}"?',
+                options=[dict(option_id=choice, label=choice) for choice in choices],
+                correct_option_id=learning_word["target_text"],
+            )
+        )
+        correct_option_ids[question_id] = learning_word["target_text"]
     contents = [
         dict(
             kind="vocabularyIntroduction",
-            title=f"A word from your {context}",
-            vocabulary_item_id=word.id,
-            target_text=focus,
-            translation=translation.translated_text,
-            part_of_speech=word.part_of_speech,
-            gender=word.gender,
-            example_sentence=example,
-        ),
-        dict(
-            kind="pronunciationPractice",
-            vocabulary_item_id=word.id,
-            prompt="Practise this word by typing it. Speech evaluation is not available yet.",
-            target_text=focus,
+            title="Learn the words in this scene",
+            words=learning_words,
+            questions=questions,
+            allow_typing_practice=True,
         ),
         dict(
             kind="grammarExplanation",
@@ -234,8 +354,12 @@ def build_tasks(session_id, objects, words, translations, uploaded):
         ),
     ]
     keys = [
-        None,
-        dict(accepted_text_answers=[focus]),
+        dict(
+            correct_option_ids=correct_option_ids,
+            accepted_text_answers_by_vocabulary_id={
+                entry["learning_key"]: [entry["target_text"]] for entry in learning_words
+            },
+        ),
         None,
         dict(accepted_text_answers=[focus], correct_option_id=focus),
         None,
@@ -256,8 +380,8 @@ def build_tasks(session_id, objects, words, translations, uploaded):
             order_index=i,
             public_content=content,
             answer_key=key,
-            vocabulary_item_id=word.id,
-            scene_object_id=obj.id,
+            vocabulary_item_id=None if content["kind"] == "vocabularyIntroduction" else word.id,
+            scene_object_id=None if content["kind"] == "vocabularyIntroduction" else obj.id,
         )
         for i, (content, key) in enumerate(zip(contents, keys, strict=True))
     ]

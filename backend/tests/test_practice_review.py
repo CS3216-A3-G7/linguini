@@ -165,11 +165,13 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
         for call in connection.execute.call_args_list
         if getattr(call.args[0], "is_insert", False) and call.args[0].table.name == "session_tasks"
     ]
-    assert len(inserted) == 8
-    assert all(task["scene_object_id"] == objects[1].id for task in inserted)
+    assert len(inserted) == 7
+    assert all(
+        task["scene_object_id"] in {None, objects[1].id} for task in inserted
+    )
     introduction = next(task for task in inserted if task["kind"] == "vocabularyIntroduction")
-    assert introduction["public_content"]["targetText"] == "mesa"
-    assert introduction["public_content"]["translation"] == "table"
+    assert introduction["public_content"]["words"][0]["targetText"] == "mesa"
+    assert introduction["public_content"]["words"][0]["translation"] == "table"
     # Same pending session can be reviewed again without changing generated task identity.
     assert introduction["id"] == uuid5(session_id, "placeholder-v1:vocabularyIntroduction")
 

@@ -19,7 +19,9 @@ dependencies = [
   "psycopg[binary]>=3.2,<4",
   "python-dotenv>=1,<2",
   "httpx>=0.28,<1",
-  "Pillow>=12.1,<13"
+  "Pillow>=12.1,<13",
+  "google-genai>=1,<2",
+  "openai>=2,<3"
 ]
 
 [project.optional-dependencies]

@@ -6,7 +6,7 @@ import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { practiceStages, taskDone, taskTitle } from "../lib/practiceTasks";
 import { speak } from "../lib/speech";
-import type { SessionTask, TaskAnswer } from "../lib/api";
+import { checkVocabularyAnswer, type SessionTask, type TaskAnswer, type VocabularyLearningWord } from "../lib/api";
 
 export function LearningTaskPage() {
   const { taskId } = useParams();
@@ -34,6 +34,12 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
   const request = useRef<{ answer: string; key: string } | null>(null);
   const busy = useRef(false);
   const content = task.publicContent;
+  if (content.kind === "vocabularyIntroduction" && content.words.length) {
+    return <VocabularyLearningFlow task={task} index={index} total={total} onNext={onNext} onClose={onClose} />;
+  }
+  if (content.kind === "grammarLesson") {
+    return <GrammarLessonFlow task={task} index={index} total={total} onNext={onNext} onClose={onClose} />;
+  }
   const card = scene.items.find(item => item.id === task.sceneObjectId);
   const terminal = taskDone(task);
   const reading = ["vocabularyIntroduction", "grammarExplanation", "syntaxExplanation"].includes(task.kind);
@@ -56,7 +62,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
   return <div className="stack">
     <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
     <div className="learning-title-row"><h1>{taskTitle(task)}</h1><Button variant="quiet" className="learning-exit" onClick={onClose}>Back to tasks</Button></div>
-    {card && ["vocabularyIntroduction", "pronunciationPractice"].includes(content.kind) ? <div className="flashcard learning-card">
+    {card && content.kind === "vocabularyIntroduction" ? <div className="flashcard learning-card">
       <div className="spread"><span className="label muted">{card.wordClass}{card.gender ? " · " + card.gender : ""}</span>
         <IconButton label={"Hear " + card.word} onClick={() => speak(card.word, scene.languageCode)}><SpeakerIcon /></IconButton></div>
       <div className="learning-card__word"><h2>{card.word}</h2><p className="muted">{card.translation}</p></div>
@@ -65,7 +71,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
     {!card && content.kind === "vocabularyIntroduction" ? <article className="flashcard learning-card">
       <div className="learning-card__word"><h2>{content.targetText}</h2><p>{content.translation}</p></div>
       <p>{content.exampleSentence}</p>
-      <IconButton label={`Hear ${content.targetText}`} onClick={() => speak(content.targetText, scene.languageCode)}><SpeakerIcon /></IconButton>
+      <IconButton label={`Hear ${content.targetText ?? "word"}`} onClick={() => speak(content.targetText ?? "", scene.languageCode)}><SpeakerIcon /></IconButton>
     </article> : null}
     {content.kind === "grammarExplanation" || content.kind === "syntaxExplanation" ? <>
       <div className="panel-note">{content.explanation}</div>
@@ -82,4 +88,148 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
       <Button variant="quiet" block disabled={practiceSaving} onClick={async () => { if (await actOnTask(task.id, "skip")) onNext(); }}>Skip task</Button>
     </>}
   </div>;
+}
+
+function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task: SessionTask; index: number; total: number; onNext: () => void; onClose: () => void }) {
+  const scene = useScene();
+  const { actOnTask, practiceSaving, practiceError } = useAppState();
+  const [stage, setStage] = useState<"review" | "quiz" | "typing">("review");
+  const [page, setPage] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [typingIndex, setTypingIndex] = useState(0);
+  const [typedAnswers, setTypedAnswers] = useState<Record<string, string>>({});
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [questionResults, setQuestionResults] = useState<Record<string, boolean>>({});
+  const [checkingQuestion, setCheckingQuestion] = useState(false);
+  const requestKey = useRef(crypto.randomUUID());
+  const content = task.publicContent;
+  if (content.kind !== "vocabularyIntroduction") return null;
+  const terminal = taskDone(task);
+  const pageCount = Math.ceil(content.words.length / 3);
+  const visibleWords = content.words.slice(page * 3, page * 3 + 3);
+  const question = content.questions[questionIndex];
+  const typingWord = content.words[typingIndex];
+  const typingKey = typingWord ? typingWord.learningKey ?? typingWord.vocabularyItemId ?? typingWord.targetText : "";
+  const submit = async () => {
+    const result = await actOnTask(task.id, "attempts", { inputMode: "vocabularyReview", answers, typedAnswers }, requestKey.current);
+    if (result) {
+      setFeedback("Vocabulary practice saved.");
+      setQuestionResults(result.attempt?.evaluationDetails?.questionResults ?? {});
+    }
+  };
+  const finishReview = () => page < pageCount - 1 ? setPage(value => value + 1) : setStage("quiz");
+  const finishQuestion = () => questionIndex < content.questions.length - 1 ? setQuestionIndex(value => value + 1) : setStage("typing");
+  const chooseAnswer = async (optionId: string) => {
+    if (!question || answers[question.questionId] || checkingQuestion) return;
+    if (question.correctOptionId) {
+      setAnswers(value => ({ ...value, [question.questionId]: optionId }));
+      setQuestionResults(value => ({ ...value, [question.questionId]: question.correctOptionId === optionId }));
+      return;
+    }
+    setCheckingQuestion(true);
+    try {
+      const result = await checkVocabularyAnswer(task.id, question.questionId, optionId);
+      setAnswers(value => ({ ...value, [question.questionId]: optionId }));
+      setQuestionResults(value => ({ ...value, [question.questionId]: result.isCorrect }));
+    } finally {
+      setCheckingQuestion(false);
+    }
+  };
+  return <div className="stack vocabulary-flow">
+    <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
+    <div className="learning-title-row"><h1>{content.title}</h1><Button variant="quiet" className="learning-exit" onClick={onClose}>Back to tasks</Button></div>
+    {!terminal && stage === "review" ? <>
+      <div className="spread"><p className="muted">Take a moment to learn each word.</p><span className="label muted">{page + 1} / {pageCount}</span></div>
+      <div className="vocabulary-learning-grid">{visibleWords.map(word => <VocabularyLearningCard key={word.learningKey ?? word.vocabularyItemId ?? word.targetText} word={word} languageCode={scene.languageCode} />)}</div>
+      <div className="vocabulary-flow__actions">{page > 0 ? <Button variant="quiet" onClick={() => setPage(value => value - 1)}>Previous words</Button> : <span />}
+        <Button onClick={finishReview}>{page < pageCount - 1 ? "Next words" : "Start quick quiz"}</Button></div>
+    </> : null}
+    {!terminal && stage === "quiz" && question ? <Card plain><div className="stack">
+      <span className="label muted">Question {questionIndex + 1} of {content.questions.length}</span><h2>{question.prompt}</h2>
+      <div className="choice-grid">{question.options.map(option => {
+        const selected = answers[question.questionId] === option.optionId;
+        const result = questionResults[question.questionId];
+        const state = result === undefined || !selected ? "" : result ? " choice--correct" : " choice--incorrect";
+        return <button key={option.optionId} className={`choice${state}`} aria-pressed={selected} disabled={!!answers[question.questionId] || checkingQuestion || !!feedback} onClick={() => void chooseAnswer(option.optionId)}>{selected ? <CheckIcon size={16} /> : null}{option.label}</button>;
+      })}</div>
+      {answers[question.questionId] ? <Feedback tone={questionResults[question.questionId] ? "good" : "warn"}><p role="status">{questionResults[question.questionId] ? "Correct!" : "Not quite — keep going."}</p></Feedback> : null}
+      <Button block disabled={!answers[question.questionId]} onClick={finishQuestion}>{questionIndex < content.questions.length - 1 ? "Next question" : "Continue"}</Button>
+    </div></Card> : null}
+    {!terminal && stage === "typing" && typingWord ? <Card plain><div className="stack">
+      <div><span className="label muted">Optional typing practice</span><h2>Type “{typingWord.translation}”</h2><p className="muted">Word {typingIndex + 1} of {content.words.length}</p></div>
+      <input className="input" aria-label={`Type ${typingWord.translation}`} value={typedAnswers[typingKey] ?? ""} onChange={event => setTypedAnswers(value => ({ ...value, [typingKey]: event.target.value }))} />
+      <Button block disabled={!typedAnswers[typingKey]?.trim() || practiceSaving} onClick={() => typingIndex < content.words.length - 1 ? setTypingIndex(value => value + 1) : void submit()}>{typingIndex < content.words.length - 1 ? "Next word" : "Finish task"}</Button>
+      <Button variant="quiet" block disabled={practiceSaving} onClick={() => void submit()}>Skip typing practice</Button>
+    </div></Card> : null}
+    {feedback ? <Feedback><p role="status">{feedback}</p></Feedback> : null}
+    {practiceError ? <p role="alert">{practiceError}</p> : null}
+    {terminal ? <Button block onClick={onNext}>{index < total - 1 ? "Next task" : "Back to tasks"}</Button> : null}
+  </div>;
+}
+
+function GrammarLessonFlow({ task, index, total, onNext, onClose }: { task: SessionTask; index: number; total: number; onNext: () => void; onClose: () => void }) {
+  const { actOnTask, practiceSaving, practiceError } = useAppState();
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [builtTokenIndexes, setBuiltTokenIndexes] = useState<Record<string, number[]>>({});
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const requestKey = useRef(crypto.randomUUID());
+  const content = task.publicContent;
+  if (content.kind !== "grammarLesson") return null;
+  const terminal = taskDone(task);
+  const sentence = (tokens: string[]) => tokens.reduce((value, token) => {
+    const joinsPrevious = /^[,.;:!?…]$/.test(token) || value.endsWith("'");
+    return value ? `${value}${joinsPrevious ? "" : " "}${token}` : token;
+  }, "");
+  const answerFor = (question: typeof content.questions[number]) => question.interactionType === "sentenceBuilding"
+    ? sentence((builtTokenIndexes[question.questionId] ?? []).map(index => question.tokenBank[index]))
+    : answers[question.questionId] ?? "";
+  const answered = content.questions.every(question => Boolean(answerFor(question)));
+  const submit = async () => {
+    const taskAnswers = Object.fromEntries(content.questions.map(question => [question.questionId, answerFor(question)]));
+    const result = await actOnTask(task.id, "attempts", { inputMode: "vocabularyReview", answers: taskAnswers, typedAnswers: {} }, requestKey.current);
+    if (result) setFeedback(result.attempt?.feedback?.message ?? "Grammar practice saved.");
+  };
+  return <div className="stack vocabulary-flow">
+    <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
+    <div className="learning-title-row"><h1>{content.title}</h1><Button variant="quiet" className="learning-exit" onClick={onClose}>Back to tasks</Button></div>
+    <div className="panel-note">{content.explanation}</div>
+    {content.questions.map((question, position) => <Card key={question.questionId} plain><div className="stack">
+      <span className="label muted">Question {position + 1} of {content.questions.length}</span>
+      {question.interactionType === "sentenceBuilding" ? <>
+        {question.translation ? <h2>{question.translation}</h2> : null}
+        <p className="muted">{question.prompt}</p>
+        <div className="sentence-builder__answer" aria-label="Your sentence">
+          {(builtTokenIndexes[question.questionId] ?? []).length ? (builtTokenIndexes[question.questionId] ?? []).map((tokenIndex, tokenPosition) => <button key={`${tokenIndex}-${tokenPosition}`} className="sentence-builder__token" disabled={terminal || practiceSaving}
+            onClick={() => setBuiltTokenIndexes(value => ({ ...value, [question.questionId]: (value[question.questionId] ?? []).filter((_, index) => index !== tokenPosition) }))}>{question.tokenBank[tokenIndex]}</button>) : <span className="muted">Choose the words to build your sentence.</span>}
+        </div>
+        <div className="chip-row" aria-label="Sentence building words">{question.tokenBank.map((token, tokenIndex) => {
+          const used = (builtTokenIndexes[question.questionId] ?? []).includes(tokenIndex);
+          return <button key={`${token}-${tokenIndex}`} className="chip" disabled={used || terminal || practiceSaving}
+            onClick={() => setBuiltTokenIndexes(value => ({ ...value, [question.questionId]: [...(value[question.questionId] ?? []), tokenIndex] }))}>{token}</button>;
+        })}</div>
+      </> : <>
+        <h2>{question.prompt}</h2>
+        {question.translation ? <p className="muted">{question.translation}</p> : null}
+        <div className="choice-grid">{question.options.map(option => <button key={option.optionId} className="choice" aria-pressed={answers[question.questionId] === option.optionId} disabled={terminal || practiceSaving}
+          onClick={() => setAnswers(value => ({ ...value, [question.questionId]: option.optionId }))}>{answers[question.questionId] === option.optionId ? <CheckIcon size={16} /> : null}{option.label}</button>)}</div>
+      </>}
+    </div></Card>)}
+    {feedback ? <Feedback><p role="status">{feedback}</p></Feedback> : null}
+    {practiceError ? <p role="alert">{practiceError}</p> : null}
+    {terminal ? <Button block onClick={onNext}>{index < total - 1 ? "Next task" : "Back to tasks"}</Button> : <>
+      <Button block disabled={!answered || practiceSaving} onClick={() => void submit()}>Submit answers</Button>
+      <Button variant="quiet" block disabled={practiceSaving} onClick={async () => { if (await actOnTask(task.id, "skip")) onNext(); }}>Skip task</Button>
+    </>}
+  </div>;
+}
+
+function VocabularyLearningCard({ word, languageCode }: { word: VocabularyLearningWord; languageCode: string }) {
+  return <article className="flashcard learning-card vocabulary-learning-card">
+    <div className="spread"><span className="label muted learning-card__meta">{word.termType === "relationship" ? "relationship" : word.partOfSpeech}{word.gender ? ` · ${word.gender}` : ""}</span>
+      <IconButton className="learning-card__audio" label={`Hear ${word.targetText}`} onClick={() => speak(word.targetText, languageCode)}><SpeakerIcon /></IconButton></div>
+    <div className="learning-card__word"><h2>{word.targetText}</h2><p className="muted">{word.translation}</p></div>
+    {word.pluralForm ? <p className="small"><strong>Plural:</strong> {word.pluralForm}</p> : null}
+    {word.exampleSentence ? <div className="learning-example"><strong className="small">{word.exampleSentence}</strong></div> : null}
+  </article>;
 }

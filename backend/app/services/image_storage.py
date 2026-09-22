@@ -19,7 +19,9 @@ class UploadObjectMissing(Exception):
 class ImageStorage:
     def __init__(self, project_url: str, service_key: str) -> None:
         self.url = project_url.rstrip("/") + "/storage/v1"
-        self.headers = {"apikey": service_key, "Authorization": f"Bearer {service_key}"}
+        self.headers = {"apikey": service_key}
+        if not service_key.startswith("sb_"):
+            self.headers["Authorization"] = f"Bearer {service_key}"
         self.signer = PrivateMediaUrls(project_url, "media-assets", service_key)
         self.configured = project_url.startswith("https://") and bool(service_key)
 

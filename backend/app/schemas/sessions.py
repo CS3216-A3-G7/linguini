@@ -11,6 +11,7 @@ from app.schemas.base import ApiModel, JsonObject
 from app.schemas.enums import SessionFailureCode, SessionStatus
 from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.tasks import SessionProgress, SessionTaskPublic
+from app.schemas.translation import SceneTranslationResult
 from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
 
 
@@ -48,7 +49,6 @@ class CreateSessionRequest(ApiModel):
 
 class GenerateSessionPlanRequest(ApiModel):
     desired_vocabulary_count: Annotated[int, Field(ge=1, le=20)] = 5
-    include_pronunciation: bool = True
     include_grammar: bool = True
     include_syntax: bool = True
     include_sentence_building: bool = True
@@ -70,6 +70,7 @@ class ReviewPracticeRequest(ApiModel):
     added_objects: Annotated[list[AddedPracticeObject], Field(max_length=20)] = Field(
         default_factory=list
     )
+    object_attributes: dict[UUID, dict[str, str]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def unique_selection(self):
@@ -77,6 +78,8 @@ class ReviewPracticeRequest(ApiModel):
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("Choose at least one object, with no duplicate IDs.")
         selected = set(ids)
+        if not set(self.object_attributes) <= selected:
+            raise ValueError("Attributes must reference selected objects.")
         triples = set()
         relation_ids = set()
         for relation in self.relations:
@@ -104,6 +107,7 @@ class SessionDetailResponse(ApiModel):
     title: str
     vocabulary: list[VocabularyItem] = Field(default_factory=list)
     translations: list[VocabularyTranslation] = Field(default_factory=list)
+    translation_preview: SceneTranslationResult | None = None
     session: Session
     scene_object_relations: list[SceneObjectRelation] = Field(default_factory=list)
     scene_objects: list[SceneObject] = Field(default_factory=list)

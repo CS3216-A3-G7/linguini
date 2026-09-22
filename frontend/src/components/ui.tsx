@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeftIcon, CloseIcon, HelpIcon } from "./icons";
+import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, CloseIcon, HelpIcon } from "./icons";
 import "./ui.css";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -199,6 +199,112 @@ export function Tabs<T extends string>({
           {option.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+export type ComboBoxOption = { value: string; label: string };
+
+export function ComboBox({
+  id,
+  value,
+  options,
+  onChange,
+  placeholder = "Choose an option",
+  ariaLabel,
+  disabled = false,
+  compact = false,
+}: {
+  id?: string;
+  value: string;
+  options: ComboBoxOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+  disabled?: boolean;
+  compact?: boolean;
+}) {
+  const generatedId = useId();
+  const listId = `${id ?? generatedId}-options`;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedIndex = options.findIndex(option => option.value === value);
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(Math.max(selectedIndex, 0));
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+
+  const choose = (index: number) => {
+    const option = options[index];
+    if (!option) return;
+    onChange(option.value);
+    setActiveIndex(index);
+    setOpen(false);
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      className={["combobox", compact ? "combobox--compact" : "", open ? "combobox--open" : ""].filter(Boolean).join(" ")}
+      onKeyDown={event => {
+        if (disabled || !options.length) return;
+        if (event.key === "Escape") { setOpen(false); return; }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          if (!open) setOpen(true);
+          setActiveIndex(current => event.key === "ArrowDown"
+            ? (current + 1) % options.length
+            : (current - 1 + options.length) % options.length);
+        }
+        if (event.key === "Enter" && open) { event.preventDefault(); choose(activeIndex); }
+      }}
+    >
+      <button
+        id={id}
+        type="button"
+        className="combobox__trigger"
+        role="combobox"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-activedescendant={open ? `${listId}-${activeIndex}` : undefined}
+        disabled={disabled}
+        onClick={() => {
+          setActiveIndex(Math.max(selectedIndex, 0));
+          setOpen(current => !current);
+        }}
+      >
+        <span className={selectedIndex < 0 ? "combobox__placeholder" : ""}>
+          {options[selectedIndex]?.label ?? placeholder}
+        </span>
+        <ChevronDownIcon className="combobox__chevron" size={18} />
+      </button>
+      {open ? (
+        <div className="combobox__list" id={listId} role="listbox">
+          {options.map((option, index) => (
+            <button
+              id={`${listId}-${index}`}
+              key={option.value}
+              type="button"
+              className={["combobox__option", index === activeIndex ? "is-active" : ""].filter(Boolean).join(" ")}
+              role="option"
+              aria-selected={option.value === value}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => choose(index)}
+            >
+              <span>{option.label}</span>
+              {option.value === value ? <CheckIcon size={18} /> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

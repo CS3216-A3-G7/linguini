@@ -37,6 +37,7 @@ from app.schemas.enums import SessionStatus
 from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
 from app.schemas.tasks import (
+    CheckVocabularyAnswerResponse,
     SessionProgress,
     SessionTask,
     SessionTaskPublic,
@@ -48,8 +49,9 @@ from app.schemas.vocabulary import (
     VocabularyItem,
     VocabularyTranslation,
 )
+from app.services.learning_tasks import LearningTaskGenerationError, required_task_focuses
 from app.services.scene_analysis import DeterministicSceneAnalyzer, SceneAnalysisError
-from app.services.session_plan import build_tasks
+from app.services.session_plan import bootstrap_word, build_grammar_lessons, build_tasks
 
 TERMINAL = {"completed", "abandoned", "failed"}
 ALLOWED_TRANSITIONS = {
@@ -67,6 +69,22 @@ READ_TASKS = {"vocabularyIntroduction", "grammarExplanation", "syntaxExplanation
 ANALYSIS_TIMEOUT = timedelta(minutes=15)
 
 
+def _normalize_answer(value):
+    return " ".join(value.casefold().strip().split()).rstrip(".!?\u3002")
+
+
+def _lesson_answer_is_correct(task, question_id, answer):
+    question = next(
+        item for item in task.public_content.questions if item.question_id == question_id
+    )
+    expected = task.answer_key.correct_option_ids.get(question_id)
+    return (
+        _normalize_answer(answer) == _normalize_answer(expected)
+        if getattr(question, "interaction_type", "multipleChoice") == "sentenceBuilding"
+        else answer == expected
+    )
+
+
 def task_progress(tasks):
     complete = sum(t.status == "completed" for t in tasks)
     skipped = sum(t.status == "skipped" for t in tasks)
@@ -76,6 +94,31 @@ def task_progress(tasks):
         terminal_task_count=complete + skipped,
         total_task_count=len(tasks),
     )
+
+
+def _learning_task_payload(translation_payload, translated_scene, scene_relations=()):
+    """Reuse the translator payload, carrying the target-language terms it produced."""
+    payload = {
+        "targetLanguage": translation_payload["targetLanguage"],
+        "sceneTitle": translation_payload["sceneTitle"],
+        "sceneSummary": translation_payload["sceneSummary"],
+        **{
+            field: [
+                term.model_dump(mode="json", by_alias=True, exclude_none=True)
+                for term in getattr(translated_scene, field)
+            ]
+            for field in ("objects", "attributes", "relationships")
+        },
+    }
+    relation_links = {str(row.id): row for row in scene_relations}
+    for term in payload["relationships"]:
+        if row := relation_links.get(term["key"]):
+            term["subjectObjectKey"] = str(row.subject_scene_object_id)
+            term["referenceObjectKey"] = str(row.reference_scene_object_id)
+    for term in payload["attributes"]:
+        term["objectKey"] = term["key"].rsplit(":", 1)[0]
+    payload["requiredTaskFocuses"] = list(required_task_focuses(payload))
+    return payload
 
 
 def parse_session(row):
@@ -99,9 +142,13 @@ def _stale_processing(status=None):
 
 
 class PostgresWorkflowRepository:
-    def __init__(self, engine, user_id, analyzer=None):
+    def __init__(
+        self, engine, user_id, analyzer=None, translator=None, learning_task_generator=None
+    ):
         self.engine, self.user_id = engine, user_id
         self.analyzer = analyzer or DeterministicSceneAnalyzer(engine)
+        self.translator = translator
+        self.learning_task_generator = learning_task_generator
 
     @contextmanager
     def transaction(self):
@@ -179,6 +226,42 @@ class PostgresWorkflowRepository:
                 .order_by(session_tasks.c.order_index)
             ).mappings()
         ]
+
+    def check_vocabulary_answer(self, task_id, question_id, option_id):
+        """Evaluate one vocabulary choice without recording or completing the task."""
+        with self.read_connection() as c:
+            row = (
+                c.execute(
+                    select(session_tasks)
+                    .join(sessions, sessions.c.id == session_tasks.c.session_id)
+                    .join(
+                        language_profiles,
+                        language_profiles.c.id == sessions.c.language_profile_id,
+                    )
+                    .where(
+                        session_tasks.c.id == task_id,
+                        sessions.c.user_id == self.user_id,
+                        language_profiles.c.is_active.is_(True),
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if row is None:
+                raise PracticeNotFoundError("Task not found.")
+            task = SessionTask.model_validate(dict(row))
+            if task.kind != "vocabularyIntroduction" or not task.answer_key:
+                raise PracticeConflictError("This task does not support answer checking.")
+            question = next(
+                (item for item in task.public_content.questions if item.question_id == question_id),
+                None,
+            )
+            if question is None or option_id not in {item.option_id for item in question.options}:
+                raise PracticeConflictError("Choose one of the offered answers.")
+            return CheckVocabularyAnswerResponse(
+                question_id=question_id,
+                is_correct=task.answer_key.correct_option_ids.get(question_id) == option_id,
+            )
 
     def _detail(self, c, session):
         asset = MediaAsset.model_validate(
@@ -292,6 +375,7 @@ class PostgresWorkflowRepository:
             scene_object_relations=relations,
             vocabulary=words,
             translations=translations,
+            translation_preview=(draft or {}).get("translationPreview"),
             tasks=[SessionTaskPublic.from_internal(t) for t in tasks],
             progress=task_progress(tasks),
             next_task_id=next(
@@ -583,6 +667,18 @@ class PostgresWorkflowRepository:
             return {"available": True}
 
     def review(self, session_id, profile_id, request):
+        try:
+            return self._review(session_id, profile_id, request)
+        except LearningTaskGenerationError:
+            # The rolled-back review leaves the session un-planned; record why it stopped.
+            with self.transaction() as c:
+                current = self._session(c, session_id)
+                if current.status not in TERMINAL:
+                    self._transition(c, current, "failed", failure_code="taskGenerationFailed")
+            raise
+
+    def _review(self, session_id, profile_id, request):
+        lessons = []
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
             if session.status in TERMINAL:
@@ -610,7 +706,9 @@ class PostgresWorkflowRepository:
                 .one()
             )
             for object_id in request.accepted_object_ids:
-                obj = existing[object_id]
+                obj = existing[object_id].model_copy(
+                    update={"attributes": request.object_attributes.get(object_id) or None}
+                )
                 c.execute(
                     upsert(scene_objects)
                     .values(**object_values(obj))
@@ -619,13 +717,17 @@ class PostgresWorkflowRepository:
             for added in request.added_objects:
                 # Scope client-generated IDs to this session; retries keep the same object.
                 object_id = uuid5(session_id, "manual:" + str(added.id))
-                word = self._catalog_word(c, profile, added.label)
                 obj = SceneObject(
                     id=object_id,
                     session_id=session_id,
                     label=added.label,
-                    vocabulary_item_id=word.id,
+                    # With a translator, new labels are linked after translation.
+                    # Offline practice reuses an existing catalogue translation.
+                    vocabulary_item_id=(
+                        None if self.translator else self._catalog_word(c, profile, added.label).id
+                    ),
                     bounding_box={"x": added.x, "y": added.y, "width": 0.01, "height": 0.01},
+                    attributes=request.object_attributes.get(added.id) or None,
                 )
                 values = object_values(obj)
                 c.execute(
@@ -689,6 +791,75 @@ class PostgresWorkflowRepository:
                 session = self._transition(c, session, "generatingTasks")
             detail = self._detail(c, session)
             objects = [obj for obj in detail.scene_objects if obj.id in accepted]
+            if self.translator:
+                payload = {
+                    "targetLanguage": profile["target_language_code"],
+                    "sceneTitle": session.session_title or detail.title,
+                    "sceneSummary": session.session_summary or "Confirmed scene vocabulary.",
+                    "objects": [
+                        {"key": str(obj.id), "source": obj.label} for obj in objects
+                    ],
+                    "attributes": [
+                        {
+                            "key": f"{obj.id}:{attribute_type}",
+                            "source": value,
+                        }
+                        for obj in objects
+                        for attribute_type, value in (obj.attributes or {}).items()
+                        if isinstance(value, str) and value.strip()
+                    ],
+                    "relationships": [
+                        {"key": str(row.id), "source": row.relation}
+                        for row in detail.scene_object_relations
+                    ],
+                }
+                translated_scene = self.translator.translate(payload)
+                if self.learning_task_generator:
+                    try:
+                        lessons = build_grammar_lessons(
+                            session_id,
+                            self.learning_task_generator.generate(
+                                _learning_task_payload(
+                                    payload, translated_scene, detail.scene_object_relations
+                                )
+                            ),
+                        )
+                    except LearningTaskGenerationError:
+                        raise
+                    except Exception as exc:
+                        raise LearningTaskGenerationError(
+                            "Learning tasks could not be built."
+                        ) from exc
+                translated_objects = {row.key: row for row in translated_scene.objects}
+                for obj in objects:
+                    translated = translated_objects[str(obj.id)]
+                    word, _source_translation = bootstrap_word(
+                        c,
+                        profile["target_language_code"],
+                        profile["source_language_code"],
+                        translated.translation,
+                        obj.label,
+                        gender=translated.gender,
+                    )
+                    c.execute(
+                        update(scene_objects)
+                        .where(scene_objects.c.id == obj.id)
+                        .values(vocabulary_item_id=word.id)
+                    )
+                draft = {
+                    **(session.analysis_draft or {}),
+                    "translationPreview": translated_scene.model_dump(
+                        mode="json", by_alias=True
+                    ),
+                }
+                c.execute(
+                    update(sessions)
+                    .where(sessions.c.id == session.id)
+                    .values(analysis_draft=draft)
+                )
+                session = session.model_copy(update={"analysis_draft": draft})
+                detail = self._detail(c, session)
+                objects = [obj for obj in detail.scene_objects if obj.id in accepted]
             words_by_id = {word.id: word for word in detail.vocabulary}
             translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
             if any(
@@ -699,16 +870,21 @@ class PostgresWorkflowRepository:
                 raise PracticeConflictError("Every selected object needs a word and translation.")
             words = [words_by_id[obj.vocabulary_item_id] for obj in objects]
             translations = [translations_by_id[obj.vocabulary_item_id] for obj in objects]
-            rebuilt = build_tasks(session_id, objects, words, translations, False)
-            # Every kept object gets vocabulary and pronunciation practice, not just the first.
-            extra = []
-            for obj, word, translation in zip(
-                objects[1:], words[1:], translations[1:], strict=True
-            ):
-                for task in build_tasks(session_id, [obj], [word], [translation], False)[:2]:
-                    task.id = uuid5(obj.id, "review:" + task.kind.value)
-                    extra.append(task)
-            rebuilt = rebuilt[:2] + extra + rebuilt[2:]
+            rebuilt = build_tasks(
+                session_id,
+                objects,
+                words,
+                translations,
+                False,
+                getattr(detail, "translation_preview", None),
+            )
+            if lessons:
+                # Generated lessons replace the deterministic grammar/syntax/sentence tasks.
+                rebuilt = [
+                    *[task for task in rebuilt if task.kind == "vocabularyIntroduction"],
+                    *lessons,
+                    *[task for task in rebuilt if task.kind in {"ispyRound", "reflection"}],
+                ]
             for index, task in enumerate(rebuilt):
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
@@ -801,13 +977,19 @@ class PostgresWorkflowRepository:
             "ispy_attempt_count": sum(outcome is not None for outcome in outcomes),
         }
 
-    def _encounter(self, c, task, event_id, outcome, introduced=False):
-        if not task.vocabulary_item_id:
+    def _encounter(
+        self, c, task, event_id, outcome, introduced=False, vocabulary_item_id=None
+    ):
+        vocabulary_item_id = vocabulary_item_id or task.vocabulary_item_id
+        if not vocabulary_item_id:
             return
         event = VocabularyEncounter(
-            id=uuid5(event_id, "vocabulary"),
+            id=uuid5(
+                event_id,
+                "vocabulary" if task.vocabulary_item_id else f"vocabulary:{vocabulary_item_id}",
+            ),
             user_id=self.user_id,
-            vocabulary_item_id=task.vocabulary_item_id,
+            vocabulary_item_id=vocabulary_item_id,
             session_id=task.session_id,
             session_task_id=task.id,
             encounter_type="introduced" if introduced else "practised",
@@ -816,7 +998,7 @@ class PostgresWorkflowRepository:
         record_vocabulary_evidence(
             c,
             user_id=self.user_id,
-            vocabulary_item_id=task.vocabulary_item_id,
+            vocabulary_item_id=vocabulary_item_id,
             encounter=event,
         )
 
@@ -877,7 +1059,9 @@ class PostgresWorkflowRepository:
                         status="skipped", skipped_at=utc_now(), skip_reason=request.reason
                     )
                 elif action == "complete":
-                    if task.kind not in READ_TASKS:
+                    if task.kind not in READ_TASKS or (
+                        task.kind == "vocabularyIntroduction" and task.public_content.words
+                    ):
                         raise PracticeConflictError("Submit an answer or skip this task.")
                     values = dict(
                         status="completed",
@@ -888,6 +1072,30 @@ class PostgresWorkflowRepository:
                         self._encounter(c, task, task.id, "completed", introduced=True)
                 elif action == "attempt":
                     correct = evaluate(task, request)
+                    evaluation_details = None
+                    feedback_message = (
+                        "Reflection recorded."
+                        if correct is None
+                        else (
+                            "Correct."
+                            if correct
+                            else "Not quite. Review this word and try it in another session."
+                        )
+                    )
+                    if request.input_mode == "vocabularyReview":
+                        question_results = {
+                            question.question_id: _lesson_answer_is_correct(
+                                task,
+                                question.question_id,
+                                request.answers.get(question.question_id, ""),
+                            )
+                            for question in task.public_content.questions
+                        }
+                        correct_count = sum(question_results.values())
+                        evaluation_details = {"questionResults": question_results}
+                        feedback_message = (
+                            f"{correct_count} of {len(question_results)} questions correct."
+                        )
                     attempt = TaskAttempt(
                         id=attempt_id,
                         session_task_id=task.id,
@@ -896,15 +1104,8 @@ class PostgresWorkflowRepository:
                         response_payload=payload,
                         is_correct=correct,
                         score=None if correct is None else int(correct),
-                        feedback={
-                            "message": "Reflection recorded."
-                            if correct is None
-                            else (
-                                "Correct."
-                                if correct
-                                else "Not quite. Review this word and try it in another session."
-                            )
-                        },
+                        feedback={"message": feedback_message},
+                        evaluation_details=evaluation_details,
                     )
                     c.execute(insert(task_attempts).values(**entity_values(attempt)))
                     if correct is True and task.kind == "ispyRound":
@@ -922,6 +1123,16 @@ class PostgresWorkflowRepository:
                         attempt.id,
                         "completed" if correct is None else ("correct" if correct else "incorrect"),
                     )
+                    if task.kind == "vocabularyIntroduction" and task.public_content.words:
+                        for learning_word in task.public_content.words:
+                            self._encounter(
+                                c,
+                                task,
+                                attempt.id,
+                                "correct" if correct else "incorrect",
+                                introduced=True,
+                                vocabulary_item_id=learning_word.vocabulary_item_id,
+                            )
                     values = dict(
                         status="completed",
                         completed_at=utc_now(),
@@ -955,10 +1166,13 @@ class PostgresWorkflowRepository:
 def evaluate(task, request):
     """Small deterministic evaluator; never accepts client scores or answer keys."""
     mode = request.input_mode
-    if task.kind in READ_TASKS:
+    if task.kind in READ_TASKS and not (
+        task.kind == "vocabularyIntroduction" and mode == "vocabularyReview"
+    ):
         raise PracticeConflictError("This task is completed by reading it.")
     allowed = {
-        "pronunciationPractice": {"text"},
+        "vocabularyIntroduction": {"vocabularyReview"},
+        "grammarLesson": {"vocabularyReview"},
         "grammarPractice": {"text", "multipleChoice"},
         "sentenceBuilding": {"text"},
         "ispyRound": {"objectSelection", "multipleChoice"},
@@ -973,6 +1187,27 @@ def evaluate(task, request):
     key = task.answer_key
     if key is None:
         raise PracticeConflictError("Task has no evaluation key.")
+    if mode == "vocabularyReview":
+        questions_by_id = {
+            question.question_id: question for question in task.public_content.questions
+        }
+        if set(request.answers) != set(questions_by_id):
+            raise PracticeConflictError("Answer every question in this lesson once.")
+        if any(
+            getattr(question, "interaction_type", "multipleChoice") == "multipleChoice"
+            and answer not in {option.option_id for option in question.options}
+            for question_id, answer in request.answers.items()
+            for question in [questions_by_id[question_id]]
+        ):
+            raise PracticeConflictError("Select only choices offered by this lesson.")
+        if not set(request.typed_answers).issubset(
+            key.accepted_text_answers_by_vocabulary_id
+        ):
+            raise PracticeConflictError("Typing practice contains an unknown word.")
+        return all(
+            _lesson_answer_is_correct(task, question_id, answer)
+            for question_id, answer in request.answers.items()
+        )
     if mode == "objectSelection":
         if request.scene_object_id not in {o.scene_object_id for o in task.public_content.options}:
             raise PracticeConflictError("Select an object offered by this task.")
@@ -984,7 +1219,6 @@ def evaluate(task, request):
             raise PracticeConflictError("Select one of the offered choices.")
         return request.option_id == key.correct_option_id
 
-    def normalize(value):
-        return " ".join(value.casefold().strip().split()).rstrip(".!?\u3002")  # noqa: B005
-
-    return normalize(request.text) in {normalize(a) for a in key.accepted_text_answers}
+    return _normalize_answer(request.text) in {
+        _normalize_answer(answer) for answer in key.accepted_text_answers
+    }

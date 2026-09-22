@@ -63,11 +63,19 @@ class BoundingBox(ApiModel):
         return self
 
 
+class AnchorPoint(ApiModel):
+    """Normalized representative point used for the scene marker."""
+
+    x: Annotated[Decimal, Field(ge=0, le=1)]
+    y: Annotated[Decimal, Field(ge=0, le=1)]
+
+
 class SceneObject(ApiModel):
     id: UUID = Field(default_factory=uuid4)
     session_id: UUID
     label: NonEmptyText
     bounding_box: BoundingBox | None = None
+    anchor_point: AnchorPoint | None = None
     attributes: JsonObject | None = None
     confidence_score: UnitScore | None = None
     source_object_key: NonEmptyText | None = None

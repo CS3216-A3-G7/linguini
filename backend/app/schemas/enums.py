@@ -30,6 +30,25 @@ class MediaSource(StrEnum):
     GENERATED = "generated"
 
 
+class SceneRelationType(StrEnum):
+    LEFT_OF = "left_of"
+    RIGHT_OF = "right_of"
+    ABOVE = "above"
+    BELOW = "below"
+    ON = "on"
+    UNDER = "under"
+    INSIDE = "inside"
+    IN_FRONT_OF = "in_front_of"
+    BEHIND = "behind"
+    NEXT_TO = "next_to"
+    NEAR = "near"
+
+
+SYMMETRIC_SCENE_RELATION_TYPES: frozenset[SceneRelationType] = frozenset(
+    {SceneRelationType.NEXT_TO, SceneRelationType.NEAR}
+)
+
+
 class PartOfSpeech(StrEnum):
     NOUN = "noun"
     VERB = "verb"
@@ -91,7 +110,7 @@ class TaskPhase(StrEnum):
 
 class TaskKind(StrEnum):
     VOCABULARY_INTRODUCTION = "vocabularyIntroduction"
-    PRONUNCIATION_PRACTICE = "pronunciationPractice"
+    GRAMMAR_LESSON = "grammarLesson"
     GRAMMAR_EXPLANATION = "grammarExplanation"
     GRAMMAR_PRACTICE = "grammarPractice"
     SYNTAX_EXPLANATION = "syntaxExplanation"
@@ -112,6 +131,7 @@ class AttemptInputMode(StrEnum):
     TEXT = "text"
     OBJECT_SELECTION = "objectSelection"
     MULTIPLE_CHOICE = "multipleChoice"
+    VOCABULARY_REVIEW = "vocabularyReview"
 
 
 class ISpyInteractionMode(StrEnum):

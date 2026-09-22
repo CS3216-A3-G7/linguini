@@ -16,9 +16,13 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
   const [practiceStalled, setStalled] = useState(false);
   const busy = useRef(false);
   const loadVersion = useRef(0);
+  const sessionLoads = useRef(new Map<string, Promise<PracticeDetail>>());
   const creation = useRef<{ asset: string; key: string } | null>(null);
   const [micReady, setMicReady] = useState(false);
-  const loadSession = useCallback(async (id: string) => {
+  const loadSession = useCallback((id: string) => {
+    const existing = sessionLoads.current.get(id);
+    if (existing) return existing;
+    const request = (async () => {
     const version = ++loadVersion.current;
     setStalled(false);
     let data = await getPractice(id);
@@ -40,6 +44,13 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       setStalled(PROCESSING.includes(data.session.status));
     }
     return data;
+    })();
+    sessionLoads.current.set(id, request);
+    const clear = () => {
+      if (sessionLoads.current.get(id) === request) sessionLoads.current.delete(id);
+    };
+    void request.then(clear, clear);
+    return request;
   }, []);
   const retryProcessing = useCallback(async (id: string) => {
     setError(null);
@@ -83,11 +94,16 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
   const saveReview = useCallback(async (review: PracticeReview) => {
     if (!session || busy.current) return false;
     busy.current = true; setSaving(true); setError(null);
+    const previous = session;
+    setSession(current => current?.session.id === session.session.id
+      ? { ...current, session: { ...current.session, status: "generatingTasks" } }
+      : current);
     try {
       const detail = await reviewPractice(session.session.id, review);
       setSession(current => current?.session.id === detail.session.id ? detail : current);
       return true;
     } catch (error) {
+      setSession(current => current?.session.id === previous.session.id ? previous : current);
       setError(error instanceof Error ? error.message : "Unable to save your words.");
       return false;
     } finally { busy.current = false; setSaving(false); }

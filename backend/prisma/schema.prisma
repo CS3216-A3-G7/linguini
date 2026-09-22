@@ -202,6 +202,7 @@ model SceneObject {
   session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "scene_objects_session_fkey")
   label String @db.Text
   boundingBox Json? @map("bounding_box") @db.JsonB
+  anchorPoint Json? @map("anchor_point") @db.JsonB
   attributes Json? @db.JsonB
   confidenceScore Decimal? @map("confidence_score") @db.Decimal(6, 5)
   sourceObjectKey String? @map("source_object_key") @db.Text
@@ -330,7 +331,7 @@ model TaskAttempt {
   sessionTaskId     String @map("session_task_id") @db.Uuid
   sessionTask       SessionTask @relation(fields: [sessionTaskId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   attemptNumber     Int @map("attempt_number")
-  inputMode         String @map("input_mode") @db.VarChar(15)
+  inputMode         String @map("input_mode") @db.VarChar(16)
   responsePayload   Json @map("response_payload") @db.JsonB
   audioMediaAssetId String? @map("audio_media_asset_id") @db.Uuid
   audioMediaAsset   MediaAsset? @relation(fields: [audioMediaAssetId], references: [id], onDelete: Restrict, onUpdate: Cascade)

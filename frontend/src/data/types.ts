@@ -14,6 +14,7 @@ export type LanguageItem = {
   y: number;
   example: string;
   exampleTranslation: string;
+  attributes?: Record<string, string>;
 };
 
 export type Scene = {

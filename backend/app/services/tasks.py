@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from app.repositories.tasks import TaskNotFoundError, TaskRepository
-from app.schemas.tasks import SessionTaskPublic
+from app.schemas.tasks import CheckVocabularyAnswerResponse, SessionTaskPublic
 from app.services.users import UserService
 
 
@@ -23,4 +23,14 @@ class TaskService:
         user = self.users.get_current_user()
         return PostgresWorkflowRepository(self.engine, user.id).task_action(
             task_id, action, request
+        )
+
+    def check_vocabulary_answer(
+        self, task_id, question_id, option_id
+    ) -> CheckVocabularyAnswerResponse:
+        from app.repositories.postgres.workflow import PostgresWorkflowRepository
+
+        user = self.users.get_current_user()
+        return PostgresWorkflowRepository(self.engine, user.id).check_vocabulary_answer(
+            task_id, question_id, option_id
         )

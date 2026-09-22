@@ -11,10 +11,17 @@ export function practiceScene(detail: PracticeDetail, media: Pick<UploadedImage,
       items: detail.sceneObjects.map((object, i) => {
         const word = detail.vocabulary.find(w => w.id === object.vocabularyItemId);
         const translation = detail.translations.find(t => t.vocabularyItemId === object.vocabularyItemId);
+        const width = Number(object.boundingBox?.width ?? 0);
+        const height = Number(object.boundingBox?.height ?? 0);
+        const anchorX = object.anchorPoint ? Number(object.anchorPoint.x) : Number(object.boundingBox?.x ?? 0.5) + width / 2;
+        const anchorY = object.anchorPoint ? Number(object.anchorPoint.y) : Number(object.boundingBox?.y ?? 0.5) + height / 2;
         return { id: object.id, word: word?.displayText ?? object.label,
           translation: translation?.translatedText ?? object.label, wordClass: word?.partOfSpeech ?? "noun",
           gender: word?.gender === "la" || word?.gender === "el" ? word.gender : null,
-          marker: i + 1, x: Number(object.boundingBox?.x ?? 0.5) * 100, y: Number(object.boundingBox?.y ?? 0.5) * 100,
+          marker: i + 1,
+          x: anchorX * 100,
+          y: anchorY * 100,
+          attributes: Object.fromEntries(Object.entries(object.attributes ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === "string")),
           example: word?.exampleSentence ?? word?.displayText ?? "", exampleTranslation: "" };
       }),
     };

@@ -95,6 +95,12 @@ export const ChevronRightIcon = ({ size = 22, className }: IconProps) => (
   </svg>
 );
 
+export const ChevronDownIcon = ({ size = 22, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
 export const CheckIcon = ({ size = 20, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M5 12.5 10 17l9-10" />

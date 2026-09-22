@@ -1,15 +1,23 @@
 import { useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Button, Card } from "../components/ui";
+import { Button, Card, ComboBox } from "../components/ui";
 import { ArrowRightIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
 import { LeaveSession } from "../components/LeaveSession";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
-import { checkPracticeWord } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
 import type { PracticeReview } from "../lib/api";
 import type { LanguageItem } from "../data/types";
+
+const ATTRIBUTE_TYPES = ["color", "size", "shape", "material", "pattern", "state", "quantity"] as const;
+const RELATION_OPTIONS = [
+  ["leftOf", "Left of"], ["rightOf", "Right of"], ["above", "Above"], ["below", "Below"],
+  ["on", "On"], ["under", "Under"], ["in", "Inside"], ["inFrontOf", "In front of"],
+  ["behind", "Behind"], ["nextTo", "Next to"], ["near", "Near"],
+] as const;
+const RELATION_CHOICES = RELATION_OPTIONS.map(([value, label]) => ({ value, label }));
+type AnalysisPanel = "objects" | "attributes" | "relations";
 
 export function PracticeAnalysis() {
   const navigate = useNavigate();
@@ -18,12 +26,16 @@ export function PracticeAnalysis() {
   const [removed, setRemoved] = useState<string[]>([]);
   const [added, setAdded] = useState<PracticeReview["addedObjects"]>([]);
   const [relations, setRelations] = useState<PracticeReview["relations"]>(() => session?.sceneObjectRelations ?? []);
+  const [panel, setPanel] = useState<AnalysisPanel>("objects");
+  const [attributes, setAttributes] = useState<Record<string, Record<string, string>>>(() =>
+    Object.fromEntries((session?.sceneObjects ?? []).map(item => [item.id,
+      Object.fromEntries(Object.entries(item.attributes ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === "string"))])));
+  const [attributeObjectId, setAttributeObjectId] = useState(session?.sceneObjects[0]?.id ?? "");
   const [subject, setSubject] = useState("");
   const [relationText, setRelationText] = useState("");
   const [reference, setReference] = useState("");
   const [label, setLabel] = useState("");
-  const [checking, setChecking] = useState(false);
-  const [pending, setPending] = useState<{ label: string } | null>(null);
+  const [pending, setPending] = useState<{ label: string; id?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const photoRef = useRef<HTMLDivElement>(null);
   const base = `/practice/sessions/${scene.sessionId}`;
@@ -38,19 +50,20 @@ export function PracticeAnalysis() {
       <div className="analysis-loading__copy"><h2>Still working on your scene...</h2><p className="muted">This is taking longer than usual. You can check again.</p>{practiceError ? <p role="alert">{practiceError}</p> : null}<Button onClick={() => retryProcessing(session.session.id)}>Retry</Button></div>
     </section> : <section className="analysis-loading" aria-live="polite" aria-busy="true">
       <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={scene} items={[]} /><span className="analysis-scan__line" /></div>
-      <div className="analysis-loading__copy"><h2>{session.session.status === "generatingTasks" ? "Preparing your practice..." : "Finding objects in your image..."}</h2><p className="muted">This will only take a moment.</p></div>
+      <div className="analysis-loading__copy"><h2>{session.session.status === "generatingTasks" ? "Translating your scene..." : "Finding objects in your image..."}</h2><p className="muted">{session.session.status === "generatingTasks" ? "Turning your confirmed words into your learning language." : "This will only take a moment."}</p></div>
     </section>}
   </div>;
   const locked = session.tasks.some(task => task.status !== "pending");
   const kept = scene.items.filter(item => !removed.includes(item.id));
   const custom: LanguageItem[] = added.map((item, index) => ({ id: `custom-${item.id}`, word: item.label,
     translation: item.label, wordClass: "noun", gender: null, marker: scene.items.length + index + 1,
-    x: item.x * 100, y: item.y * 100, example: "", exampleTranslation: "" }));
+    x: item.x * 100, y: item.y * 100, attributes: attributes[item.id] ?? {}, example: "", exampleTranslation: "" }));
   const relationObjects = [...kept.map(item => ({ id: item.id, label: item.translation })), ...added];
   const selectedIds = new Set(relationObjects.map(item => item.id));
+  const activeAttributeObjectId = selectedIds.has(attributeObjectId) ? attributeObjectId : relationObjects[0]?.id ?? "";
   const visibleRelations = relations.filter(row => selectedIds.has(row.subjectSceneObjectId) && selectedIds.has(row.referenceSceneObjectId));
   const addRelation = () => {
-    const text = relationText.trim();
+    const text = relationText;
     if (!text || subject === reference || !selectedIds.has(subject) || !selectedIds.has(reference)) return;
     if (visibleRelations.some(row => row.subjectSceneObjectId === subject && row.referenceSceneObjectId === reference && row.relation.toLowerCase() === text.toLowerCase())) {
       setError("That relation is already in your list."); return;
@@ -58,28 +71,34 @@ export function PracticeAnalysis() {
     setRelations(current => [...current, { id: crypto.randomUUID(), subjectSceneObjectId: subject, relation: text, referenceSceneObjectId: reference, sourceRelationKey: null }]);
     setRelationText(""); setError(null);
   };
-  const startAdding = async () => {
+  const startAdding = () => {
     const word = label.trim();
-    if (!word || pending || practiceSaving || checking) return;
+    if (!word || pending || practiceSaving) return;
     if ([...kept.map(item => item.translation), ...added.map(item => item.label)].some(item => item.toLowerCase() === word.toLowerCase())) {
       setError("That word is already in your list."); return;
     }
-    setChecking(true);
-    try { await checkPracticeWord(session.session.id, word); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to check this word. Please retry."); return; }
-    finally { setChecking(false); }
     setPending({ label: word });
     setError(null);
     photoRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   };
   const place = ({ x, y }: { x: number; y: number }) => {
     if (!pending || practiceSaving) return;
-    setAdded(current => [...current, { id: crypto.randomUUID(), ...pending, x: Math.min(x / 100, 0.99), y: Math.min(y / 100, 0.99) }]);
+    const location = { x: Math.min(x / 100, 0.99), y: Math.min(y / 100, 0.99) };
+    setAdded(current => pending.id
+      ? current.map(item => item.id === pending.id ? { ...item, ...location } : item)
+      : [...current, { id: crypto.randomUUID(), label: pending.label, ...location }]);
     setPending(null); setLabel("");
+  };
+  const replaceLocation = (item: PracticeReview["addedObjects"][number]) => {
+    setPending({ id: item.id, label: item.label });
+    setError(null);
+    photoRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   };
   const proceed = async () => {
     if (pending || practiceSaving || (!kept.length && !added.length)) return;
-    if (locked || await saveReview({ acceptedObjectIds: kept.map(item => item.id), addedObjects: added, relations: visibleRelations })) navigate(`${base}/mic-test`);
+    const selectedAttributes = Object.fromEntries([...kept.map(item => item.id), ...added.map(item => item.id)]
+      .map(id => [id, attributes[id] ?? {}]));
+    if (locked || await saveReview({ acceptedObjectIds: kept.map(item => item.id), addedObjects: added, relations: visibleRelations, objectAttributes: selectedAttributes })) navigate(`${base}/mic-test`);
   };
   return <div className="stack analysis-page">
     <div className="analysis-titlebar">
@@ -97,16 +116,16 @@ export function PracticeAnalysis() {
           <ScenePhoto scene={scene} items={[...kept, ...custom]} onLocationSelect={pending ? place : undefined}
             locationLabel={pending ? `Choose the location of ${pending.label}` : undefined} />
         </div>
-        {!locked ? <form className="analysis-add-word" onSubmit={event => { event.preventDefault(); void startAdding(); }}>
-          <label className="field__label" htmlFor="analysis-new-word">Add another object you see</label>
-          <div className="analysis-add-word__controls">
-            <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={checking || practiceSaving || !!pending} onChange={event => setLabel(event.target.value)} />
-            <Button variant="secondary" type="submit" disabled={checking || !label.trim() || !!pending || practiceSaving || added.length >= 20}>{checking ? "Checking..." : "Add"}</Button>
-          </div>
-        </form> : null}
+        <div className="analysis-panel-tabs" role="tablist" aria-label="Scene analysis details">
+          {(["objects", "attributes", "relations"] as const).map(value => <button key={value} type="button" role="tab"
+            aria-selected={panel === value} className={panel === value ? "is-active" : ""} onClick={() => setPanel(value)}>
+            {value[0].toUpperCase() + value.slice(1)}
+            <span>{value === "objects" ? kept.length + added.length : value === "attributes" ? Object.values(attributes).reduce((sum, row) => sum + Object.values(row).filter(Boolean).length, 0) : visibleRelations.length}</span>
+          </button>)}
+        </div>
       </div>
       <div className="analysis-review-column">
-        <section className="analysis-results" aria-labelledby="analysis-found-title">
+        {panel === "objects" ? <section className="analysis-results" aria-labelledby="analysis-found-title">
           <div><h2 id="analysis-found-title">{kept.length + added.length} words selected</h2>
             <p className="muted">{locked ? "Your lesson has started. Start a new practice to change its words." : "Keep what matches your photo. Remove or add anything you need."}</p>
           </div>
@@ -115,28 +134,51 @@ export function PracticeAnalysis() {
               {kept.map(item => <div className="analysis-word-row" key={item.id}>
                 <span className="analysis-word-row__marker">{item.marker}</span>
                 <div className="grow"><strong>{item.translation}</strong></div>
-                {!locked ? <button className="analysis-word-row__remove" type="button" disabled={checking || practiceSaving} aria-label={`Remove ${item.translation}`}
+                {!locked ? <button className="analysis-word-row__remove" type="button" disabled={practiceSaving} aria-label={`Remove ${item.translation}`}
                   onClick={() => setRemoved(current => [...current, item.id])}><CloseIcon size={18} /></button> : null}
               </div>)}
               {added.map((item, index) => <div className="analysis-word-row" key={item.id}>
                 <span className="analysis-word-row__marker analysis-word-row__marker--custom">{scene.items.length + index + 1}</span>
                 <div className="grow"><strong>{item.label}</strong>
+                  <button className="analysis-location-action" type="button" disabled={practiceSaving || !!pending}
+                    onClick={() => replaceLocation(item)}>Change location</button>
                 </div>
-                <button className="analysis-word-row__remove" type="button" disabled={checking || practiceSaving} aria-label={`Remove ${item.label}`}
+                <button className="analysis-word-row__remove" type="button" disabled={practiceSaving} aria-label={`Remove ${item.label}`}
                   onClick={() => setAdded(current => current.filter(row => row.id !== item.id))}><CloseIcon size={18} /></button>
               </div>)}
               {!kept.length && !added.length ? <p className="small muted">Add a word you can see below.</p> : null}
             </div>
             {removed.length ? (
               <div className="analysis-restore">
-                <Button variant="quiet" disabled={checking || practiceSaving} onClick={() => setRemoved([])}>
+                <Button variant="quiet" disabled={practiceSaving} onClick={() => setRemoved([])}>
                   Restore removed words
                 </Button>
               </div>
             ) : null}
           </Card>
-        </section>
-        <section className="analysis-results" aria-labelledby="analysis-relations-title">
+          {!locked ? <form className="analysis-add-word" onSubmit={event => { event.preventDefault(); startAdding(); }}>
+            <label className="field__label" htmlFor="analysis-new-word">Add another object you see</label>
+            <div className="analysis-add-word__controls">
+              <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={practiceSaving || !!pending} onChange={event => setLabel(event.target.value)} />
+              <Button variant="secondary" type="submit" disabled={!label.trim() || !!pending || practiceSaving || added.length >= 20}>Select location</Button>
+            </div>
+          </form> : null}
+        </section> : null}
+        {panel === "attributes" ? <section className="analysis-results" aria-labelledby="analysis-attributes-title">
+          <div><h2 id="analysis-attributes-title">Visible attributes</h2><p className="muted">Correct only what you can clearly see in the photo.</p></div>
+          <Card plain className="analysis-word-card analysis-attribute-card">
+            <label className="field__label" htmlFor="attribute-object">Object</label>
+            <ComboBox id="attribute-object" value={activeAttributeObjectId}
+              options={relationObjects.map(item => ({ value: item.id, label: item.label }))}
+              onChange={setAttributeObjectId} />
+            <div className="analysis-attribute-fields">
+              {ATTRIBUTE_TYPES.map(type => { const value = attributes[activeAttributeObjectId]?.[type] ?? ""; return <label key={type}><span>{type}</span><input className={`input${value.trim() ? " is-filled" : ""}`} value={value}
+                placeholder={`No ${type}`} disabled={locked || practiceSaving} onChange={event => setAttributes(current => ({ ...current,
+                  [activeAttributeObjectId]: { ...(current[activeAttributeObjectId] ?? {}), [type]: event.target.value } }))} /></label>; })}
+            </div>
+          </Card>
+        </section> : null}
+        {panel === "relations" ? <section className="analysis-results" aria-labelledby="analysis-relations-title">
           <h2 id="analysis-relations-title">How objects relate</h2>
           <p className="muted">Keep or add connections you can see, such as a cup on a table. Removing a word also removes its connections.</p>
           <Card plain className="analysis-word-card">
@@ -145,7 +187,12 @@ export function PracticeAnalysis() {
                 <span className="analysis-word-row__marker analysis-relation-row__marker">{index + 1}</span>
                 <div className="analysis-relation-row__flow">
                   <strong>{relationObjects.find(item => item.id === row.subjectSceneObjectId)?.label}</strong>
-                  <span className="analysis-relation-row__relation">{row.relation}</span>
+                  {locked ? <span className="analysis-relation-row__relation">{RELATION_OPTIONS.find(option => option[0] === row.relation)?.[1] ?? row.relation}</span> :
+                    <ComboBox compact ariaLabel="Connection" value={row.relation}
+                      options={!RELATION_OPTIONS.some(option => option[0] === row.relation)
+                        ? [{ value: row.relation, label: row.relation }, ...RELATION_CHOICES]
+                        : RELATION_CHOICES}
+                      onChange={value => setRelations(current => current.map(item => item.id === row.id ? { ...item, relation: value } : item))} />}
                   <strong>{relationObjects.find(item => item.id === row.referenceSceneObjectId)?.label}</strong>
                 </div>
                 {!locked ? <button type="button" className="analysis-word-row__remove" disabled={practiceSaving} aria-label={`Remove relation ${row.relation}`} onClick={() => setRelations(current => current.filter(item => item.id !== row.id))}><CloseIcon size={18} /></button> : null}
@@ -154,23 +201,21 @@ export function PracticeAnalysis() {
             </div>
             {!locked ? <form className="stack" onSubmit={event => { event.preventDefault(); addRelation(); }}>
               <label className="field__label" htmlFor="relation-subject">Object</label>
-              <select className="input" id="relation-subject" value={subject} disabled={practiceSaving} onChange={event => setSubject(event.target.value)}>
-                <option value="">Choose an object</option>
-                {relationObjects.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
+              <ComboBox id="relation-subject" value={subject} disabled={practiceSaving} placeholder="Choose an object"
+                options={relationObjects.map(item => ({ value: item.id, label: item.label }))} onChange={setSubject} />
               <label className="field__label" htmlFor="relation-text">Connection</label>
-              <input className="input" id="relation-text" value={relationText} maxLength={200} placeholder="e.g. on, beside, under" disabled={practiceSaving} onChange={event => setRelationText(event.target.value)} />
+              <ComboBox id="relation-text" value={relationText} disabled={practiceSaving} placeholder="Choose a connection"
+                options={RELATION_CHOICES} onChange={setRelationText} />
               <label className="field__label" htmlFor="relation-reference">Related object</label>
-              <select className="input" id="relation-reference" value={reference} disabled={practiceSaving} onChange={event => setReference(event.target.value)}>
-                <option value="">Choose another object</option>
-                {relationObjects.filter(item => item.id !== subject).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
+              <ComboBox id="relation-reference" value={reference} disabled={practiceSaving} placeholder="Choose another object"
+                options={relationObjects.filter(item => item.id !== subject).map(item => ({ value: item.id, label: item.label }))}
+                onChange={setReference} />
               <Button type="submit" variant="secondary" disabled={practiceSaving || !relationText.trim() || subject === reference || !selectedIds.has(subject) || !selectedIds.has(reference) || visibleRelations.length >= 100}>Add connection</Button>
             </form> : null}
           </Card>
-        </section>
+        </section> : null}
         {error || practiceError ? <p role="alert">{error ?? practiceError}</p> : null}
-        <Button block className="analysis-continue" disabled={checking || practiceSaving || !!pending || (!kept.length && !added.length)} onClick={() => void proceed()}>
+        <Button block className="analysis-continue" disabled={practiceSaving || !!pending || (!kept.length && !added.length)} onClick={() => void proceed()}>
           {practiceSaving ? "Saving your words..." : "Continue"} <ArrowRightIcon />
         </Button>
       </div>

@@ -15,7 +15,7 @@ export function taskTitle(task: SessionTask) {
   const content = task.publicContent;
   if ("title" in content) return content.title;
   const labels: Partial<Record<SessionTask["kind"], string>> = {
-    pronunciationPractice: "Practise pronunciation", grammarPractice: "Practise grammar",
+    grammarPractice: "Practise grammar",
     sentenceBuilding: "Build a sentence", ispyRound: "Linguini clues", reflection: "Your reflection",
   };
   return labels[task.kind] ?? "Practise";
@@ -25,6 +25,9 @@ export function taskDescription(task: SessionTask) {
   const content = task.publicContent;
   if ("prompt" in content) return content.prompt;
   if ("explanation" in content) return content.explanation;
-  if (content.kind === "vocabularyIntroduction") return `${content.targetText} · ${content.translation}`;
+  if (content.kind === "vocabularyIntroduction") {
+    if (content.words?.length) return `${content.words.length} words from your scene`;
+    return `${content.targetText ?? "Vocabulary"} · ${content.translation ?? "Review"}`;
+  }
   return content.clue;
 }
