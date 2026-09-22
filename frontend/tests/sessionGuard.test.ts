@@ -262,22 +262,22 @@ test("finishing the last learning task keeps the task page showing its feedback"
   assert.equal(shown(), "page-learn-task");
 });
 
-test("a session leaving the analysis stage forwards the mic check underneath the learner", async () => {
+test("analysis stays visible during generation and forwards when ready", async () => {
   fixture = detail("awaitingObjectReview");
   await mount(`${BASE}/analysis`);
   assert.equal(shown(), "page-analysis");
   await advance(detail("generatingTasks"));
-  assert.equal(shown(), "page-mic-test");
-  await advance(detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
+  assert.equal(shown(), "page-analysis");
+  await advance(detail("ready"));
   assert.equal(shown(), "page-mic-test");
 });
 
-test("the analysis page redirects to the mic check once review is submitted", async () => {
+test("resuming generation forwards to mic check after generation finishes", async () => {
   fixture = detail("generatingTasks");
   await mount(`${BASE}/analysis`);
-  // Task generation is still in flight, so the session loader polls for up to a
-  // minute before the guard can re-validate and forward to the mic check.
-  for (let i = 0; i < 70 && shown() !== "page-mic-test"; i += 1) {
+  assert.notEqual(shown(), "page-mic-test");
+  fixture = detail("ready");
+  for (let i = 0; i < 5 && shown() !== "page-mic-test"; i += 1) {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 1000)); });
   }
   assert.equal(shown(), "page-mic-test");
