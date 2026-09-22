@@ -617,9 +617,6 @@ class PostgresWorkflowRepository:
 
     def _run_scene_analysis(self, session_id, profile_id, claimed, asset, profile, scene):
         """Model round-trip, off the request path. Must never raise to its runner."""
-        # TEMPORARY authorized testing delay; remove after timing/resume checks.
-        import time
-        time.sleep(20)
         try:
             result = self.analyzer.analyze(
                 claimed, asset, profile, scene
@@ -707,9 +704,6 @@ class PostgresWorkflowRepository:
 
     def _run_task_generation(self, session_id, profile_id):
         """Translator + lesson generation, off the request path. Never re-raises."""
-        # TEMPORARY authorized testing delay; remove after timing/resume checks.
-        import time
-        time.sleep(20)
         try:
             self._generate_tasks(session_id, profile_id)
         except Exception:
