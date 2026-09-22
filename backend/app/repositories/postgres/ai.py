@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from app.database import read_connection
 from app.repositories.ai import AiRunConflictError, AiRunNotFoundError, AiRunStorageError
 from app.schemas.ai import AiGenerationRun, AiGenerationRunCompletion
 from app.schemas.base import utc_now
@@ -76,7 +77,7 @@ class PostgresAiGenerationRunRepository:
 
     def get(self, run_id: UUID) -> AiGenerationRun | None:
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 row = (
                     connection.execute(
                         select(ai_generation_runs).where(
@@ -101,7 +102,7 @@ class PostgresAiGenerationRunRepository:
         if journal_id is not None:
             statement = statement.where(ai_generation_runs.c.journal_id == journal_id)
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 return [
                     AiGenerationRun.model_validate(dict(row))
                     for row in connection.execute(

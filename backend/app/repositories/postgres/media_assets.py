@@ -19,6 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from app.database import read_connection
 from app.repositories.media_assets import (
     MediaAssetConflictError,
     MediaAssetStorageError,
@@ -53,7 +54,7 @@ class PostgresMediaAssetRepository:
         if not asset_ids:
             return {}
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 rows = connection.execute(
                     select(media_assets).where(media_assets.c.id.in_(asset_ids))
                 ).mappings()
@@ -67,7 +68,7 @@ class PostgresMediaAssetRepository:
         from app.repositories.postgres.practice import sessions
 
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 rows = connection.execute(
                     select(
                         sessions.c.id.label("session_id"),

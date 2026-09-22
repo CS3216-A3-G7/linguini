@@ -1,7 +1,7 @@
 import { practiceScene } from "../lib/practiceScene";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMedia, getPractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
 import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
@@ -27,14 +27,16 @@ function SessionLoader({ id }: { id: string }) {
   // re-validated while the pathname stays the same — Back/Forward and every
   // in-app move change the pathname, so they are always checked.
   const checked = useRef<{ path: string; allowed: boolean } | null>(null);
+  const queryClient = useQueryClient();
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
     const initial = await getPractice(id);
     const media = await getMedia(initial.mediaAsset.id);
+    queryClient.setQueryData(queryKeys.media(initial.mediaAsset.id), media.signedUrl);
     if (!signal?.aborted) setPreview(practiceScene(initial, media, learner.language));
-    const loaded = await loadSession(id);
+    const loaded = await loadSession(id, initial);
     setDetail(loaded);
     return practiceScene(loaded, media, learner.language);
-  }, [id, loadSession, learner.language]);
+  }, [id, loadSession, learner.language, queryClient]);
   // Side-effecting session resolution: never served from or retained in cache.
   const { data, isPending: loading, error: queryErrorValue } = useQuery({
     queryKey: queryKeys.sessionScene(id),

@@ -22,13 +22,13 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
   const sessionLoads = useRef(new Map<string, Promise<PracticeDetail>>());
   const creation = useRef<{ asset: string; key: string } | null>(null);
   const [micReady, setMicReady] = useState(false);
-  const loadSession = useCallback((id: string) => {
+  const loadSession = useCallback((id: string, initial?: PracticeDetail) => {
     const existing = sessionLoads.current.get(id);
     if (existing) return existing;
     const request = (async () => {
     const version = ++loadVersion.current;
     setStalled(false);
-    let data = await getPractice(id);
+    let data = initial ?? await getPractice(id);
     if (data.session.status === "created") {
       try { data = await analyzePractice(id); }
       catch (error) {

@@ -2,7 +2,7 @@
 
 import os
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Connection, Engine, create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
@@ -38,3 +38,8 @@ def create_database_engine() -> Engine:
         connect_args={"connect_timeout": 10},
         hide_parameters=True,
     )
+
+
+def read_connection(engine: Engine) -> Connection:
+    """Single-statement reads need no transaction; AUTOCOMMIT avoids BEGIN/ROLLBACK round trips."""
+    return engine.connect().execution_options(isolation_level="AUTOCOMMIT")
