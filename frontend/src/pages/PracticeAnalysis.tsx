@@ -98,7 +98,13 @@ export function PracticeAnalysis() {
     if (pending || practiceSaving || (!kept.length && !added.length)) return;
     const selectedAttributes = Object.fromEntries([...kept.map(item => item.id), ...added.map(item => item.id)]
       .map(id => [id, attributes[id] ?? {}]));
-    if (locked || await saveReview({ acceptedObjectIds: kept.map(item => item.id), addedObjects: added, relations: visibleRelations, objectAttributes: selectedAttributes })) navigate(`${base}/mic-test`);
+    if (locked) {
+      navigate(`${base}/mic-test`);
+      return;
+    }
+    // Stay on the translating screen while background generation runs.
+    // SessionRoute forwards to the mic check when the session becomes ready.
+    await saveReview({ acceptedObjectIds: kept.map(item => item.id), addedObjects: added, relations: visibleRelations, objectAttributes: selectedAttributes });
   };
   return <div className="stack analysis-page">
     <div className="analysis-titlebar">

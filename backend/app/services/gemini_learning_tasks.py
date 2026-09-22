@@ -13,9 +13,10 @@ from app.services.learning_tasks import (
     DEFAULT_PROMPT_PATH,
     GENERATION_FORMAT_INSTRUCTION,
     LearningTaskGenerationError,
-    generation_response_model,
+    normalize_learning_task_option_ids,
     normalize_learning_task_references,
     required_task_focuses,
+    scene_generation_response_model,
     unpack_generated_tasks,
     validate_learning_tasks,
 )
@@ -45,7 +46,7 @@ class GeminiLearningTaskGenerator:
     def generate(self, payload: dict[str, Any]) -> LearningTaskResult:
         focuses = required_task_focuses(payload)
         payload = {**payload, "requiredTaskFocuses": list(focuses)}
-        response_model = generation_response_model(focuses)
+        response_model = scene_generation_response_model(payload)
         try:
             response = self.client.models.generate_content(
                 model=self.model,
@@ -63,6 +64,7 @@ class GeminiLearningTaskGenerator:
                 payload, response_model.model_validate_json(response.text)
             )
             result = normalize_learning_task_references(payload, result)
+            result = normalize_learning_task_option_ids(result)
             validate_learning_tasks(payload, result)
             return result
         except LearningTaskGenerationError:

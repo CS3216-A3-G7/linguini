@@ -1,7 +1,8 @@
+import hashlib
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 
 from app.api.dependencies import get_active_language, get_media_asset_service, get_scene_service
 from app.schemas.media import (
@@ -12,6 +13,7 @@ from app.schemas.media import (
     PreloadedScene,
 )
 from app.schemas.scenes import PreloadedSceneCatalogDetail
+from app.services.image_derivatives import ALLOWED_WIDTHS
 from app.services.media_assets import MediaAssetService
 from app.services.scenes import SceneService
 
@@ -24,6 +26,32 @@ def get_media_asset(
     service: Annotated[MediaAssetService, Depends(get_media_asset_service)],
 ) -> MediaAssetResponse:
     return service.read_asset(asset_id)
+
+
+IMAGE_CACHE_HEADERS = "private, max-age=31536000, immutable"
+
+
+@router.get("/media/{asset_id}/image")
+def get_media_image(
+    asset_id: UUID,
+    service: Annotated[MediaAssetService, Depends(get_media_asset_service)],
+    if_none_match: Annotated[str | None, Header()] = None,
+    width: Annotated[int, Query()] = 640,
+) -> Response:
+    if width not in ALLOWED_WIDTHS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "invalid_width",
+                "message": "Width must be one of 320, 640 or 1280.",
+            },
+        )
+    data = service.read_image(asset_id, width)
+    etag = f'"{hashlib.sha256(data).hexdigest()}"'
+    headers = {"Cache-Control": IMAGE_CACHE_HEADERS, "ETag": etag}
+    if if_none_match == etag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+    return Response(content=data, media_type="image/webp", headers=headers)
 
 
 @router.post("/media/upload-url", response_model=CreateUploadUrlResponse)

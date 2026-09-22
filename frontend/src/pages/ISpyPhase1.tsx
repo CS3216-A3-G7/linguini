@@ -38,6 +38,11 @@ function ClueRound({ task, index, total, onNext }: { task: SessionTask; index: n
   const submitting = useRef(false);
   const content = task.publicContent;
   if (content.kind !== "ispyRound") return null;
+  const opening = scene.languageCode === "es"
+    ? "Veo, veo, algo que"
+    : scene.languageCode === "fr"
+      ? "Je vois, je vois, quelque chose qui"
+      : "I spy with my little eye, something that";
   const answered = taskDone(task);
   const choose = async (optionId: string) => {
     if (answered || practiceSaving || submitting.current) return;
@@ -58,8 +63,8 @@ function ClueRound({ task, index, total, onNext }: { task: SessionTask; index: n
     <ProgressTrail value={index + (answered ? 1 : 0)} total={total} label={`${index + 1} / ${total}`} />
     <ScenePhoto scene={scene} activeItemId={result?.attempt?.isCorrect ? selected?.sceneObjectId : null} />
     <div className="card card--lifted stack-2">
-      <div className="spread"><span className="label muted">Linguini says</span><IconButton label="Hear the clue" onClick={() => speak(content.clue, scene.languageCode)}><SpeakerIcon /></IconButton></div>
-      <h3>{content.clue}</h3>
+      <div className="spread"><span className="label muted">Linguini says</span><IconButton label="Hear the clue" onClick={() => speak(`${opening} ${content.clue}`, scene.languageCode)}><SpeakerIcon /></IconButton></div>
+      <h3>{opening} {content.clue}</h3>
       {content.clueTranslation ? showTranslation ? <p className="small muted">{content.clueTranslation}</p> : <Button variant="quiet" onClick={() => setShowTranslation(true)}>Show translation</Button> : null}
     </div>
     <div className="choice-grid">{content.options.map(option => {

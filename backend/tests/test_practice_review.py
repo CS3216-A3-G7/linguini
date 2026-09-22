@@ -172,8 +172,9 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
         status="inProgress",
     )
     generating = in_progress.model_copy(update={"status": "generatingTasks"})
-    # Phase A claims the rebuild, then the background job reads the session twice.
-    repo._session = MagicMock(side_effect=[in_progress, generating, generating])
+    # Phase A claims the rebuild, then the background job reads the session once
+    # per phase that re-checks the generatingTasks claim.
+    repo._session = MagicMock(side_effect=[in_progress, generating, generating, generating])
     repo._tasks = lambda *args: []
     repo._detail = MagicMock(side_effect=[detail, detail, generated])
     repo.review(session_id, profile_id, ReviewPracticeRequest(accepted_object_ids=[objects[1].id]))

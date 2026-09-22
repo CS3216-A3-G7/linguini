@@ -8,8 +8,8 @@ import pytest
 from app.services.gemini_learning_tasks import GeminiLearningTaskGenerator
 from app.services.learning_tasks import (
     LearningTaskGenerationError,
-    generation_response_model,
     required_task_focuses,
+    scene_generation_response_model,
 )
 from tests.test_openai_learning_tasks import INPUT, tasks
 
@@ -41,7 +41,7 @@ def test_generation_returns_the_required_tasks_for_one_relationship(tmp_path):
         "chainedDescription",
     ]
     call = client.models.generate_content.call_args.kwargs
-    response_model = generation_response_model(required_task_focuses(INPUT))
+    response_model = scene_generation_response_model(INPUT)
     assert call["config"].response_json_schema == response_model.model_json_schema(
         by_alias=True
     )

@@ -51,9 +51,15 @@ from app.schemas.vocabulary import (
     VocabularyTranslation,
 )
 from app.services.background import InlineBackgroundRunner
-from app.services.learning_tasks import LearningTaskGenerationError, required_task_focuses
+from app.services.ispy_clues import ISpyClueGenerationError
+from app.services.learning_tasks import required_task_focuses
 from app.services.scene_analysis import DeterministicSceneAnalyzer
-from app.services.session_plan import bootstrap_word, build_grammar_lessons, build_tasks
+from app.services.session_plan import (
+    bootstrap_word,
+    build_grammar_lessons,
+    build_ispy_clue_tasks,
+    build_tasks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +131,25 @@ def _learning_task_payload(translation_payload, translated_scene, scene_relation
     return payload
 
 
+def _ispy_clue_payload(translation_payload, translated_scene, objects, scene_relations=()):
+    """Give the clue model translated scene facts and positions, never the image itself."""
+    payload = _learning_task_payload(translation_payload, translated_scene, scene_relations)
+    positions = {
+        str(obj.id): (
+            obj.bounding_box.model_dump() if obj.bounding_box is not None else {}
+        )
+        for obj in objects
+    }
+    for item in payload["objects"]:
+        box = positions.get(item["key"], {})
+        item["anchorPoint"] = {
+            "x": round(float(box.get("x", 0.5)) + float(box.get("width", 0)) / 2, 3),
+            "y": round(float(box.get("y", 0.5)) + float(box.get("height", 0)) / 2, 3),
+        }
+    payload.pop("requiredTaskFocuses", None)
+    return payload
+
+
 def parse_session(row):
     return Session.model_validate({k: row[k] for k in Session.model_fields})
 
@@ -153,12 +178,14 @@ class PostgresWorkflowRepository:
         analyzer=None,
         translator=None,
         learning_task_generator=None,
+        ispy_clue_generator=None,
         background=None,
     ):
         self.engine, self.user_id = engine, user_id
         self.analyzer = analyzer or DeterministicSceneAnalyzer(engine)
         self.translator = translator
         self.learning_task_generator = learning_task_generator
+        self.ispy_clue_generator = ispy_clue_generator
         self.background = background or InlineBackgroundRunner()
 
     @contextmanager
@@ -835,6 +862,7 @@ class PostgresWorkflowRepository:
 
     def _generate_tasks(self, session_id, profile_id):
         lessons = []
+        ispy_clues = []
         translated_scene = None
         # Phase 1: read everything the provider calls need, then let go of the
         # connection before the model round-trips start.
@@ -887,14 +915,17 @@ class PostgresWorkflowRepository:
                             )
                         ),
                     )
-                except LearningTaskGenerationError:
-                    raise
-                except Exception as exc:
-                    raise LearningTaskGenerationError(
-                        "Learning tasks could not be built."
-                    ) from exc
+                except Exception:
+                    # AI grammar is an enhancement. A bad provider response
+                    # must not abandon a learner's otherwise valid session.
+                    logger.exception(
+                        "Learning-task generation failed for session %s; "
+                        "using the deterministic lesson plan.",
+                        session_id,
+                    )
         # Phase 3: bail if the session left generatingTasks while the models ran,
-        # then persist the rebuild in one transaction.
+        # persist the translation, and capture the inputs the I-Spy call needs.
+        clue_words = []
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
             if session.status != "generatingTasks":
@@ -930,6 +961,31 @@ class PostgresWorkflowRepository:
                 session = session.model_copy(update={"analysis_draft": draft})
                 detail = self._detail(c, session)
                 objects = list(detail.scene_objects)
+                words_by_id = {word.id: word for word in detail.vocabulary}
+                clue_words = [words_by_id[obj.vocabulary_item_id] for obj in objects]
+        # Phase 4: the I-Spy clue call also runs with no connection held.
+        if self.ispy_clue_generator and translated_scene is not None:
+            try:
+                ispy_clues = build_ispy_clue_tasks(
+                    session_id,
+                    self.ispy_clue_generator.generate(
+                        _ispy_clue_payload(
+                            payload, translated_scene, objects,
+                            detail.scene_object_relations,
+                        )
+                    ),
+                    objects,
+                    clue_words,
+                )
+            except ISpyClueGenerationError:
+                # A clue is additive. Keep the deterministic round instead of
+                # failing a learner's complete practice session.
+                logger.exception("I-Spy clue generation failed for session %s.", session_id)
+        # Phase 5: re-check the claim, then build and insert the rebuilt plan.
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.status != "generatingTasks":
+                return
             words_by_id = {word.id: word for word in detail.vocabulary}
             translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
             if any(
@@ -954,6 +1010,11 @@ class PostgresWorkflowRepository:
                     *[task for task in rebuilt if task.kind == "vocabularyIntroduction"],
                     *lessons,
                     *[task for task in rebuilt if task.kind in {"ispyRound", "reflection"}],
+                ]
+            if ispy_clues:
+                rebuilt = [
+                    *[task for task in rebuilt if task.kind != "ispyRound"],
+                    *ispy_clues,
                 ]
             for index, task in enumerate(rebuilt):
                 task.order_index = index

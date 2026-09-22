@@ -29,11 +29,13 @@ from app.repositories.users import UserRepository
 from app.services.gemini_learning_tasks import GeminiLearningTaskGenerator
 from app.services.gemini_scene_analysis import GeminiSceneAnalyzer, RoutedSceneAnalyzer
 from app.services.gemini_translation import GeminiSceneTranslator
+from app.services.image_derivatives import ImageDerivatives
 from app.services.image_storage import ImageStorage
 from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
+from app.services.openai_ispy_clues import OpenAIISpyClueGenerator
 from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
 from app.services.openai_scene_analysis import OpenAISceneAnalyzer
 from app.services.openai_translation import OpenAISceneTranslator
@@ -113,6 +115,22 @@ def get_media_asset_repository(request: Request) -> MediaAssetRepository:
     return PostgresMediaAssetRepository(request.app.state.database_engine)
 
 
+# One shared derivative cache per process so its LRU survives across requests.
+_IMAGE_DERIVATIVES: ImageDerivatives | None = None
+
+
+def get_image_derivatives() -> ImageDerivatives:
+    global _IMAGE_DERIVATIVES
+    if _IMAGE_DERIVATIVES is None:
+        _IMAGE_DERIVATIVES = ImageDerivatives(
+            ImageStorage(
+                os.getenv("SUPABASE_URL", "").strip(),
+                os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+            )
+        )
+    return _IMAGE_DERIVATIVES
+
+
 def get_media_asset_service(
     repository: Annotated[MediaAssetRepository, Depends(get_media_asset_repository)],
     users: Annotated[UserService, Depends(get_user_service)],
@@ -124,14 +142,14 @@ def get_media_asset_service(
             os.getenv("SUPABASE_URL", "").strip(),
             os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
         ),
+        get_image_derivatives(),
     )
 
 
 def get_scene_service(
     repository: Annotated[SceneRepository, Depends(get_scene_repository)],
-    media: Annotated[MediaAssetRepository, Depends(get_media_asset_repository)],
 ) -> SceneService:
-    return SceneService(repository, media, get_media_public_base_url(), get_private_media_urls())
+    return SceneService(repository, get_media_public_base_url(), get_private_media_urls())
 
 
 def get_practice_repository(
@@ -234,12 +252,28 @@ def get_practice_repository(
         )
     else:
         raise ValueError(f"Unsupported LEARNING_TASK_PROVIDER: {learning_task_provider}")
+    ispy_clue_provider = os.getenv("ISPY_CLUE_PROVIDER", "openai").strip().casefold()
+    ispy_clue_timeout = int(os.getenv("ISPY_CLUE_TIMEOUT_SECONDS", "60"))
+    if ispy_clue_provider == "openai":
+        ispy_clue_model = os.getenv("OPENAI_ISPY_CLUE_MODEL", "gpt-4o-mini").strip()
+        ispy_clue_generator = (
+            OpenAIISpyClueGenerator(
+                openai_key, ispy_clue_model, timeout_seconds=ispy_clue_timeout
+            )
+            if openai_key and ispy_clue_model
+            else None
+        )
+    elif ispy_clue_provider == "none":
+        ispy_clue_generator = None
+    else:
+        raise ValueError(f"Unsupported ISPY_CLUE_PROVIDER: {ispy_clue_provider}")
     return PostgresWorkflowRepository(
         engine,
         demo_user_id,
         analyzer=analyzer,
         translator=translator,
         learning_task_generator=learning_task_generator,
+        ispy_clue_generator=ispy_clue_generator,
         background=getattr(request.app.state, "background_runner", None),
     )
 

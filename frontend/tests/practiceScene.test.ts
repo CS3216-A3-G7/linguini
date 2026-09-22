@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { practiceScene } from "../src/lib/practiceScene.ts";
 import { applyTaskResult } from "../src/lib/practiceUpdates.ts";
-import type { PracticeDetail, TaskActionResult, UploadedImage } from "../src/lib/api.ts";
+import type { PracticeDetail, TaskActionResult } from "../src/lib/api.ts";
 
 const detail: PracticeDetail = {
   session: { id: "session", status: "inProgress", sceneMediaAssetId: "asset", sessionTitle: null, sessionSummary: null, failureCode: null },
@@ -14,7 +14,7 @@ const detail: PracticeDetail = {
   translations: [{ vocabularyItemId: "unrelated", translatedText: "wrong translation" }, { vocabularyItemId: "word", translatedText: "chair" }],
   tasks: [], nextTaskId: null, progress: { completedTaskCount: 0, skippedTaskCount: 0, totalTaskCount: 8, terminalTaskCount: 0 },
 };
-const media: UploadedImage = { id: "asset", signedUrl: "https://example.test/signed-image", mimeType: "image/jpeg", width: 800, height: 600 };
+const imageUrl = "https://example.test/image?width=1280";
 
 const saved: TaskActionResult = {
   task: { id: "task", kind: "reflection", phase: "learning", status: "completed", isSkippable: true,
@@ -39,11 +39,11 @@ test("a saved task updates its session's persisted task and progress", () => {
 });
 
 for (const source of ["preloaded", "camera", "userUpload"] as const) {
-  test(`${source} uses the normalized scene contract and signed media`, () => {
-    const scene = practiceScene({ ...detail, mediaAsset: { id: "asset", source }, sceneId: source === "preloaded" ? "bedroom" : null }, media, "Spanish");
+  test(`${source} uses the normalized scene contract and the supplied image URL`, () => {
+    const scene = practiceScene({ ...detail, mediaAsset: { id: "asset", source }, sceneId: source === "preloaded" ? "bedroom" : null }, imageUrl, "Spanish");
     assert.equal(scene.sessionId, "session");
     assert.equal(scene.isUploaded, source !== "preloaded");
-    assert.equal(scene.imageUrl, media.signedUrl);
+    assert.equal(scene.imageUrl, imageUrl);
     assert.equal(scene.items[0].word, "silla");
     assert.equal(scene.items[0].translation, "chair");
     assert.equal(scene.items[0].id, "object");
@@ -53,7 +53,7 @@ for (const source of ["preloaded", "camera", "userUpload"] as const) {
 }
 
 test("a missing vocabulary join falls back to the object's label without inventing a translation", () => {
-  const scene = practiceScene({ ...detail, vocabulary: [], translations: [] }, media, "Spanish");
+  const scene = practiceScene({ ...detail, vocabulary: [], translations: [] }, imageUrl, "Spanish");
   assert.equal(scene.items[0].word, "chair");
   assert.equal(scene.items[0].translation, "chair");
 });
@@ -63,7 +63,7 @@ test("reviewed scenes contain confirmed objects and retain translations and mark
   const reviewed: PracticeDetail = { ...detail, sceneObjects: [
     { ...detail.sceneObjects[0], id: "kept" },
   ] };
-  const scene = practiceScene(reviewed, media, "Spanish");
+  const scene = practiceScene(reviewed, imageUrl, "Spanish");
   assert.equal(scene.items.length, 1);
   assert.equal(scene.items[0].id, "kept");
   assert.equal(scene.items[0].translation, "chair");
@@ -73,6 +73,6 @@ test("reviewed scenes contain confirmed objects and retain translations and mark
 
 
 test("objects without a bounding box use a safe marker fallback", () => {
-  const scene = practiceScene({ ...detail, sceneObjects: [{ ...detail.sceneObjects[0], boundingBox: null }] }, media, "Spanish");
+  const scene = practiceScene({ ...detail, sceneObjects: [{ ...detail.sceneObjects[0], boundingBox: null }] }, imageUrl, "Spanish");
   assert.deepEqual([scene.items[0].x, scene.items[0].y], [50, 50]);
 });
