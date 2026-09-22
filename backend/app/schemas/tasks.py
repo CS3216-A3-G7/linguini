@@ -186,6 +186,7 @@ class TaskAnswerKey(ApiModel):
     evaluation_notes: str | None = None
     correct_option_ids: dict[str, str] = Field(default_factory=dict)
     accepted_text_answers_by_vocabulary_id: dict[str, list[str]] = Field(default_factory=dict)
+    scene_description_context: JsonObject | None = None
 
 
 class SessionTask(EntityModel):
@@ -212,7 +213,10 @@ class SessionTask(EntityModel):
             raise ValueError("publicContent.kind must match task kind")
         if self.kind is TaskKind.ISPY_ROUND and self.phase is not TaskPhase.ISPY:
             raise ValueError("ispyRound tasks must belong to the ispy phase")
-        if self.kind is not TaskKind.ISPY_ROUND and self.phase is TaskPhase.ISPY:
+        if (
+            self.kind not in {TaskKind.ISPY_ROUND, TaskKind.REFLECTION}
+            and self.phase is TaskPhase.ISPY
+        ):
             raise ValueError("only ispyRound tasks may belong to the ispy phase")
         if self.status is TaskStatus.COMPLETED and self.completed_at is None:
             raise ValueError("completed tasks require completedAt")
