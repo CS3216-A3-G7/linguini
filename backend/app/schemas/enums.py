@@ -179,21 +179,3 @@ class XpEventType(StrEnum):
     PERFECT_SESSION = "perfectSession"
     JOURNAL_ENTRY = "journalEntry"
     LEGACY_BACKFILL = "legacyBackfill"
-
-
-class AiFeature(StrEnum):
-    SCENE_ANALYSIS = "sceneAnalysis"
-    VOCABULARY_GENERATION = "vocabularyGeneration"
-    SESSION_PLAN_GENERATION = "sessionPlanGeneration"
-    CLUE_GENERATION = "clueGeneration"
-    ATTEMPT_EVALUATION = "attemptEvaluation"
-    SPEECH_TRANSCRIPTION = "speechTranscription"
-    PRONUNCIATION_EVALUATION = "pronunciationEvaluation"
-    JOURNAL_FEEDBACK = "journalFeedback"
-    JOURNAL_WORD_MATCHING = "journalWordMatching"
-
-
-class AiRunStatus(StrEnum):
-    PENDING = "pending"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"

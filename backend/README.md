@@ -183,7 +183,6 @@ See [Supabase public URLs](https://supabase.com/docs/reference/javascript/file-b
 | Practice | `sessions`, `scene_objects` |
 | Tasks | `session_tasks`, `task_attempts`, `task_hints` |
 | Journals | `journals`, `journal_media`, `journal_revisions`, `journal_suggestions`, `journal_word_mentions` |
-| AI observability | `ai_generation_runs` |
 | Preloaded scene definitions, markers, demo questions and prompts | `preloaded_scenes` |
 
 The scene catalog is read from PostgreSQL through `PostgresSceneRepository`.
@@ -259,23 +258,6 @@ Annotation offsets use zero-based Unicode code points with an exclusive end;
 JavaScript UTF-16 offsets must be converted for supplementary characters. Child rows
 cascade when their journal is deleted; referenced media/vocabulary remain protected.
 
-AI runs record feature, model/prompt/schema versions, pending/succeeded/failed status,
-optional nonnegative BIGINT token counts and latency, validation outcome, error code,
-and input/output references. Null metrics mean unknown. Composite foreign keys
-ensure linked sessions/journals belong to the run's user. Ownerless runs are system
-jobs and cannot reference a session or journal. Deleting a linked user/session/journal
-also deletes its runs.
-
-Trusted workers use `PostgresAiGenerationRunRepository(engine, user_id)` and
-`AiGenerationRunCompletion`. `create` starts a pending run with a stable UUID;
-matching retries return its current record. `finish` records succeeded or failed,
-with completion time defaulting to current UTC. Failure requires a nonblank error
-code. Concurrent completion serializes, identical retries succeed, and conflicting
-results are rejected. Identity/version fields and completed results are immutable.
-`get` and `list_runs` are owner-scoped; `user_id=None` means system runs only.
-Deduplicating run records does not provide a provider-job lease. Store storage
-identifiers in input/output references rather than raw prompts.
-
 Tables use UUID identities and timezone-aware timestamps. Migrations define foreign
 keys, checks, update triggers, RLS, and revoked browser-role grants. All access is
 through backend repositories; the frontend must not query these tables directly.
@@ -284,9 +266,7 @@ through backend repositories; the frontend must not query these tables directly.
 
 Authentication, real image analysis, AI generation and speech evaluation
 are not implemented. Uploaded images use validated storage uploads and deterministic
-placeholder objects. AI runs are populated only when backend workers call the
-repository; ordinary frontend use does not fabricate run records. Vocabulary
-"Move" is still local frontend state. Session learning credit comes from persisted
+placeholder objects. Vocabulary "Move" is still local frontend state. Session learning credit comes from persisted
 vocabulary encounters; analysis and skipped tasks award none. Daily vocabulary, home aggregation, and other unfinished
 routes return an explicit 501. Journal eligible-photo/learned-word recommendations
 and automatic annotations remain unpopulated. Creating tables does not implement
