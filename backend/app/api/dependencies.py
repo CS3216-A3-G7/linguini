@@ -15,6 +15,8 @@ from app.ai import (
     load_ai_settings,
 )
 from app.ai.instrumentation import TracedISpyGuessGenerator
+from app.ai.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
+from app.ai.vision_gemini import GeminiVisionClient
 from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
@@ -36,7 +38,6 @@ from app.repositories.postgres.workflow import PostgresWorkflowRepository
 from app.repositories.scenes import SceneRepository
 from app.repositories.users import UserRepository
 from app.services.gemini_learning_tasks import GeminiLearningTaskGenerator
-from app.services.gemini_scene_analysis import GeminiSceneAnalyzer, RoutedSceneAnalyzer
 from app.services.gemini_translation import GeminiSceneTranslator
 from app.services.image_derivatives import ImageDerivatives
 from app.services.image_storage import ImageStorage
@@ -47,13 +48,14 @@ from app.services.media_assets import MediaAssetService
 from app.services.openai_ispy_clues import OpenAIISpyClueGenerator
 from app.services.openai_ispy_guess import OpenAIISpyGuessGenerator
 from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
-from app.services.openai_scene_analysis import OpenAISceneAnalyzer
 from app.services.openai_translation import OpenAISceneTranslator
 from app.services.practice import PracticeService
 from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.scenes import SceneService
 from app.services.tasks import TaskService
 from app.services.users import UserService
+from app.services.vision_model import VisionModelConfig
+from app.services.vision_openai import OpenAIVisionClient
 
 
 def get_user_repository(request: Request) -> UserRepository:
@@ -212,28 +214,33 @@ def get_practice_repository(
     )
 
     scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
-    if scene_config.provider is AiProvider.OPENAI:
-        uploaded_analyzer = (
-            OpenAISceneAnalyzer(
-                storage,
-                openai_key,
-                scene_config.model_name,
+    tracer = get_ai_tracer(request)
+    if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
+        if not settings.is_configured(scene_config):
+            uploaded_analyzer = None
+        else:
+            vision_config = VisionModelConfig(
+                model_name=scene_config.model_name,
                 timeout_seconds=scene_config.timeout_seconds,
+                max_output_tokens=scene_config.max_output_tokens or 1500,
+                max_retries=min(scene_config.max_retries, 1),
             )
-            if settings.is_configured(scene_config)
-            else None
-        )
-    elif scene_config.provider is AiProvider.GEMINI:
-        uploaded_analyzer = (
-            GeminiSceneAnalyzer(
-                storage,
-                gemini_key,
-                scene_config.model_name,
-                timeout_seconds=scene_config.timeout_seconds,
-            )
-            if settings.is_configured(scene_config)
-            else None
-        )
+            if scene_config.provider is AiProvider.OPENAI:
+                uploaded_analyzer = UploadedSceneAnalyzer(
+                    storage,
+                    OpenAIVisionClient(openai_key, vision_config),
+                    vision_config,
+                    tracer=tracer,
+                    provider=scene_config.provider.value,
+                )
+            else:
+                uploaded_analyzer = UploadedSceneAnalyzer(
+                    storage,
+                    GeminiVisionClient(gemini_key, vision_config),
+                    vision_config,
+                    tracer=tracer,
+                    provider=scene_config.provider.value,
+                )
     elif scene_config.provider is AiProvider.NONE:
         uploaded_analyzer = None
     else:

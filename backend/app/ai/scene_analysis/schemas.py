@@ -1,4 +1,4 @@
-"""Schemas for validating raw scene-analysis model output."""
+"""Structured output contract for scene-analysis model responses."""
 
 from __future__ import annotations
 
@@ -10,6 +10,21 @@ from pydantic import AliasChoices, Field, field_validator
 
 from app.schemas.base import ApiModel, NonEmptyText
 from app.schemas.enums import SceneRelationType
+
+
+class SceneAttributeType(StrEnum):
+    COLOR = "color"
+    SIZE = "size"
+    SHAPE = "shape"
+    MATERIAL = "material"
+    PATTERN = "pattern"
+    STATE = "state"
+    QUANTITY = "quantity"
+
+
+class ModelSceneAttribute(ApiModel):
+    type: SceneAttributeType
+    value: NonEmptyText = Field(max_length=40)
 
 
 class ModelBoundingBox(ApiModel):
@@ -28,13 +43,14 @@ class ModelAnchorPoint(ApiModel):
 
 class ModelSceneObject(ApiModel):
     object_key: NonEmptyText = Field(
+        max_length=64,
         validation_alias=AliasChoices("objectKey", "key"),
         serialization_alias="objectKey",
     )
-    label: NonEmptyText
+    label: NonEmptyText = Field(max_length=60)
     bounding_box: ModelBoundingBox
     anchor_point: ModelAnchorPoint | None = None
-    attributes: list[NonEmptyText] | dict[NonEmptyText, NonEmptyText] = []
+    attributes: list[ModelSceneAttribute] = Field(default_factory=list, max_length=6)
     confidence_score: Annotated[
         float,
         Field(
@@ -83,12 +99,16 @@ class ModelSceneRelation(ApiModel):
 
     @field_validator("relation", mode="before")
     @classmethod
-    def accept_snake_case_relation(cls, value):
+    def accept_relation_aliases(cls, value):
         aliases = {
             "leftOf": "left_of",
             "rightOf": "right_of",
             "inFrontOf": "in_front_of",
             "nextTo": "next_to",
+            "in": "inside",
+            "beside": "next_to",
+            "insideOf": "inside",
+            "inside_of": "inside",
         }
         return aliases.get(value, value)
 
@@ -115,12 +135,15 @@ class ModelSceneRelation(ApiModel):
 
 class SceneAnalysisModelResult(ApiModel):
     suggested_scene_title: NonEmptyText = Field(
+        max_length=80,
         validation_alias=AliasChoices("suggestedSceneTitle", "title"),
         serialization_alias="suggestedSceneTitle",
     )
-    summary: NonEmptyText = "A scene containing useful vocabulary."
+    summary: NonEmptyText = Field(
+        default="A scene containing useful vocabulary.", max_length=300
+    )
     objects: Annotated[list[ModelSceneObject], Field(max_length=6)]
-    relations: list[ModelSceneRelation] = []
+    relations: Annotated[list[ModelSceneRelation], Field(max_length=12)] = []
 
     @property
     def title(self) -> str:
@@ -135,10 +158,15 @@ class SceneAnalysisIssueCode(StrEnum):
     BOUNDING_BOX_OUT_OF_RANGE = "boundingBoxOutOfRange"
     NON_POSITIVE_BOUNDING_BOX_SIZE = "nonPositiveBoundingBoxSize"
     BOUNDING_BOX_OUTSIDE_IMAGE = "boundingBoxOutsideImage"
+    NON_FINITE_ANCHOR_POINT = "nonFiniteAnchorPoint"
+    ANCHOR_POINT_OUT_OF_RANGE = "anchorPointOutOfRange"
+    NON_FINITE_CONFIDENCE = "nonFiniteConfidence"
+    CONFIDENCE_OUT_OF_RANGE = "confidenceOutOfRange"
     UNKNOWN_RELATION_OBJECT = "unknownRelationObject"
     SELF_RELATION = "selfRelation"
     DUPLICATE_RELATION = "duplicateRelation"
     SYMMETRIC_DUPLICATE_RELATION = "symmetricDuplicateRelation"
+    INVERSE_DUPLICATE_RELATION = "inverseDuplicateRelation"
 
 
 @dataclass(frozen=True)

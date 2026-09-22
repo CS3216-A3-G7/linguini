@@ -1,5 +1,6 @@
 """Shared API and domain enum values."""
 
+from collections.abc import Mapping
 from enum import StrEnum
 
 
@@ -47,6 +48,17 @@ class SceneRelationType(StrEnum):
 SYMMETRIC_SCENE_RELATION_TYPES: frozenset[SceneRelationType] = frozenset(
     {SceneRelationType.NEXT_TO, SceneRelationType.NEAR}
 )
+
+INVERSE_SCENE_RELATION_TYPES: Mapping[SceneRelationType, SceneRelationType] = {
+    SceneRelationType.LEFT_OF: SceneRelationType.RIGHT_OF,
+    SceneRelationType.RIGHT_OF: SceneRelationType.LEFT_OF,
+    SceneRelationType.ABOVE: SceneRelationType.BELOW,
+    SceneRelationType.BELOW: SceneRelationType.ABOVE,
+    SceneRelationType.ON: SceneRelationType.UNDER,
+    SceneRelationType.UNDER: SceneRelationType.ON,
+    SceneRelationType.IN_FRONT_OF: SceneRelationType.BEHIND,
+    SceneRelationType.BEHIND: SceneRelationType.IN_FRONT_OF,
+}
 
 
 class PartOfSpeech(StrEnum):

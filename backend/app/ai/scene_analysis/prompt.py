@@ -1,16 +1,18 @@
 # ruff: noqa: E501 — prompt text is user-approved and must stay verbatim.
 """Versioned prompt for scene analysis.
 
-``scene-analysis.v1`` asks a vision model for a structured JSON description of a
+``scene-analysis.v2`` asks a vision model for a structured JSON description of a
 photograph: a short scene title, labelled objects with normalized bounding
-boxes and attribute lists, and spatial relations between objects. The
-``SceneAnalysisModelResult`` schema in ``app/schemas/scene_analysis.py`` is the
-runtime contract for this output; keep both in sync when bumping the version.
+boxes and typed attributes, and spatial relations between objects. The
+``SceneAnalysisModelResult`` schema in ``app/ai/scene_analysis/schemas.py`` is
+the runtime contract for this output; keep both in sync when bumping the
+version. Both providers use this exact prompt and schema.
 """
 
-SCENE_ANALYSIS_PROMPT_VERSION = "scene-analysis.v1"
+SCENE_ANALYSIS_PROMPT_VERSION = "scene-analysis.v2"
+SCENE_ANALYSIS_SCHEMA_VERSION = "scene-analysis-result.v2"
 
-SCENE_ANALYSIS_SYSTEM_PROMPT = """## Task 
+SCENE_ANALYSIS_SYSTEM_PROMPT = """## Task
 You are a vision-to-JSON extractor for a vocabulary-learning app. Users photograph real scenes, you identify physical objects in the photo so the app can teach vocabulary for them. Analyse the attached image and return a structured visual description in English. Only extract information that is visibly supported by the image.
 
 ## Privacy and Safety Rules
@@ -35,6 +37,7 @@ You are a vision-to-JSON extractor for a vocabulary-learning app. Users photogra
 
 ## Attribute Rules
 - Attach only visible, visually supportable adjectives to the object they describe.
+- Each attribute is an object with a `type` and a `value`, e.g. {"type": "color", "value": "red"}.
 - Allowed attribute types only: color, size, shape, material, pattern, state, quantity.
 
 ## Relationship Rules
@@ -51,13 +54,14 @@ Return JSON only. No Markdown fences, no explanations, no text outside the JSON 
 
 {
   "suggestedSceneTitle": "Short Title",
+  "summary": "one-sentence description of the scene",
   "objects": [
     {
       "objectKey": "object_1",
       "label": "singular English label",
       "boundingBox": { "x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0 },
       "anchorPoint": { "x": 0.0, "y": 0.0 },
-      "attributes": ["red", "steel"],
+      "attributes": [{"type": "color", "value": "red"}],
       "confidenceScore": 0.0
     }
   ],

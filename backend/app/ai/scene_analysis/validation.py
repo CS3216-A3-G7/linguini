@@ -1,4 +1,4 @@
-"""Validation for raw scene-analysis model output."""
+"""Deterministic semantic validation for raw scene-analysis model output."""
 
 from __future__ import annotations
 
@@ -8,11 +8,15 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.schemas.enums import SYMMETRIC_SCENE_RELATION_TYPES, SceneRelationType
-from app.schemas.scene_analysis import (
+from app.ai.scene_analysis.schemas import (
     SceneAnalysisIssue,
     SceneAnalysisIssueCode,
     SceneAnalysisModelResult,
+)
+from app.schemas.enums import (
+    INVERSE_SCENE_RELATION_TYPES,
+    SYMMETRIC_SCENE_RELATION_TYPES,
+    SceneRelationType,
 )
 from app.services.scene_analysis import SceneAnalysisError
 
@@ -44,7 +48,33 @@ def _issue(
     return SceneAnalysisIssue(code=code, message=message, path=path)
 
 
-def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisModelResult:
+def _check_confidence(
+    issues: list[SceneAnalysisIssue],
+    value: float,
+    subject: str,
+    path: str,
+) -> None:
+    if not math.isfinite(value):
+        issues.append(
+            _issue(
+                SceneAnalysisIssueCode.NON_FINITE_CONFIDENCE,
+                f"{subject} has non-finite confidence {value!r}",
+                path,
+            )
+        )
+    elif not 0 <= value <= 1:
+        issues.append(
+            _issue(
+                SceneAnalysisIssueCode.CONFIDENCE_OUT_OF_RANGE,
+                f"{subject} has confidence {value!r}, expected 0..1",
+                path,
+            )
+        )
+
+
+def validate_scene_analysis(
+    result: SceneAnalysisModelResult,
+) -> SceneAnalysisModelResult:
     issues: list[SceneAnalysisIssue] = []
 
     object_keys: set[str] = set()
@@ -128,6 +158,41 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
                 )
             )
 
+        _check_confidence(
+            issues,
+            scene_object.confidence_score,
+            f"object {scene_object.object_key!r}",
+            f"objects[{index}].confidenceScore",
+        )
+
+        anchor = scene_object.anchor_point
+        if anchor is not None:
+            anchor_path = f"objects[{index}].anchorPoint"
+            non_finite_anchor = [
+                field for field in ("x", "y") if not math.isfinite(getattr(anchor, field))
+            ]
+            for field in non_finite_anchor:
+                issues.append(
+                    _issue(
+                        SceneAnalysisIssueCode.NON_FINITE_ANCHOR_POINT,
+                        f"object {scene_object.object_key!r} has non-finite "
+                        f"anchor {field}={getattr(anchor, field)!r}",
+                        f"{anchor_path}.{field}",
+                    )
+                )
+            if not non_finite_anchor:
+                for field in ("x", "y"):
+                    value = getattr(anchor, field)
+                    if not 0 <= value <= 1:
+                        issues.append(
+                            _issue(
+                                SceneAnalysisIssueCode.ANCHOR_POINT_OUT_OF_RANGE,
+                                f"object {scene_object.object_key!r} has anchor "
+                                f"{field}={value!r}, expected 0..1",
+                                f"{anchor_path}.{field}",
+                            )
+                        )
+
     seen_relations: set[tuple[SceneRelationType, str, str]] = set()
     for index, relation in enumerate(result.relations):
         relation_path = f"relations[{index}]"
@@ -150,6 +215,13 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
                 )
             )
 
+        _check_confidence(
+            issues,
+            relation.confidence_score,
+            f"relation {relation.relation_key!r}",
+            f"{relation_path}.confidenceScore",
+        )
+
         is_self_relation = relation.subject_object_key == relation.reference_object_key
         if is_self_relation:
             issues.append(
@@ -171,8 +243,9 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
             issues.append(
                 _issue(
                     SceneAnalysisIssueCode.DUPLICATE_RELATION,
-                    f"relation {relation.relation_key!r} duplicates "
-                    f"{relation.relation.value} {relation.subject_object_key!r}"
+                    f"relation {relation.relation_key!r} duplicates an earlier "
+                    f"{relation.relation.value} relation from "
+                    f"{relation.subject_object_key!r}"
                     f"->{relation.reference_object_key!r}",
                     relation_path,
                 )
@@ -194,6 +267,25 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
                     relation_path,
                 )
             )
+        else:
+            inverse = INVERSE_SCENE_RELATION_TYPES.get(relation.relation)
+            if (
+                inverse is not None
+                and (
+                    inverse,
+                    relation.reference_object_key,
+                    relation.subject_object_key,
+                )
+                in seen_relations
+            ):
+                issues.append(
+                    _issue(
+                        SceneAnalysisIssueCode.INVERSE_DUPLICATE_RELATION,
+                        f"relation {relation.relation_key!r} inverts an earlier "
+                        f"{inverse.value} relation",
+                        relation_path,
+                    )
+                )
         seen_relations.add(relation_tuple)
 
     if issues:
@@ -201,7 +293,9 @@ def validate_scene_analysis(result: SceneAnalysisModelResult) -> SceneAnalysisMo
     return result
 
 
-def parse_scene_analysis(payload: Mapping[str, Any] | str | bytes) -> SceneAnalysisModelResult:
+def parse_scene_analysis(
+    payload: Mapping[str, Any] | str | bytes,
+) -> SceneAnalysisModelResult:
     try:
         if isinstance(payload, (str, bytes)):
             result = SceneAnalysisModelResult.model_validate_json(payload)
