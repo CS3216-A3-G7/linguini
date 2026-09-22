@@ -11,8 +11,7 @@ import { useAppState } from "../state/useAppState";
 
 export function Home() {
   const navigate = useNavigate();
-  const { learner, activeProfile, progress, progressLoading, progressError,
-    vocabulary, vocabularyLoading, vocabularyError } = useAppState();
+  const { learner, activeProfile, progress, progressLoading, progressError } = useAppState();
   const queryClient = useQueryClient();
   const profileId = activeProfile?.id ?? "";
   const { data: resume, error: resumeQueryError, isPending: resumeLoading } = useQuery({
@@ -79,7 +78,7 @@ export function Home() {
         </Button>
       ) : null}
 
-      {vocabulary.length > 0 ? <Button variant="quiet" className="home-action-row home-action-row--journal" onClick={() => navigate("/journal/new")}>
+      {(progress?.xp ?? 0) > 0 ? <Button variant="quiet" className="home-action-row home-action-row--journal" onClick={() => navigate("/journal/new")}>
         <span className="home-action-row__icon home-action-row__icon--teal">
           <BookIcon size={20} />
         </span>
@@ -132,9 +131,7 @@ export function Home() {
       </div>
       <section className="stack-2" aria-labelledby="home-word-bank">
         <h2 id="home-word-bank">Your word bank</h2>
-        {vocabularyLoading ? <p role="status">Loading your words...</p> : vocabularyError ? (
-          <p role="alert">{vocabularyError} Reload to retry.</p>
-        ) : <p>{vocabulary.length ? `${vocabulary.length} words collected` : "Your words will appear here as you practise."}</p>}
+        <p>Review the words you've collected.</p>
         <Button variant="secondary" onClick={() => navigate("/vocabulary")}>
           <BookIcon size={20} /> Explore your words
         </Button>

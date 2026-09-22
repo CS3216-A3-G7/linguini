@@ -151,6 +151,7 @@ class JournalTodayContextResponse(ApiModel):
 
 class JournalDetailResponse(ApiModel):
     image_url: str | None = None
+    image_urls: dict[UUID, str] = Field(default_factory=dict)
     journal: Journal
     media: list[JournalMedia] = Field(default_factory=list)
     revisions: list[JournalRevision] = Field(default_factory=list)

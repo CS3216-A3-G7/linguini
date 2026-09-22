@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button, Card, Noodle, StatusPill, XpPill } from "../components/ui";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
+import { useVocabularyQuery } from "../state/queries";
 import { createPractice, getPracticeSummary } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
@@ -11,7 +12,8 @@ import { queryError, queryKeys } from "../lib/queryKeys";
 export function SessionSummary() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, activeProfile, vocabulary } = useAppState();
+  const { session, activeProfile } = useAppState();
+  const { vocabulary } = useVocabularyQuery();
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const requestKey = useRef(crypto.randomUUID());

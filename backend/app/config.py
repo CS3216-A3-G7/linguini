@@ -5,7 +5,7 @@ from uuid import UUID
 
 import httpx
 
-from app.services.media_urls import PrivateMediaUrls
+from app.services.media_urls import PrivateMediaUrls, SignedUrlCache
 from app.services.vision_model import VisionModelClient, VisionModelConfig
 from app.services.vision_openai import build_vision_client
 
@@ -16,6 +16,9 @@ def get_media_public_base_url() -> str | None:
     return os.getenv("MEDIA_PUBLIC_BASE_URL", "").strip() or None
 
 
+_SIGNED_URL_CACHE = SignedUrlCache()
+
+
 def get_private_media_urls() -> PrivateMediaUrls | None:
     if os.getenv("MEDIA_STORAGE_PRIVATE", "false").strip().lower() != "true":
         return None
@@ -23,6 +26,7 @@ def get_private_media_urls() -> PrivateMediaUrls | None:
         os.getenv("SUPABASE_URL", "").strip(),
         os.getenv("MEDIA_STORAGE_BUCKET", "media-assets").strip(),
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
+        cache=_SIGNED_URL_CACHE,
     )
 
 
