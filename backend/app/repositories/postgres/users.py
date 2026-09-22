@@ -18,6 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.database import read_connection
 from app.repositories.users import UserRepositoryError
 from app.schemas.users import UpdateUserRequest, User
 
@@ -46,7 +47,7 @@ class PostgresUserRepository:
 
     def get_by_id(self, user_id: UUID) -> User | None:
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 row = (
                     connection.execute(select(users).where(users.c.id == user_id))
                     .mappings()

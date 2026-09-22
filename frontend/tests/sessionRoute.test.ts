@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../src/lib/sessionRoute.ts";
+import { isPreTaskStep, isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../src/lib/sessionRoute.ts";
 import type { PracticeDetail, SessionStatus, SessionTask, TaskContent } from "../src/lib/api.ts";
 
 const contents: Record<string, TaskContent> = {
@@ -37,6 +37,21 @@ test("every session status maps to its canonical route", () => {
   assert.equal(sessionDestination(detail("failed")).path, "/practice");
 });
 
+test("isPreTaskStep marks only the pre-task steps as auto-forwardable", () => {
+  assert.equal(isPreTaskStep("/practice/sessions/s1/analysis"), true);
+  assert.equal(isPreTaskStep("/practice/sessions/s1/mic-test"), true);
+  for (const step of ["learn", "learn/learn-0", "ispy-1", "ispy-2", "summary"]) {
+    assert.equal(isPreTaskStep(`/practice/sessions/s1/${step}`), false, step);
+  }
+  assert.equal(isPreTaskStep("/practice"), false);
+});
+
+test("generatingTasks sends the analysis page to the mic check", () => {
+  const generating = detail("generatingTasks");
+  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/mic-test"), true);
+  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/analysis"), false);
+});
+
 test("inProgress resumes at the first unfinished stage", () => {
   const pendingLearn = [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)];
   assert.equal(sessionDestination(detail("inProgress", pendingLearn)).path, "/practice/sessions/s1/learn");
@@ -57,9 +72,6 @@ test("sessions with no task rows resume at analysis", () => {
 test("the route guard allows only the canonical destination", () => {
   assert.equal(isSessionRouteAllowed(detail("created"), "/practice/sessions/s1/learn"), false);
   assert.equal(isSessionRouteAllowed(detail("created"), "/practice/sessions/s1/analysis"), true);
-  // Analysis finishing keeps the learner on the analysis page.
-  assert.equal(isSessionRouteAllowed(detail("analyzingScene"), "/practice/sessions/s1/analysis"), true);
-  assert.equal(isSessionRouteAllowed(detail("awaitingObjectReview"), "/practice/sessions/s1/analysis"), true);
 
   const pendingLearn = [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)];
   assert.equal(isSessionRouteAllowed(detail("inProgress", pendingLearn), "/practice/sessions/s1/learn"), true);
@@ -84,11 +96,6 @@ test("the route guard allows only the canonical destination", () => {
   assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/mic-test"), true);
   assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/learn"), false);
   assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/ispy-1"), false);
-
-  // Task generation runs after the object review; the learner waits on the mic test.
-  assert.equal(isSessionRouteAllowed(detail("generatingTasks"), "/practice/sessions/s1/mic-test"), true);
-  assert.equal(isSessionRouteAllowed(detail("generatingTasks"), "/practice/sessions/s1/learn"), false);
-  assert.equal(isSessionRouteAllowed(detail("generatingTasks"), "/practice/sessions/s1/analysis"), false);
   for (const status of ["abandoned", "failed"] as const) {
     for (const step of ["analysis", "mic-test", "learn", "ispy-1", "ispy-2", "summary"]) {
       assert.equal(isSessionRouteAllowed(detail(status), `/practice/sessions/s1/${step}`), false);

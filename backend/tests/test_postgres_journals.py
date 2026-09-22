@@ -388,3 +388,43 @@ def test_journal_entry_xp_independent_of_words(context):
             )
         ).scalar_one()
     assert mastered == "mastered"
+
+
+def test_scoped_reads_limit_and_return_single_entries(context):
+    _, owner, profile, client, repository, *_ = context
+    row = save(client, profile)
+    today = date.fromisoformat(row["localDate"])
+    older = [
+        Journal(
+            user_id=owner.id,
+            language_profile_id=profile.id,
+            local_date=today - timedelta(days=offset),
+            timezone="UTC",
+        )
+        for offset in (1, 2)
+    ]
+
+    def add(rows):
+        rows.extend(JournalDetailResponse(journal=journal) for journal in older)
+
+    repository.change(add)
+
+    limited = repository.read_for_user(limit=2)
+    assert [entry.journal.local_date for entry in limited] == [
+        today,
+        today - timedelta(days=1),
+    ]
+    assert [entry.journal.id for entry in limited] == [UUID(row["id"]), older[0].id]
+    assert len(limited[0].revisions) == 1
+    assert limited[0].revisions[0].journal_id == limited[0].journal.id
+
+    one = repository.read_one(UUID(row["id"]))
+    assert one is not None
+    assert one.journal.id == UUID(row["id"])
+    assert [revision.revision_number for revision in one.revisions] == [1]
+    assert repository.read_one(uuid4()) is None
+
+    by_date = repository.read_for_date(today - timedelta(days=2))
+    assert by_date is not None
+    assert by_date.journal.id == older[1].id
+    assert repository.read_for_date(today - timedelta(days=9)) is None

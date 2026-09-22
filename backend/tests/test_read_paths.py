@@ -5,6 +5,7 @@ from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy import event, select
+from sqlalchemy.engine import Engine
 from test_postgres_sessions import age_session, analyze, create_run
 from test_postgres_sessions import database as database
 
@@ -52,6 +53,32 @@ def count_statements(engine, fn):
         return fn(), statements
     finally:
         event.remove(engine, "before_cursor_execute", listener)
+
+
+def count_request_statements(fn):
+    """Records statements on every engine, including the one create_app() builds."""
+    statements = []
+
+    def listener(_conn, _cursor, statement, _params, _context, _executemany):
+        if not statement.startswith(("SET", "BEGIN", "COMMIT", "ROLLBACK", "SELECT 1")):
+            statements.append(statement)
+
+    event.listen(Engine, "before_cursor_execute", listener)
+    try:
+        return fn(), statements
+    finally:
+        event.remove(Engine, "before_cursor_execute", listener)
+
+
+def test_request_statement_counts(database):
+    _, _, _, client = database
+    for path, limit in [
+        ("/api/v1/me", 1),
+        ("/api/v1/me/progress", 4),
+        ("/api/v1/journals", 6),
+    ]:
+        _, statements = count_request_statements(lambda path=path: client.get(path))
+        assert len(statements) <= limit, (path, len(statements), statements)
 
 
 def test_session_detail_query_count(database):

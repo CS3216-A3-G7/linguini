@@ -1,55 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { CameraIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
 import { ApiError, createPractice, getActivePractice } from "../lib/api";
-import type { PracticeDetail } from "../lib/api";
 import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { sessionDestination } from "../lib/sessionRoute";
-import { queryKeys } from "../lib/queryKeys";
-import { useQueryClient } from "@tanstack/react-query";
+import { queryError, queryKeys } from "../lib/queryKeys";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppState } from "../state/useAppState";
+import { useScenesQuery } from "../state/queries";
 
 export function PracticeSelect() {
   const navigate = useNavigate();
   const notice = (useLocation().state as { practiceNotice?: string } | null)?.practiceNotice;
-  const { scenes, learner, activeProfile } = useAppState();
+  const { learner, activeProfile } = useAppState();
+  const { scenes } = useScenesQuery();
   const activeProfileId = activeProfile?.id;
   const [uploading, setUploading] = useState(false);
   const [selected, setSelected] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeSession, setActiveSession] = useState<PracticeDetail | null>(null);
-  const [activeCheckLoading, setActiveCheckLoading] = useState(true);
-  const [activeCheckError, setActiveCheckError] = useState<string | null>(null);
   const busy = useRef(false);
   const request = useRef<{ asset: string; key: string } | null>(null);
   const queryClient = useQueryClient();
+  // Mount check consumes the shared cache; only the flows below force a fresh fetch.
+  const activeCheck = useQuery({
+    queryKey: queryKeys.activeSession(activeProfileId ?? ""),
+    queryFn: () => getActivePractice(),
+    enabled: !!activeProfileId,
+  });
+  const activeSession = activeProfileId ? activeCheck.data ?? null : null;
+  const activeCheckLoading = !!activeProfileId && activeCheck.isPending;
+  const activeCheckError = queryError(activeCheck.error);
   const activeFetch = useCallback(() => queryClient.fetchQuery({
     queryKey: queryKeys.activeSession(activeProfileId ?? ""),
     queryFn: () => getActivePractice(),
     staleTime: 0,
   }), [queryClient, activeProfileId]);
-  useEffect(() => {
-    let cancelled = false;
-    if (!activeProfileId) {
-      setActiveSession(null);
-      setActiveCheckLoading(false);
-      return () => { cancelled = true; };
-    }
-    setActiveSession(null);
-    setActiveCheckLoading(true);
-    setActiveCheckError(null);
-    activeFetch()
-      .then(session => { if (!cancelled) setActiveSession(session); })
-      .catch(reason => {
-        if (!cancelled) setActiveCheckError(reason instanceof Error ? reason.message : "Unable to check active practice.");
-      })
-      .finally(() => { if (!cancelled) setActiveCheckLoading(false); });
-    return () => { cancelled = true; };
-  }, [activeProfileId, activeFetch]);
   const interactionDisabled = selected || starting || activeCheckLoading || !!activeSession || !!activeCheckError || !activeProfile;
   const start = async (asset: string) => {
     if (busy.current || !activeProfile || activeCheckLoading || activeSession || activeCheckError) return;
@@ -62,7 +51,6 @@ export function PracticeSelect() {
       if (reason instanceof ApiError && reason.code === "active_session_exists" && reason.activeSessionId) {
         setSelected(false);
         const existing = await activeFetch().catch(() => null);
-        if (existing) setActiveSession(existing);
         navigate(existing ? sessionDestination(existing).path : `/practice/sessions/${reason.activeSessionId}/analysis`);
         return;
       }
@@ -73,8 +61,7 @@ export function PracticeSelect() {
   const continueActive = async () => {
     try {
       const fresh = await activeFetch();
-      if (!fresh) { setActiveSession(null); return; }
-      setActiveSession(fresh);
+      if (!fresh) return;
       navigate(sessionDestination(fresh).path);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load your practice."); }
   };

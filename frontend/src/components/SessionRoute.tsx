@@ -1,10 +1,10 @@
 import { practiceScene } from "../lib/practiceScene";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMedia, getPractice } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
-import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
+import { isPreTaskStep, isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
@@ -16,23 +16,28 @@ export function SessionRoute() {
   return <SessionLoader key={sessionId} id={sessionId} />;
 }
 function SessionLoader({ id }: { id: string }) {
-  const { loadSession, learner, session } = useAppState();
+  const { loadSession, learner, session, flushLearningChanges } = useAppState();
+  // Leaving the session flushes deferred learning invalidations once, not per task.
+  useEffect(() => () => flushLearningChanges(), [flushLearningChanges]);
   const [preview, setPreview] = useState<Scene | null>(null);
   const [detail, setDetail] = useState<PracticeDetail | null>(null);
   const location = useLocation();
   // The guard validates every navigation against the latest canonical
-  // destination. Recompute when the pathname or the session status changes —
-  // a background transition (task generation finishing or failing) must
-  // re-route a page the learner is standing on.
-  const checked = useRef<{ path: string; status: string; allowed: boolean } | null>(null);
+  // destination. Task pages are not re-validated while the pathname stays the
+  // same — a learner reading their answer feedback must keep it — but the
+  // pre-task steps (analysis, mic check) forward automatically when the
+  // session advances so nobody is stranded on a stale waiting screen.
+  const checked = useRef<{ path: string; canonical: string | null; allowed: boolean } | null>(null);
+  const queryClient = useQueryClient();
   const load = useCallback(async (signal?: AbortSignal): Promise<Scene> => {
     const initial = await getPractice(id);
     const media = await getMedia(initial.mediaAsset.id);
+    queryClient.setQueryData(queryKeys.media(initial.mediaAsset.id), media.signedUrl);
     if (!signal?.aborted) setPreview(practiceScene(initial, media, learner.language));
-    const loaded = await loadSession(id);
+    const loaded = await loadSession(id, initial);
     setDetail(loaded);
     return practiceScene(loaded, media, learner.language);
-  }, [id, loadSession, learner.language]);
+  }, [id, loadSession, learner.language, queryClient]);
   // Side-effecting session resolution: never served from or retained in cache.
   const { data, isPending: loading, error: queryErrorValue } = useQuery({
     queryKey: queryKeys.sessionScene(id),
@@ -53,16 +58,11 @@ function SessionLoader({ id }: { id: string }) {
     ? practiceScene(session, { id: data.mediaAssetId, signedUrl: data.imageUrl ?? "" }, learner.language)
     : data;
   const authoritative = session?.session.id === id ? session : detail;
-  if (
-    authoritative
-    && (checked.current?.path !== location.pathname
-      || checked.current?.status !== authoritative.session.status)
-  ) {
-    checked.current = {
-      path: location.pathname,
-      status: authoritative.session.status,
-      allowed: isSessionRouteAllowed(authoritative, location.pathname),
-    };
+  const canonical = authoritative ? sessionDestination(authoritative).path : null;
+  const revalidate = checked.current?.path !== location.pathname
+    || (checked.current.canonical !== canonical && isPreTaskStep(location.pathname));
+  if (authoritative && revalidate) {
+    checked.current = { path: location.pathname, canonical, allowed: isSessionRouteAllowed(authoritative, location.pathname) };
   }
   if (checked.current && !checked.current.allowed) {
     const dest = sessionDestination(authoritative!);

@@ -110,3 +110,61 @@ def test_journal_cover_uses_attachment_and_checks_ownership():
     signer.resolve.return_value = {}
     assert service._with_images([entry])[0].image_url is None
     signer.resolve.assert_called_once_with([])
+
+
+def test_with_images_resolves_all_attachments_in_one_resolve_call():
+    owner = uuid4()
+    journal = Journal(
+        user_id=owner,
+        language_profile_id=uuid4(),
+        local_date=utc_now().date(),
+        timezone="UTC",
+    )
+    cover = MediaAsset(
+        id=uuid4(),
+        source="userUpload",
+        owner_user_id=owner,
+        media_type="image",
+        storage_key="users/x/cover.jpg",
+        mime_type="image/jpeg",
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    extra = MediaAsset(
+        id=uuid4(),
+        source="userUpload",
+        owner_user_id=owner,
+        media_type="image",
+        storage_key="users/x/extra.jpg",
+        mime_type="image/jpeg",
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    entry = JournalDetailResponse(
+        journal=journal,
+        media=[
+            JournalMedia(journal_id=journal.id, media_asset_id=cover.id, display_order=0),
+            JournalMedia(journal_id=journal.id, media_asset_id=extra.id, display_order=1),
+        ],
+    )
+    media = MagicMock()
+    media.get_by_ids.return_value = {cover.id: cover, extra.id: extra}
+    signer = MagicMock()
+    signer.resolve.return_value = {
+        cover.storage_key: "https://example.com/signed-cover.jpg",
+        extra.storage_key: "https://example.com/signed-extra.jpg",
+    }
+    service = JournalService(MagicMock(), MagicMock(), MagicMock(), media, None, signer)
+
+    result = service._with_images([entry])[0]
+
+    assert result.image_url == "https://example.com/signed-cover.jpg"
+    assert result.image_urls == {
+        cover.id: "https://example.com/signed-cover.jpg",
+        extra.id: "https://example.com/signed-extra.jpg",
+    }
+    media.get_by_ids.assert_called_once()
+    signer.resolve.assert_called_once()
+    assert sorted(signer.resolve.call_args.args[0]) == sorted(
+        [cover.storage_key, extra.storage_key]
+    )

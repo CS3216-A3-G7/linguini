@@ -67,6 +67,12 @@ const loadingCopy: Record<string, SessionLoadingCopy> = {
   summary: { title: "Practice summary", heading: "Gathering your results...", scan: false },
 };
 
+/** Steps before the learner starts tasks: forwarding them when the session advances strands nobody. */
+export function isPreTaskStep(pathname: string): boolean {
+  const step = pathname.split("/practice/sessions/")[1]?.split("/").slice(1)[0] ?? null;
+  return step === "analysis" || step === "mic-test";
+}
+
 export function sessionLoadingCopy(pathname: string): SessionLoadingCopy {
   const step = pathname.split("/practice/sessions/")[1]?.split("/").slice(1)[0] ?? null;
   return (step && loadingCopy[step]) || { title: "Practice", heading: "Loading your practice...", scan: false };

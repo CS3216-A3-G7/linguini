@@ -2,7 +2,10 @@ import type { LeaderboardRow, ScenarioProgress, VocabRecord, VocabStatus, WordCl
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "");
+// The Node test runner has no import.meta.env; read process.env there.
+const envBaseUrl = import.meta.env?.VITE_API_BASE_URL
+  ?? (globalThis as { process?: { env?: { VITE_API_BASE_URL?: string } } }).process?.env?.VITE_API_BASE_URL;
+const apiBaseUrl = envBaseUrl?.replace(/\/+$/, "");
 
 export interface UploadedImage {
   id: string;
@@ -168,7 +171,7 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
   const items: DailyVocabularyItem[] = [];
   let cursor: string | null = null;
   do {
-    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    const query = cursor ? `?limit=500&cursor=${encodeURIComponent(cursor)}` : "?limit=500";
     const page: { items: DailyVocabularyItem[]; nextCursor: string | null } =
       await request(`/api/v1/me/vocabulary${query}`, signal);
     items.push(...page.items);
@@ -194,6 +197,7 @@ interface JournalRecord {
 interface JournalDetail {
   media: { mediaAssetId: string; displayOrder: number }[];
   imageUrl?: string | null;
+  imageUrls?: Record<string, string | null>;
   journal: JournalRecord;
   revisions: { id: string; content: string }[];
 }
@@ -201,7 +205,7 @@ function journalEntry(detail: JournalDetail): JournalEntry {
   const row = detail.journal;
   const media = [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder);
   return { id: row.id, languageProfileId: row.languageProfileId, date: row.localDate,
-    photos: media.map((photo, index) => ({ ...photo, imageUrl: index === 0 ? detail.imageUrl ?? null : null })),
+    photos: media.map((photo, index) => ({ ...photo, imageUrl: detail.imageUrls?.[photo.mediaAssetId] ?? (index === 0 ? detail.imageUrl ?? null : null) })),
     title: row.title, mediaAssetId: [...detail.media].sort((a, b) => a.displayOrder - b.displayOrder)[0]?.mediaAssetId ?? null, imageUrl: detail.imageUrl ?? null, wordsUsed: row.selectedWords,
     body: detail.revisions.find((revision) => revision.id === row.currentRevisionId)?.content ?? "" };
 }
@@ -231,16 +235,20 @@ export async function saveJournal(draft: JournalDraft, profileId: string, id?: s
     const current = await getJournal(row.id);
     // Remove changed positions first; the API requires unique positions and asset IDs.
     // Reading persisted attachments on every retry also recovers from a partial save.
+    let touched = false;
     for (const photo of current.photos) {
       if (desired[photo.displayOrder] !== photo.mediaAssetId) {
         await request<void>(`/api/v1/journals/${row.id}/media/${photo.mediaAssetId}`, undefined, { method: "DELETE" });
+        touched = true;
       }
     }
     for (const [displayOrder, mediaAssetId] of desired.entries()) {
       if (!current.photos.some(photo => photo.mediaAssetId === mediaAssetId && photo.displayOrder === displayOrder)) {
         await write(`/api/v1/journals/${row.id}/media`, "POST", { mediaAssetId, displayOrder });
+        touched = true;
       }
     }
+    if (!touched) return current;
   }
   return getJournal(row.id);
 }

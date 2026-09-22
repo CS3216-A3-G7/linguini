@@ -18,7 +18,7 @@ def list_vocabulary(
     service: Annotated[LearningService, Depends(get_learning_service)],
     language: Annotated[str, Depends(get_active_language)],
     cursor: str | None = None,
-    limit: int = Query(default=50, ge=1, le=100),
+    limit: int = Query(default=50, ge=1, le=500),
 ) -> CursorPage[DailyVocabularyItem]:
     return service.list_vocabulary(cursor, limit, language)
 
