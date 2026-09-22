@@ -272,7 +272,6 @@ test("a session leaving the analysis stage forwards the mic check underneath the
   assert.equal(shown(), "page-mic-test");
 });
 
-
 test("the analysis page redirects to the mic check once review is submitted", async () => {
   fixture = detail("generatingTasks");
   await mount(`${BASE}/analysis`);
