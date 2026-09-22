@@ -6,7 +6,15 @@ from uuid import UUID
 
 from fastapi import Depends, Request
 
-from app.ai import AiFeature, AiProvider, AiSettings, load_ai_settings
+from app.ai import (
+    AiFeature,
+    AiProvider,
+    AiSettings,
+    AITracer,
+    NoOpAITracer,
+    load_ai_settings,
+)
+from app.ai.instrumentation import TracedISpyGuessGenerator
 from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
@@ -162,7 +170,12 @@ def get_ai_settings(request: Request) -> AiSettings:
     return settings
 
 
-def get_ispy_guess_generator(settings: AiSettings):
+def get_ai_tracer(request: Request) -> AITracer:
+    """Tracer built in the app lifespan; falls back to a no-op."""
+    return getattr(request.app.state, "ai_tracer", None) or NoOpAITracer()
+
+
+def get_ispy_guess_generator(settings: AiSettings, tracer: AITracer | None = None):
     """Build the target-blind I-Spy evaluator used by task generation and attempts."""
     config = settings.feature(AiFeature.ISPY_GUESS)
     if config.provider is AiProvider.NONE:
@@ -171,10 +184,16 @@ def get_ispy_guess_generator(settings: AiSettings):
         raise ValueError(f"Unsupported ISPY_GUESS_PROVIDER: {config.provider}")
     if not settings.is_configured(config):
         return None
-    return OpenAIISpyGuessGenerator(
-        settings.openai_api_key,
-        config.model_name,
-        timeout_seconds=config.timeout_seconds,
+    return TracedISpyGuessGenerator(
+        OpenAIISpyGuessGenerator(
+            settings.openai_api_key,
+            config.model_name,
+            timeout_seconds=config.timeout_seconds,
+        ),
+        tracer or NoOpAITracer(),
+        provider=config.provider.value,
+        model=config.model_name,
+        max_retries=config.max_retries,
     )
 
 
@@ -298,7 +317,9 @@ def get_practice_repository(
         translator=translator,
         learning_task_generator=learning_task_generator,
         ispy_clue_generator=ispy_clue_generator,
-        ispy_guess_generator=get_ispy_guess_generator(settings),
+        ispy_guess_generator=get_ispy_guess_generator(
+            settings, get_ai_tracer(request)
+        ),
         background=getattr(request.app.state, "background_runner", None),
     )
 
@@ -318,7 +339,9 @@ def get_task_service(
         PostgresTaskRepository(request.app.state.database_engine),
         users,
         request.app.state.database_engine,
-        ispy_guess_generator=get_ispy_guess_generator(get_ai_settings(request)),
+        ispy_guess_generator=get_ispy_guess_generator(
+            get_ai_settings(request), get_ai_tracer(request)
+        ),
     )
 
 

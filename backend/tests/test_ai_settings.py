@@ -241,3 +241,91 @@ def test_settings_are_plain_frozen_models_without_clients():
     keyed = load_ai_settings(env={"AI_API_KEY": "general"})
     assert keyed.api_key_for(AiProvider.OPENAI) == ""
     assert keyed.api_key_for(AiProvider.NONE) == ""
+
+
+def test_observability_defaults_and_canonical_names():
+    defaults = load_ai_settings(env={}).observability
+    assert defaults.enabled is False
+    assert defaults.base_url == "https://cloud.langfuse.com"
+    assert defaults.public_key == ""
+    assert defaults.secret_key == ""
+    assert defaults.environment == "development"
+    assert defaults.capture_content is False
+
+    settings = load_ai_settings(
+        env={
+            "AI_OBSERVABILITY_ENABLED": "true",
+            "AI_OBSERVABILITY_BASE_URL": "https://lf.example.com",
+            "AI_OBSERVABILITY_PUBLIC_KEY": "pk",
+            "AI_OBSERVABILITY_SECRET_KEY": "sk",
+            "AI_OBSERVABILITY_ENVIRONMENT": "staging",
+            "AI_OBSERVABILITY_CAPTURE_CONTENT": "on",
+        }
+    ).observability
+    assert settings.enabled is True
+    assert settings.base_url == "https://lf.example.com"
+    assert settings.public_key == "pk"
+    assert settings.secret_key == "sk"
+    assert settings.environment == "staging"
+    assert settings.capture_content is True
+
+
+def test_observability_langfuse_aliases_and_canonical_precedence():
+    settings = load_ai_settings(
+        env={
+            "LANGFUSE_TRACING_ENABLED": "yes",
+            "LANGFUSE_PUBLIC_KEY": "pk-alias",
+            "LANGFUSE_SECRET_KEY": "sk-alias",
+            "LANGFUSE_HOST": "https://host.example.com",
+            "LANGFUSE_TRACING_ENVIRONMENT": "prod",
+            # Canonical wins when both are present.
+            "AI_OBSERVABILITY_PUBLIC_KEY": "pk-canonical",
+            "AI_OBSERVABILITY_BASE_URL": "https://canonical.example.com",
+        }
+    ).observability
+    assert settings.enabled is True
+    assert settings.public_key == "pk-canonical"
+    assert settings.secret_key == "sk-alias"
+    assert settings.base_url == "https://canonical.example.com"
+    assert settings.environment == "prod"
+
+
+def test_observability_invalid_values_raise_configuration_error():
+    with pytest.raises(
+        AiConfigurationError, match="AI_OBSERVABILITY_ENABLED"
+    ):
+        load_ai_settings(env={"AI_OBSERVABILITY_ENABLED": "maybe"})
+    with pytest.raises(AiConfigurationError, match="'maybe'"):
+        load_ai_settings(env={"LANGFUSE_TRACING_ENABLED": "maybe"})
+    with pytest.raises(AiConfigurationError, match="'Bad Env'"):
+        load_ai_settings(env={"AI_OBSERVABILITY_ENVIRONMENT": "Bad Env"})
+    with pytest.raises(AiConfigurationError, match="langfuse-prod"):
+        load_ai_settings(env={"AI_OBSERVABILITY_ENVIRONMENT": "langfuse-prod"})
+
+
+def test_real_mode_requires_langfuse_keys_when_observability_enabled():
+    with pytest.raises(AiConfigurationError) as excinfo:
+        load_ai_settings(
+            env={
+                "AI_MODE": "real",
+                "AI_OPENAI_API_KEY": "k",
+                "AI_GEMINI_API_KEY": "k",
+                "AI_SCENE_ANALYSIS_MODEL": "m",
+                "AI_SCENE_TRANSLATION_MODEL": "m",
+                "AI_LEARNING_TASK_MODEL": "m",
+                "AI_ISPY_CLUE_MODEL": "m",
+                "AI_ISPY_GUESS_MODEL": "m",
+                "AI_OBSERVABILITY_ENABLED": "true",
+                "AI_OBSERVABILITY_PUBLIC_KEY": "pk",
+            }
+        )
+    message = str(excinfo.value)
+    assert "observability" in message
+    assert "AI_OBSERVABILITY_SECRET_KEY" in message
+
+    # Demo mode never fails on missing Langfuse keys.
+    demo = load_ai_settings(
+        env={"AI_MODE": "demo", "AI_OBSERVABILITY_ENABLED": "true"}
+    )
+    assert demo.observability.enabled is True
+    assert demo.observability.secret_key == ""

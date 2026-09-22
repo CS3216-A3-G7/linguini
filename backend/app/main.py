@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.ai import load_ai_settings
+from app.ai import build_tracer, load_ai_settings
 from app.api.learning_errors import register_learning_errors
 from app.api.router import api_router
 from app.config import get_allowed_origins
@@ -18,9 +18,15 @@ async def lifespan(app: FastAPI):
     engine = create_database_engine()
     app.state.database_engine = engine
     app.state.background_runner = ThreadPoolBackgroundRunner()
+    app.state.ai_tracer = build_tracer(app.state.ai_settings)
     try:
         yield
     finally:
+        try:
+            app.state.ai_tracer.flush()
+            app.state.ai_tracer.shutdown()
+        except Exception:
+            pass
         app.state.background_runner.shutdown(wait=True)
         engine.dispose()
 
