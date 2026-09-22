@@ -8,7 +8,7 @@ import { queryKeys } from "../lib/queryKeys";
 
 const PROCESSING = ["analyzingScene", "generatingTasks"];
 
-export function usePractice(_userId: string, profileId: string, onLearningChanged: () => void) {
+export function usePractice(_userId: string, profileId: string, onLearningChanged: (scope: "task" | "session") => void) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<PracticeDetail | null>(null);
   const [practiceSaving, setSaving] = useState(false);
@@ -34,7 +34,8 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
         data = await getPractice(id);
       }
     }
-    for (let attempt = 0; attempt < 20 && PROCESSING.includes(data.session.status); attempt += 1) {
+    // Scene analysis can take ~60s, so poll for up to a minute before stalling.
+    for (let attempt = 0; attempt < 40 && PROCESSING.includes(data.session.status); attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       if (version !== loadVersion.current) break;
       data = await getPractice(id);
@@ -73,7 +74,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     try {
       const result = await taskAction(taskId, action, answer ? { ...answer, idempotencyKey: key } : {});
       setSession(value => applyTaskResult(value, session.session.id, result));
-      onLearningChanged();
+      onLearningChanged("task");
       return result;
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save task. Retry your action."); return null; }
     finally { busy.current = false; setSaving(false); }
@@ -82,10 +83,11 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     if (!session || busy.current) return false;
     busy.current = true; setSaving(true); setError(null);
     try {
-      await completePractice(session.session.id);
-      const completed = await getPractice(session.session.id);
-      setSession(value => value?.session.id === completed.session.id ? completed : value);
-      onLearningChanged();
+      const completed = await completePractice(session.session.id);
+      setSession(value => value?.session.id === completed.id
+        ? { ...value, session: { ...value.session, status: completed.status as typeof value.session.status } }
+        : value);
+      onLearningChanged("session");
       void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(session.session.id) });
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to complete session."); return false; }
@@ -101,12 +103,15 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     try {
       const detail = await reviewPractice(session.session.id, review);
       setSession(current => current?.session.id === detail.session.id ? detail : current);
+      // Task generation now runs off the request path; start draining it while
+      // `proceed` navigates — SessionRoute reuses this in-flight load.
+      if (PROCESSING.includes(detail.session.status)) void loadSession(session.session.id);
       return true;
     } catch (error) {
       setSession(current => current?.session.id === previous.session.id ? previous : current);
       setError(error instanceof Error ? error.message : "Unable to save your words.");
       return false;
     } finally { busy.current = false; setSaving(false); }
-  }, [session]);
+  }, [session, loadSession]);
   return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, retryProcessing, actOnTask, completeSession, saveReview, micReady, setMicReady };
 }

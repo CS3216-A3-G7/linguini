@@ -141,6 +141,14 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
         vocabulary=words,
         translations=translations,
     )
+    # Task generation runs in a second transaction after the rejected objects
+    # were deleted, so it only ever sees the accepted ones.
+    generated = SimpleNamespace(
+        scene_objects=[objects[1]],
+        scene_object_relations=[],
+        vocabulary=words,
+        translations=translations,
+    )
     repo = PostgresWorkflowRepository(None, uuid4())
     connection = MagicMock()
     connection.execute.return_value.first.return_value = None
@@ -158,7 +166,7 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
         id=session_id, status="inProgress", started_at=None
     )
     repo._tasks = lambda *args: []
-    repo._detail = lambda *args: detail
+    repo._detail = MagicMock(side_effect=[detail, detail, generated])
     repo.review(session_id, profile_id, ReviewPracticeRequest(accepted_object_ids=[objects[1].id]))
     inserted = [
         call.args[0].compile().params

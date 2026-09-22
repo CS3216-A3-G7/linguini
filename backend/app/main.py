@@ -9,15 +9,18 @@ from app.api.learning_errors import register_learning_errors
 from app.api.router import api_router
 from app.config import get_allowed_origins
 from app.database import create_database_engine
+from app.services.background import ThreadPoolBackgroundRunner
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     engine = create_database_engine()
     app.state.database_engine = engine
+    app.state.background_runner = ThreadPoolBackgroundRunner()
     try:
         yield
     finally:
+        app.state.background_runner.shutdown(wait=True)
         engine.dispose()
 
 

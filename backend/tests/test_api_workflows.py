@@ -66,11 +66,13 @@ def test_missing_user_and_scene_errors(database, monkeypatch):
 def test_server_rejects_forged_awards_and_unknown_events(database):
     _, _, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
-    detail = client.post(f"/api/v1/sessions/{sid}/analyze").json()
-    detail = client.put(
+    client.post(f"/api/v1/sessions/{sid}/analyze")
+    detail = client.get(f"/api/v1/sessions/{sid}").json()
+    client.put(
         f"/api/v1/sessions/{sid}/review",
         json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
-    ).json()
+    )
+    detail = client.get(f"/api/v1/sessions/{sid}").json()
     task_id = detail["tasks"][1]["id"]
     response = client.post(
         f"/api/v1/tasks/{task_id}/attempts",
