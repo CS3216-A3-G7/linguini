@@ -266,8 +266,7 @@ through backend repositories; the frontend must not query these tables directly.
 
 Authentication, real image analysis, AI generation and speech evaluation
 are not implemented. Uploaded images use validated storage uploads and deterministic
-placeholder objects. Vocabulary
-"Move" is still local frontend state. Session learning credit comes from persisted
+placeholder objects. Vocabulary "Move" is still local frontend state. Session learning credit comes from persisted
 vocabulary encounters; analysis and skipped tasks award none. Daily vocabulary, home aggregation, and other unfinished
 routes return an explicit 501. Journal eligible-photo/learned-word recommendations
 and automatic annotations remain unpopulated. Creating tables does not implement
