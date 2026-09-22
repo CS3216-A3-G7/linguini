@@ -22,9 +22,11 @@ from app.services.users import UserService
 
 
 class FakeStorage:
-    def __init__(self, objects=None, fail_put=False):
+    def __init__(self, objects=None, remote_objects=None, fail_put=False):
         self.objects = dict(objects or {})
         self.downloads = []
+        self.url_downloads = []
+        self.remote_objects = dict(remote_objects or {})
         self.puts = []
         self.fail_put = fail_put
 
@@ -33,6 +35,12 @@ class FakeStorage:
         if key not in self.objects:
             raise UploadObjectMissing()
         return self.objects[key]
+
+    def download_url(self, url):
+        self.url_downloads.append(url)
+        if url not in self.remote_objects:
+            raise UploadObjectMissing()
+        return self.remote_objects[url]
 
     def put(self, key, data, content_type):
         self.puts.append(key)
@@ -183,3 +191,48 @@ def test_another_users_asset_is_not_readable(media_client):
         with engine.begin() as connection:
             connection.execute(delete(media_assets).where(media_assets.c.id == foreign.id))
             connection.execute(delete(users).where(users.c.id == foreign_owner.id))
+
+
+def test_remote_url_asset_derives_from_the_hosted_original(media_client):
+    engine, owner, client = media_client
+    asset = insert_asset(engine, owner.id, storage_key="https://cdn.example.com/photo.jpg")
+    storage = FakeStorage(remote_objects={asset.storage_key: jpeg_bytes()})
+    try:
+        install(client, engine, owner, storage)
+        response = client.get(f"/api/v1/media/{asset.id}/image?width=320")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/webp"
+        with Image.open(BytesIO(response.content)) as image:
+            assert image.format == "WEBP"
+            assert image.width <= 320
+        assert storage.url_downloads == [asset.storage_key]
+        assert asset.storage_key not in storage.downloads
+    finally:
+        with engine.begin() as connection:
+            connection.execute(delete(media_assets).where(media_assets.c.id == asset.id))
+
+
+def test_remote_url_asset_reuses_its_hashed_derived_object(media_client):
+    engine, owner, client = media_client
+    asset = insert_asset(engine, owner.id, storage_key="https://cdn.example.com/other.jpg")
+    derived = ImageDerivatives(FakeStorage()).derived_key(asset.storage_key, 640)
+    assert derived.startswith("derived/w640/remote/")
+    storage = FakeStorage({derived: jpeg_bytes(640, 480)})
+    try:
+        install(client, engine, owner, storage)
+        assert client.get(f"/api/v1/media/{asset.id}/image?width=640").status_code == 200
+        assert not storage.url_downloads
+    finally:
+        with engine.begin() as connection:
+            connection.execute(delete(media_assets).where(media_assets.c.id == asset.id))
+
+
+def test_remote_url_missing_on_the_host_returns_404(media_client):
+    engine, owner, client = media_client
+    asset = insert_asset(engine, owner.id, storage_key="https://cdn.example.com/gone.jpg")
+    try:
+        install(client, engine, owner, FakeStorage())
+        assert client.get(f"/api/v1/media/{asset.id}/image").status_code == 404
+    finally:
+        with engine.begin() as connection:
+            connection.execute(delete(media_assets).where(media_assets.c.id == asset.id))

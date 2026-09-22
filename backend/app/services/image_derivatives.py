@@ -1,14 +1,21 @@
 """Resized WebP renditions cached in Storage and in process."""
 
+import hashlib
 import threading
 from collections import OrderedDict
 from io import BytesIO
+from urllib.parse import urlsplit
 
 from PIL import Image
 
 from app.services.image_storage import ImageStorage, UploadObjectMissing
 
 ALLOWED_WIDTHS = (320, 640, 1280)
+
+
+def _is_remote(storage_key: str) -> bool:
+    # Storage keys are admin/seeded data, not user input — this is not an open fetch proxy.
+    return urlsplit(storage_key).scheme in ("http", "https")
 
 
 class ImageDerivatives:
@@ -21,6 +28,9 @@ class ImageDerivatives:
         self._lock = threading.Lock()
 
     def derived_key(self, storage_key: str, width: int) -> str:
+        if _is_remote(storage_key):
+            digest = hashlib.sha256(storage_key.encode()).hexdigest()
+            return f"derived/w{width}/remote/{digest}.webp"
         return f"derived/w{width}/{storage_key}.webp"
 
     def get(self, storage_key: str, width: int) -> bytes:
@@ -38,7 +48,11 @@ class ImageDerivatives:
             return data
         except UploadObjectMissing:
             pass
-        data = self._resize(self.storage.download(storage_key), width)
+        if _is_remote(storage_key):
+            original = self.storage.download_url(storage_key)
+        else:
+            original = self.storage.download(storage_key)
+        data = self._resize(original, width)
         self._remember(cache_key, data)
         try:
             self.storage.put(self.derived_key(storage_key, width), data, "image/webp")

@@ -27,9 +27,7 @@ class SceneService:
             if row.media_asset.source is not MediaSource.PRELOADED:
                 raise MediaAssetStorageError("Preloaded scene media is missing or not shared.")
         urls = (
-            self.private_media_urls.resolve(
-                [row.media_asset.storage_key for row in rows]
-            )
+            self.private_media_urls.resolve([row.media_asset.storage_key for row in rows])
             if self.private_media_urls is not None
             else {}
         )

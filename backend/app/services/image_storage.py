@@ -1,6 +1,6 @@
 """Server-only Storage access; upload capabilities never allow overwrites."""
 
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -73,6 +73,25 @@ class ImageStorage:
                 return bytes(data)
         except (httpx.HTTPError, ValueError) as exc:
             raise MediaUrlError("Unable to inspect uploaded image.") from exc
+
+    def download_url(self, url: str) -> bytes:
+        # Public originals: no service-key headers, so nothing leaks to third-party hosts.
+        self._check()
+        if urlsplit(url).scheme not in ("http", "https") or not urlsplit(url).netloc:
+            raise MediaUrlError("Refusing to download a non-HTTP image URL.")
+        try:
+            with httpx.stream("GET", url, timeout=30) as response:
+                if response.status_code == 404:
+                    raise UploadObjectMissing()
+                response.raise_for_status()
+                data = bytearray()
+                for chunk in response.iter_bytes(chunk_size=65536):
+                    data.extend(chunk)
+                    if len(data) > MAX_IMAGE_BYTES:
+                        raise InvalidImageUpload("Image exceeds 10 MB.")
+                return bytes(data)
+        except (httpx.HTTPError, ValueError) as exc:
+            raise MediaUrlError("Unable to inspect hosted image.") from exc
 
     def put(self, key: str, data: bytes, content_type: str) -> None:
         # Derivatives are regenerable, so overwrite is safe here unlike user uploads.
