@@ -36,6 +36,7 @@ from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
 from app.services.openai_ispy_clues import OpenAIISpyClueGenerator
+from app.services.openai_ispy_guess import OpenAIISpyGuessGenerator
 from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
 from app.services.openai_scene_analysis import OpenAISceneAnalyzer
 from app.services.openai_translation import OpenAISceneTranslator
@@ -150,6 +151,24 @@ def get_scene_service(
     repository: Annotated[SceneRepository, Depends(get_scene_repository)],
 ) -> SceneService:
     return SceneService(repository, get_media_public_base_url(), get_private_media_urls())
+
+
+def get_ispy_guess_generator():
+    """Build the target-blind I-Spy evaluator used by task generation and attempts."""
+    provider = os.getenv("ISPY_GUESS_PROVIDER", "openai").strip().casefold()
+    if provider == "none":
+        return None
+    if provider != "openai":
+        raise ValueError(f"Unsupported ISPY_GUESS_PROVIDER: {provider}")
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    model = os.getenv("OPENAI_ISPY_GUESS_MODEL", "gpt-4o-mini").strip()
+    if not api_key or not model:
+        return None
+    return OpenAIISpyGuessGenerator(
+        api_key,
+        model,
+        timeout_seconds=int(os.getenv("ISPY_GUESS_TIMEOUT_SECONDS", "60")),
+    )
 
 
 def get_practice_repository(
@@ -274,6 +293,7 @@ def get_practice_repository(
         translator=translator,
         learning_task_generator=learning_task_generator,
         ispy_clue_generator=ispy_clue_generator,
+        ispy_guess_generator=get_ispy_guess_generator(),
         background=getattr(request.app.state, "background_runner", None),
     )
 
@@ -293,6 +313,7 @@ def get_task_service(
         PostgresTaskRepository(request.app.state.database_engine),
         users,
         request.app.state.database_engine,
+        ispy_guess_generator=get_ispy_guess_generator(),
     )
 
 

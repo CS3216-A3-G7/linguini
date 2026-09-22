@@ -5,7 +5,11 @@ from app.schemas.learning_tasks import LearningTaskResult
 from app.schemas.media import SceneObject
 from app.schemas.tasks import SessionTaskPublic
 from app.schemas.vocabulary import VocabularyItem
-from app.services.session_plan import build_grammar_lessons, build_ispy_clue_tasks
+from app.services.session_plan import (
+    build_grammar_lessons,
+    build_ispy_clue_tasks,
+    build_ispy_description_tasks,
+)
 from tests.test_openai_learning_tasks import tasks
 
 
@@ -57,3 +61,23 @@ def test_generated_ispy_clues_keep_the_answer_key_private():
     public = SessionTaskPublic.from_internal(tasks[0]).model_dump(mode="json")
     assert "answerKey" not in public
     assert len(public["publicContent"]["options"]) == 2
+
+
+def test_backend_selects_two_ispy_description_targets_without_storing_one_in_context():
+    session_id = uuid4()
+    words = [
+        VocabularyItem(language_code="fr", lemma=text, display_text=text, part_of_speech="noun")
+        for text in ["tasse", "table", "livre"]
+    ]
+    objects = [
+        SceneObject(session_id=session_id, label=label, vocabulary_item_id=word.id)
+        for label, word in zip(["cup", "table", "book"], words, strict=True)
+    ]
+    context = {"targetLanguage": "fr", "sceneObjects": {"objects": []}}
+
+    tasks = build_ispy_description_tasks(session_id, objects, words, context)
+
+    assert [task.scene_object_id for task in tasks] == [objects[0].id, objects[1].id]
+    assert all(task.phase == "ispy" for task in tasks)
+    assert all(task.answer_key.scene_description_context == context for task in tasks)
+    assert "selectedTargetObjectKey" not in str(tasks[0].answer_key.scene_description_context)
