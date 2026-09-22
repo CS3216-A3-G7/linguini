@@ -1,21 +1,13 @@
-"""Structured scene-vocabulary translation contracts."""
+"""Re-export shim: the translation contracts now live in the feature package.
 
-from typing import Annotated
+``app.ai.features.translation.schemas`` owns both the request and result
+models; this module stays so ``app/schemas/sessions.py`` (``translation_preview``)
+and existing imports keep working unchanged.
+"""
 
-from pydantic import Field
+from app.ai.features.translation.schemas import (
+    SceneTranslationResult,
+    TranslatedTerm,
+)
 
-from app.schemas.base import ApiModel, NonEmptyText
-
-
-class TranslatedTerm(ApiModel):
-    key: NonEmptyText
-    source: NonEmptyText
-    translation: Annotated[str, Field(min_length=1, max_length=300)]
-    article: Annotated[str, Field(min_length=1, max_length=20)] | None = None
-    gender: Annotated[str, Field(pattern="^(masculine|feminine)$")] | None = None
-
-
-class SceneTranslationResult(ApiModel):
-    objects: list[TranslatedTerm]
-    attributes: list[TranslatedTerm]
-    relationships: list[TranslatedTerm]
+__all__ = ["SceneTranslationResult", "TranslatedTerm"]

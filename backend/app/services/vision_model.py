@@ -8,46 +8,19 @@ stable error codes surfaced to callers. Images are always inlined as raw bytes
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Any, Protocol
 
 from pydantic import BaseModel
 
+from app.ai.model_errors import ProviderError, ProviderErrorCode
 from app.schemas.media import MAX_IMAGE_BYTES
 
 ALLOWED_IMAGE_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 
-
-class VisionModelErrorCode(StrEnum):
-    INVALID_IMAGE = "invalidImage"
-    PROVIDER_TIMEOUT = "providerTimeout"
-    PROVIDER_UNAVAILABLE = "providerUnavailable"
-    PROVIDER_RATE_LIMITED = "providerRateLimited"
-    PROVIDER_AUTH = "providerAuth"
-    PROVIDER_REFUSED = "providerRefused"
-    PROVIDER_RESPONSE_INVALID = "providerResponseInvalid"
-    PROVIDER_ERROR = "providerError"
-
-
-_TRANSIENT_CODES = frozenset(
-    {
-        VisionModelErrorCode.PROVIDER_TIMEOUT,
-        VisionModelErrorCode.PROVIDER_UNAVAILABLE,
-        VisionModelErrorCode.PROVIDER_RATE_LIMITED,
-    }
-)
-
-
-class VisionModelError(Exception):
-    """Stable vision-model failure. Never carries provider payload text."""
-
-    def __init__(self, code: VisionModelErrorCode, message: str) -> None:
-        self.code = code
-        super().__init__(message)
-
-    @property
-    def transient(self) -> bool:
-        return self.code in _TRANSIENT_CODES
+# Vision adapters keep the historical names; the shared definitions live in
+# app/ai/model_errors.py so text adapters raise the same errors.
+VisionModelErrorCode = ProviderErrorCode
+VisionModelError = ProviderError
 
 
 @dataclass(frozen=True)
