@@ -59,18 +59,18 @@ async function downscale(file: File): Promise<File> {
 export async function uploadImage(file: File, source: "camera" | "userUpload", onPhase: (phase: string) => void): Promise<UploadedImage> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Choose a JPEG, PNG or WebP image.");
   if (!file.size || file.size > 10 * 1024 * 1024) throw new Error("Choose an image between 1 byte and 10 MB.");
-  onPhase("Optimising imageâ€¦");
+  onPhase("Optimising image…");
   const prepared = await downscale(file);
-  onPhase("Preparing uploadâ€¦");
+  onPhase("Preparing upload…");
   const upload = await write<{ assetId: string; storageKey: string; uploadUrl: string }>("/api/v1/media/upload-url", "POST", {
     fileName: file.name, fileSize: prepared.size, mimeType: prepared.type, source,
   });
-  onPhase("Uploading imageâ€¦");
+  onPhase("Uploading image…");
   const response = await fetch(upload.uploadUrl, {
     method: "PUT", headers: { "Content-Type": prepared.type, "x-upsert": "false" }, body: prepared,
   });
   if (!response.ok) throw new Error("Image upload failed. Please try again.");
-  onPhase("Checking imageâ€¦");
+  onPhase("Checking image…");
   // Confirmation is idempotent; retry once if the server committed but its response was lost.
   const confirm = () => write<UploadedImage>("/api/v1/media/confirm-upload", "POST", {
     assetId: upload.assetId, storageKey: upload.storageKey, source,
