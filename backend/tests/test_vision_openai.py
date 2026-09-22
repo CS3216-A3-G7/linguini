@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from app.ai.scene_analysis import (
+from app.ai.features.scene_analysis import (
     SCENE_ANALYSIS_PROMPT_VERSION,
     SceneAnalysisModelResult,
 )

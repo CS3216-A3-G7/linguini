@@ -12,19 +12,19 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any
 
-from app.ai.observability import AITracer
-from app.ai.scene_analysis.mapping import model_result_to_domain
-from app.ai.scene_analysis.prompt import (
+from app.ai.features.scene_analysis.mapping import model_result_to_domain
+from app.ai.features.scene_analysis.prompt import (
     SCENE_ANALYSIS_PROMPT_VERSION,
     SCENE_ANALYSIS_SCHEMA_VERSION,
     SCENE_ANALYSIS_SYSTEM_PROMPT,
     SCENE_ANALYSIS_USER_INSTRUCTION,
 )
-from app.ai.scene_analysis.schemas import SceneAnalysisModelResult
-from app.ai.scene_analysis.validation import (
+from app.ai.features.scene_analysis.schemas import SceneAnalysisModelResult
+from app.ai.features.scene_analysis.validation import (
     SceneAnalysisValidationError,
     parse_scene_analysis,
 )
+from app.ai.observability import AITracer
 from app.ai.settings import AiFeature
 from app.schemas.media import MediaAsset
 from app.schemas.sessions import Session

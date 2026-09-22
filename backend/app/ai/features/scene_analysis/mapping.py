@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid5
 
-from app.ai.scene_analysis.schemas import (
+from app.ai.features.scene_analysis.schemas import (
     ModelAnchorPoint,
     ModelBoundingBox,
     SceneAnalysisModelResult,

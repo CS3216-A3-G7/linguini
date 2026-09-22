@@ -4,7 +4,7 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from app.ai.scene_analysis.schemas import (
+from app.ai.features.scene_analysis.schemas import (
     ModelAnchorPoint,
     ModelBoundingBox,
     ModelSceneObject,
@@ -12,7 +12,7 @@ from app.ai.scene_analysis.schemas import (
     SceneAnalysisIssueCode,
     SceneAnalysisModelResult,
 )
-from app.ai.scene_analysis.validation import (
+from app.ai.features.scene_analysis.validation import (
     SceneAnalysisValidationError,
     parse_scene_analysis,
     validate_scene_analysis,

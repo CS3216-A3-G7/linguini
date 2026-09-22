@@ -14,8 +14,8 @@ from app.ai import (
     NoOpAITracer,
     load_ai_settings,
 )
+from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
-from app.ai.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
 from app.ai.vision_gemini import GeminiVisionClient
 from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository

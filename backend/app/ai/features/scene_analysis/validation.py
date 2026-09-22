@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.ai.scene_analysis.schemas import (
+from app.ai.features.scene_analysis.schemas import (
     SceneAnalysisIssue,
     SceneAnalysisIssueCode,
     SceneAnalysisModelResult,

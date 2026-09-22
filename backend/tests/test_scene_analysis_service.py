@@ -9,8 +9,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from app.ai.observability import NoOpAITracer
-from app.ai.scene_analysis import (
+from app.ai.features.scene_analysis import (
     SCENE_ANALYSIS_PROMPT_VERSION,
     SCENE_ANALYSIS_SCHEMA_VERSION,
     SCENE_ANALYSIS_SYSTEM_PROMPT,
@@ -26,6 +25,7 @@ from app.ai.scene_analysis import (
     UploadedSceneAnalyzer,
     build_scene_analysis_schema,
 )
+from app.ai.observability import NoOpAITracer
 from app.ai.vision_gemini import GeminiVisionClient
 from app.schemas.enums import SceneRelationType
 from app.schemas.media import MediaAsset
@@ -355,7 +355,7 @@ def _domain(objects, relations=None):
         "objects": objects,
         "relations": relations or [],
     }
-    from app.ai.scene_analysis import parse_scene_analysis
+    from app.ai.features.scene_analysis import parse_scene_analysis
 
     return parse_scene_analysis(payload)
 
@@ -386,7 +386,7 @@ def test_low_confidence_objects_are_dropped_with_their_relations() -> None:
             "confidenceScore": 0.9,
         }
     ]
-    from app.ai.scene_analysis import model_result_to_domain
+    from app.ai.features.scene_analysis import model_result_to_domain
 
     result = model_result_to_domain(session(), _domain(objects, relations))
     assert [obj.label for obj in result.objects] == ["chair"]
@@ -394,14 +394,14 @@ def test_low_confidence_objects_are_dropped_with_their_relations() -> None:
 
 
 def test_all_low_confidence_raises_no_reliable_objects() -> None:
-    from app.ai.scene_analysis import model_result_to_domain
+    from app.ai.features.scene_analysis import model_result_to_domain
 
     with pytest.raises(SceneAnalysisError, match="No reliable"):
         model_result_to_domain(session(), _domain([_object("x", confidence=0.1)]))
 
 
 def test_anchor_outside_box_falls_back_to_box_centre() -> None:
-    from app.ai.scene_analysis import model_result_to_domain
+    from app.ai.features.scene_analysis import model_result_to_domain
 
     obj = _object("chair")
     obj["anchorPoint"] = {"x": 0.95, "y": 0.95}
@@ -412,7 +412,7 @@ def test_anchor_outside_box_falls_back_to_box_centre() -> None:
 
 
 def test_anchor_inside_box_passes_through() -> None:
-    from app.ai.scene_analysis import model_result_to_domain
+    from app.ai.features.scene_analysis import model_result_to_domain
 
     obj = _object("chair")
     obj["anchorPoint"] = {"x": 0.15, "y": 0.25}
@@ -423,7 +423,7 @@ def test_anchor_inside_box_passes_through() -> None:
 
 
 def test_later_duplicate_attribute_types_win() -> None:
-    from app.ai.scene_analysis import model_result_to_domain
+    from app.ai.features.scene_analysis import model_result_to_domain
 
     obj = _object("chair")
     obj["attributes"] = [
