@@ -4,9 +4,10 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
+
 from app.services.ispy_guess import ISpyGuessError, scene_guess_response_model
 from app.services.openai_ispy_guess import OpenAIISpyGuessGenerator
-from pydantic import ValidationError
 
 CONTEXT = {
     "targetLanguage": "es",
