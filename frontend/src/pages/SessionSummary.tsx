@@ -11,13 +11,15 @@ import { queryError, queryKeys } from "../lib/queryKeys";
 export function SessionSummary() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, activeProfile, vocabulary } = useAppState();
+  const { session, activeProfile, vocabulary, completionPending, completionError, retryCompletion } = useAppState();
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const requestKey = useRef(crypto.randomUUID());
   const { data, error: queryErrorValue, isPending: loading } = useQuery({
     queryKey: queryKeys.sessionSummary(scene.sessionId!),
     queryFn: () => getPracticeSummary(scene.sessionId!),
+    // Summary XP is only final once the completion write lands.
+    enabled: !(completionPending && session?.session.id === scene.sessionId),
   });
   const error = queryError(queryErrorValue);
   const completed = session?.session.status === "completed";
@@ -44,6 +46,7 @@ export function SessionSummary() {
     </div>
     {loading ? <p role="status">Loading your results...</p> : null}
     {error || startError ? <p role="alert">{error || startError}</p> : null}
+    {completionError ? <><p role="alert">{completionError}</p><Button onClick={retryCompletion}>Retry saving your session</Button></> : null}
     {data ? <>
       <div className="stat-grid">
         <div className="stat"><div className="stat__value">{data.xpEarned}</div><span className="stat__label">XP earned</span></div>

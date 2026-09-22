@@ -1,5 +1,5 @@
 import { practiceScene } from "../lib/practiceScene";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getMedia, getPractice } from "../lib/api";
@@ -16,7 +16,9 @@ export function SessionRoute() {
   return <SessionLoader key={sessionId} id={sessionId} />;
 }
 function SessionLoader({ id }: { id: string }) {
-  const { loadSession, learner, session } = useAppState();
+  const { loadSession, learner, session, flushLearningChanges } = useAppState();
+  // Leaving the session flushes deferred learning invalidations once, not per task.
+  useEffect(() => () => flushLearningChanges(), [flushLearningChanges]);
   const [preview, setPreview] = useState<Scene | null>(null);
   const [detail, setDetail] = useState<PracticeDetail | null>(null);
   const location = useLocation();

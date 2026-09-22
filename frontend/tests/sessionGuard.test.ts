@@ -94,7 +94,7 @@ try {
     resolve: { extensions: [".tsx", ".ts", ".js"] },
     plugins: [{
       name: "api-base-url",
-      transform: (code: string) => code.replaceAll("import.meta.env.VITE_API_BASE_URL", '"http://test.local"'),
+      transform: (code: string) => code.replaceAll("import.meta.env?.VITE_API_BASE_URL", '"http://test.local"'),
     }, {
       name: "stub-css",
       resolveId: (id: string) => (id.endsWith(".css") ? "\0empty-css" : null),

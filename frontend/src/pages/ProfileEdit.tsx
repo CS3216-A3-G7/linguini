@@ -6,7 +6,7 @@ import { useAppState } from "../state/useAppState";
 
 export function ProfileEdit() {
   const navigate = useNavigate();
-  const { learner, activeProfile, saveProfileSettings, profileSaving, profileError } = useAppState();
+  const { learner, activeProfile, startProfileSettingsSave, profileSaving, profileError } = useAppState();
   const [name, setName] = useState(learner.name);
   const [language, setLanguageDraft] = useState(learner.languageCode || "es");
   const [dailyMinutes, setDailyMinutes] = useState(learner.dailyMinutes ?? 10);
@@ -14,12 +14,12 @@ export function ProfileEdit() {
   const [micOn, setMicOn] = useState(learner.micOn);
   const [cameraOn, setCameraOn] = useState(learner.cameraOn);
 
-  const saveProfile = async () => {
+  const saveProfile = () => {
     if (profileSaving || !name.trim()) return;
-    const saved = await saveProfileSettings(language, {
+    const started = startProfileSettingsSave(language, {
       displayName: name.trim(), microphoneEnabled: micOn, cameraEnabled: cameraOn,
     }, { dailyGoalMinutes: dailyMinutes, preferredInputMode: practicePreference });
-    if (saved) navigate("/profile");
+    if (started) navigate("/profile");
   };
 
   return (

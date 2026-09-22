@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, TaskAnswer, TaskActionResult } from "../lib/api";
@@ -15,6 +15,8 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
   const [practiceError, setError] = useState<string | null>(null);
   const [practiceStalled, setStalled] = useState(false);
   const busy = useRef(false);
+  const learningDirty = useRef(false);
+  const [completionError, setCompletionError] = useState<string | null>(null);
   const loadVersion = useRef(0);
   const sessionLoads = useRef(new Map<string, Promise<PracticeDetail>>());
   const creation = useRef<{ asset: string; key: string } | null>(null);
@@ -73,24 +75,53 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     try {
       const result = await taskAction(taskId, action, answer ? { ...answer, idempotencyKey: key } : {});
       setSession(value => applyTaskResult(value, session.session.id, result));
-      onLearningChanged();
+      learningDirty.current = true;
       return result;
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save task. Retry your action."); return null; }
     finally { busy.current = false; setSaving(false); }
-  }, [session, onLearningChanged]);
-  const completeSession = useCallback(async () => {
-    if (!session || busy.current) return false;
-    busy.current = true; setSaving(true); setError(null);
-    try {
-      await completePractice(session.session.id);
-      const completed = await getPractice(session.session.id);
-      setSession(value => value?.session.id === completed.session.id ? completed : value);
+  }, [session]);
+  const flushLearningChanges = useCallback(() => {
+    if (learningDirty.current) {
+      learningDirty.current = false;
       onLearningChanged();
-      void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(session.session.id) });
-      return true;
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to complete session."); return false; }
-    finally { busy.current = false; setSaving(false); }
-  }, [session, onLearningChanged, queryClient]);
+    }
+  }, [onLearningChanged]);
+  const completion = useMutation({
+    mutationFn: (sessionId: string) => completePractice(sessionId),
+    // The route guard only sends /summary when status is "completed", so the
+    // optimistic status must land before the caller navigates.
+    onMutate: (sessionId: string) => {
+      const previousStatus = session?.session.id === sessionId ? session.session.status : null;
+      setSession(current => current?.session.id === sessionId
+        ? { ...current, session: { ...current.session, status: "completed" } }
+        : current);
+      return { sessionId, previousStatus };
+    },
+    onError: (error, sessionId, context) => {
+      const previousStatus = context?.previousStatus;
+      if (previousStatus) {
+        setSession(current => current?.session.id === sessionId
+          ? { ...current, session: { ...current.session, status: previousStatus } }
+          : current);
+      }
+      setCompletionError(error instanceof Error ? error.message : "Unable to complete session.");
+    },
+    onSuccess: (_data, sessionId) => {
+      flushLearningChanges();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(sessionId) });
+    },
+  });
+  const completeSession = useCallback(() => {
+    if (!session || completion.isPending) return false;
+    setCompletionError(null);
+    completion.mutate(session.session.id);
+    return true;
+  }, [session, completion]);
+  const retryCompletion = useCallback(() => {
+    if (!session || completion.isPending) return;
+    setCompletionError(null);
+    completion.mutate(session.session.id);
+  }, [session, completion]);
   const saveReview = useCallback(async (review: PracticeReview) => {
     if (!session || busy.current) return false;
     busy.current = true; setSaving(true); setError(null);
@@ -108,5 +139,5 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       return false;
     } finally { busy.current = false; setSaving(false); }
   }, [session]);
-  return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, retryProcessing, actOnTask, completeSession, saveReview, micReady, setMicReady };
+  return { session, practiceSaving, practiceError, practiceStalled, startSession, loadSession, retryProcessing, actOnTask, completeSession, completionPending: completion.isPending, completionError, retryCompletion, flushLearningChanges, saveReview, micReady, setMicReady };
 }

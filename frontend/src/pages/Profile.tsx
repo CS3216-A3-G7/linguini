@@ -5,7 +5,7 @@ import { useAppState } from "../state/useAppState";
 export function Profile() {
   const navigate = useNavigate();
   const { learner, vocabulary, journal, user, activeProfile, progress, progressLoading, progressError,
-    vocabularyLoading, vocabularyError, journalLoading, journalError } = useAppState();
+    vocabularyLoading, vocabularyError, journalLoading, journalError, profileError } = useAppState();
   const metrics = [
     { value: vocabularyLoading || vocabularyError ? "--" : vocabulary.length, label: "Words" },
     { value: vocabularyLoading || vocabularyError ? "--" : vocabulary.filter(word => word.status === "mastered").length, label: "Mastered" },
@@ -44,6 +44,7 @@ export function Profile() {
 
       {progressLoading || vocabularyLoading || journalLoading ? <p role="status">Loading your progress...</p> : null}
       {[progressError, vocabularyError, journalError].filter(Boolean).map((error, index) => <p key={index} role="alert">{error} Reload to retry.</p>)}
+      {profileError ? <p role="alert">{profileError}</p> : null}
       <section className="profile-section">
         <div className="profile-section__heading">
           <h2>Your progress</h2>
