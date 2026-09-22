@@ -88,16 +88,14 @@ def test_list_and_detail_use_current_media_key(private):
     )
     repository = MagicMock()
     repository.list_scenes.return_value = [scene]
-    media = MagicMock()
-    media.get_by_ids.return_value = {asset.id: asset.model_copy(update={"storage_key": "new.jpg"})}
     signer = MagicMock() if private else None
-    expected_url = BASE + "/new.jpg"
+    expected_url = BASE + "/old.jpg"
     if signer:
         expected_url = (
-            "https://project.supabase.co/storage/v1/object/sign/scenes/new.jpg?token=test"
+            "https://project.supabase.co/storage/v1/object/sign/scenes/old.jpg?token=test"
         )
-        signer.resolve.return_value = {"new.jpg": expected_url}
-    service = SceneService(repository, media, BASE, signer)
+        signer.resolve.return_value = {"old.jpg": expected_url}
+    service = SceneService(repository, BASE, signer)
     summary = service.list_scenes("es")[0]
     detail = service.get_scene("cafe", "es")
     assert summary.model_dump(by_alias=True)["imageUrl"] == expected_url
@@ -105,7 +103,7 @@ def test_list_and_detail_use_current_media_key(private):
     assert detail.items == scene.items
     assert scene.image_url is None
     if signer:
-        signer.resolve.assert_called_with(["new.jpg"])
+        signer.resolve.assert_called_with(["old.jpg"])
 
 
 def test_signing_batches_paths_and_keeps_credentials_on_server(monkeypatch):

@@ -1,4 +1,4 @@
-from app.repositories.media_assets import MediaAssetRepository, MediaAssetStorageError
+from app.repositories.media_assets import MediaAssetStorageError
 from app.repositories.scenes import SceneRepository
 from app.schemas.enums import MediaSource
 from app.schemas.media import PreloadedScene
@@ -14,35 +14,26 @@ class SceneService:
     def __init__(
         self,
         repository: SceneRepository,
-        media: MediaAssetRepository | None = None,
         media_public_base_url: str | None = None,
         private_media_urls: PrivateMediaUrls | None = None,
     ) -> None:
         self.repository = repository
-        self.media = media
         self.media_public_base_url = media_public_base_url
         self.private_media_urls = private_media_urls
 
     def _hydrate_media(self, rows: list[PreloadedSceneDetail]) -> list[PreloadedSceneDetail]:
-        assets = (
-            self.media.get_by_ids([row.media_asset.id for row in rows])
-            if self.media is not None
-            else {row.media_asset.id: row.media_asset for row in rows}
-        )
+        # The repository join already validated each row's media asset.
         for row in rows:
-            asset = assets.get(row.media_asset.id)
-            if asset is None or asset.source is not MediaSource.PRELOADED:
+            if row.media_asset.source is not MediaSource.PRELOADED:
                 raise MediaAssetStorageError("Preloaded scene media is missing or not shared.")
         urls = (
-            self.private_media_urls.resolve(
-                [assets[row.media_asset.id].storage_key for row in rows]
-            )
+            self.private_media_urls.resolve([row.media_asset.storage_key for row in rows])
             if self.private_media_urls is not None
             else {}
         )
         result = []
         for row in rows:
-            asset = assets[row.media_asset.id]
+            asset = row.media_asset
             result.append(
                 row.model_copy(
                     update={

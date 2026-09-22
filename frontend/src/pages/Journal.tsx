@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button, Card, IconButton } from "../components/ui";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { JournalImage } from "../components/JournalImage";
+import { MediaImage } from "../components/MediaImage";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useJournalsQuery } from "../state/queries";
 import type { JournalEntry } from "../data/types";
@@ -107,7 +108,9 @@ function JournalMonths({ journal }: { journal: JournalEntry[] }) {
               onClick={() => navigate(`/journal/${entry.id}`)}
             >
               <span className="thumb thumb--lg">
-                <JournalImage title={entry.title} imageUrl={entry.imageUrl} />
+                {entry.mediaAssetId
+                  ? <MediaImage assetId={entry.mediaAssetId} title={entry.title} width={320} lazy />
+                  : <JournalImage title={entry.title} imageUrl={entry.imageUrl} lazy />}
               </span>
               <span className="grow journal-list-entry__details">
                 <strong className="journal-list-entry__title">{entry.title}</strong>
