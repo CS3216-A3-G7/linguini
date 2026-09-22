@@ -83,6 +83,29 @@ class GeneratedQuestion(ApiModel):
         return self
 
 
+class GeneratedMultipleChoiceQuestion(GeneratedQuestion):
+    interaction_type: Literal["multipleChoice"] = "multipleChoice"
+    options: list[GeneratedChoice] = Field(min_length=4, max_length=4)
+    correct_option_id: NonEmptyText
+
+
+class GeneratedDescriptionQuestion(GeneratedMultipleChoiceQuestion):
+    translation: NonEmptyText = Field(
+        description="English translation of the complete correct sentence. Never null or empty."
+    )
+
+
+class GeneratedSentenceBuilderQuestion(GeneratedQuestion):
+    interaction_type: Literal["sentenceBuilding"] = "sentenceBuilding"
+    options: list[GeneratedChoice] = Field(default_factory=list, max_length=0)
+    correct_option_id: None = None
+    correct_text: NonEmptyText
+    token_bank: list[NonEmptyText] = Field(min_length=1)
+    translation: NonEmptyText = Field(
+        description="Complete English sentence the learner must translate using the word bank."
+    )
+
+
 class GeneratedLearningTask(ApiModel):
     focus: LearningTaskFocus
     title: NonEmptyText

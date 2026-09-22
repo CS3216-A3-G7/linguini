@@ -130,8 +130,8 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     try {
       const detail = await reviewPractice(session.session.id, review);
       setSession(current => current?.session.id === detail.session.id ? detail : current);
-      // Task generation now runs off the request path; start draining it while
-      // `proceed` navigates — SessionRoute reuses this in-flight load.
+      // Poll in the background while analysis displays the translating screen.
+      // SessionRoute forwards to the mic check when this resolves as ready.
       if (PROCESSING.includes(detail.session.status)) void loadSession(session.session.id);
       return true;
     } catch (error) {

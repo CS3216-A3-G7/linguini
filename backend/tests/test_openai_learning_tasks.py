@@ -5,7 +5,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.schemas.learning_tasks import LearningTaskResult
-from app.services.learning_tasks import LearningTaskGenerationError
+from app.services.learning_tasks import (
+    LearningTaskGenerationError,
+    normalize_learning_task_references,
+)
 from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
 
 INPUT = {
@@ -206,9 +209,7 @@ def test_generation_rejects_keys_outside_the_supplied_scene(tmp_path):
 def test_generation_repairs_an_unambiguous_relationship_label(tmp_path):
     payload = tasks()
     payload["tasks"][0]["questions"][0]["relationshipKeys"] = ["on"]
-    provider, _ = generator(tmp_path, LearningTaskResult.model_validate(payload))
-
-    result = provider.generate(INPUT)
+    result = normalize_learning_task_references(INPUT, LearningTaskResult.model_validate(payload))
 
     assert result.tasks[0].questions[0].relationship_keys == ["relation_1"]
 
@@ -241,12 +242,11 @@ def test_generation_requires_a_relationship_for_relation_tasks(tmp_path):
         provider.generate(INPUT)
 
 
-def test_generation_requires_chained_descriptions_for_two_relationships(tmp_path):
+def test_generation_accepts_a_simpler_grounded_builder(tmp_path):
     payload = tasks()
     provider, _ = generator(tmp_path, LearningTaskResult.model_validate(payload))
 
-    with pytest.raises(LearningTaskGenerationError):
-        provider.generate(INPUT_WITH_TWO_RELATIONSHIPS)
+    assert len(provider.generate(INPUT_WITH_TWO_RELATIONSHIPS).tasks) == 4
 
 
 def test_generation_accepts_a_chained_sentence_builder(tmp_path):

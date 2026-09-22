@@ -25,10 +25,10 @@ function detail(status: SessionStatus, tasks: SessionTask[] = [], failureCode: P
 }
 
 test("every session status maps to its canonical route", () => {
-  for (const status of ["created", "analyzingScene", "awaitingObjectReview"] as const) {
+  for (const status of ["created", "analyzingScene", "awaitingObjectReview", "generatingTasks"] as const) {
     assert.deepEqual(sessionDestination(detail(status)), { path: "/practice/sessions/s1/analysis", notice: null });
   }
-  for (const status of ["generatingTasks", "ready"] as const) {
+  for (const status of ["ready"] as const) {
     assert.deepEqual(sessionDestination(detail(status)), { path: "/practice/sessions/s1/mic-test", notice: null });
   }
   assert.deepEqual(sessionDestination(detail("completed")), { path: "/practice/sessions/s1/summary", notice: null });
@@ -46,10 +46,12 @@ test("isPreTaskStep marks only the pre-task steps as auto-forwardable", () => {
   assert.equal(isPreTaskStep("/practice"), false);
 });
 
-test("generatingTasks sends the analysis page to the mic check", () => {
+test("generation stays on analysis until ready for the mic check", () => {
   const generating = detail("generatingTasks");
-  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/mic-test"), true);
-  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/analysis"), false);
+  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/mic-test"), false);
+  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/analysis"), true);
+  assert.equal(isSessionRouteAllowed(detail("ready"), "/practice/sessions/s1/analysis"), false);
+  assert.equal(sessionDestination(detail("ready")).path, "/practice/sessions/s1/mic-test");
 });
 
 test("inProgress resumes at the first unfinished stage", () => {
