@@ -59,6 +59,9 @@ def database(monkeypatch):
 
     app.add_exception_handler(PracticeStorageError, storage_failure)
     with TestClient(app) as client:
+        from app.services.background import InlineBackgroundRunner
+
+        app.state.background_runner = InlineBackgroundRunner()
         yield engine, owner, profile, client
     with engine.begin() as connection:
         connection.execute(delete(sessions).where(sessions.c.user_id == owner.id))
@@ -96,14 +99,15 @@ def vocabulary_answer(content, correct=True):
 def analyze(client, sid, confirm=True):
     response = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert response.status_code == 200, response.text
-    detail = response.json()
+    detail = client.get(f"/api/v1/sessions/{sid}").json()
     if confirm and not detail["tasks"]:
         response = client.put(
             f"/api/v1/sessions/{sid}/review",
             json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
         )
         assert response.status_code == 200, response.text
-    return response.json()
+        detail = client.get(f"/api/v1/sessions/{sid}").json()
+    return detail
 
 
 @pytest.mark.parametrize("source", ["preloaded", "userUpload", "camera"])
@@ -333,9 +337,10 @@ def test_active_session_replacement_and_owner_scope(database, monkeypatch):
         json={"acceptedObjectIds": [detail["sceneObjects"][0]["id"]]},
     )
     assert reviewed.status_code == 200, reviewed.text
-    assert reviewed.json()["session"]["status"] == "inProgress"
-    assert reviewed.json()["session"]["startedAt"] is not None
-    for task in reviewed.json()["tasks"]:
+    reviewed = client.get(f"/api/v1/sessions/{first}").json()
+    assert reviewed["session"]["status"] == "inProgress"
+    assert reviewed["session"]["startedAt"] is not None
+    for task in reviewed["tasks"]:
         assert client.post(f"/api/v1/tasks/{task['id']}/skip", json={}).status_code == 200
     assert client.post(f"/api/v1/sessions/{first}/complete").status_code == 200
     completed = client.get(f"/api/v1/sessions/{first}").json()["session"]
@@ -530,7 +535,7 @@ def test_review_rejects_adds_and_rebuilds_without_duplicate_objects(database):
     ]
     response = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
     assert response.status_code == 200, response.text
-    saved = response.json()
+    saved = client.get(f"/api/v1/sessions/{sid}").json()
     selected = saved["sceneObjects"]
     assert len(selected) == 2
     relation = saved["sceneObjectRelations"][0]
@@ -550,8 +555,9 @@ def test_review_rejects_adds_and_rebuilds_without_duplicate_objects(database):
     assert len(introductions[0]["publicContent"]["words"]) == 2
     retry = client.put(f"/api/v1/sessions/{sid}/review", json=payload)
     assert retry.status_code == 200, retry.text
-    assert len(retry.json()["sceneObjects"]) == len(saved["sceneObjects"])
-    assert retry.json()["sceneObjectRelations"] == saved["sceneObjectRelations"]
+    retry = client.get(f"/api/v1/sessions/{sid}").json()
+    assert len(retry["sceneObjects"]) == len(saved["sceneObjects"])
+    assert retry["sceneObjectRelations"] == saved["sceneObjectRelations"]
     task_id = next(task["id"] for task in saved["tasks"] if task["kind"] == "grammarExplanation")
     assert client.post(f"/api/v1/tasks/{task_id}/complete", json={}).status_code == 200
     assert client.put(f"/api/v1/sessions/{sid}/review", json=payload).status_code == 409

@@ -1,5 +1,6 @@
 """Atomic normalized session workflow. Locks serialize each user's transitions."""
 
+import logging
 from contextlib import contextmanager
 from datetime import timedelta
 from uuid import uuid5
@@ -49,9 +50,12 @@ from app.schemas.vocabulary import (
     VocabularyItem,
     VocabularyTranslation,
 )
+from app.services.background import InlineBackgroundRunner
 from app.services.learning_tasks import LearningTaskGenerationError, required_task_focuses
-from app.services.scene_analysis import DeterministicSceneAnalyzer, SceneAnalysisError
+from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.session_plan import bootstrap_word, build_grammar_lessons, build_tasks
+
+logger = logging.getLogger(__name__)
 
 TERMINAL = {"completed", "abandoned", "failed"}
 ALLOWED_TRANSITIONS = {
@@ -143,12 +147,19 @@ def _stale_processing(status=None):
 
 class PostgresWorkflowRepository:
     def __init__(
-        self, engine, user_id, analyzer=None, translator=None, learning_task_generator=None
+        self,
+        engine,
+        user_id,
+        analyzer=None,
+        translator=None,
+        learning_task_generator=None,
+        background=None,
     ):
         self.engine, self.user_id = engine, user_id
         self.analyzer = analyzer or DeterministicSceneAnalyzer(engine)
         self.translator = translator
         self.learning_task_generator = learning_task_generator
+        self.background = background or InlineBackgroundRunner()
 
     @contextmanager
     def transaction(self):
@@ -592,38 +603,58 @@ class PostgresWorkflowRepository:
             if asset.source == "preloaded" and scene is None:
                 raise PracticeNotFoundError("Curated scene not found.")
             claimed = self._transition(c, session, "analyzingScene")
+            detail = self._detail(c, claimed)
+        self.background.submit(
+            self._run_scene_analysis,
+            session_id,
+            profile_id,
+            claimed,
+            asset,
+            dict(profile),
+            dict(scene) if scene else None,
+        )
+        return detail
+
+    def _run_scene_analysis(self, session_id, profile_id, claimed, asset, profile, scene):
+        """Model round-trip, off the request path. Must never raise to its runner."""
         try:
             result = self.analyzer.analyze(
-                claimed, asset, dict(profile), dict(scene) if scene else None
+                claimed, asset, profile, scene
             )
-        except Exception as exc:
             with self.transaction() as c:
-                current = self._session(c, session_id)
-                if current.status == "analyzingScene":
-                    self._transition(c, current, "failed", failure_code="sceneAnalysisFailed")
-            if isinstance(exc, PracticeConflictError | PracticeNotFoundError):
-                raise
-            raise SceneAnalysisError("Scene analysis failed.") from exc
-        with self.transaction() as c:
-            current = self._session(c, session_id, profile_id)
-            if current.status != "analyzingScene":
-                return self._detail(c, current)
-            current = self._transition(
-                c,
-                current,
-                "awaitingObjectReview",
-                session_title=result.title,
-                session_summary=result.summary,
-                analysis_draft={
-                    "objects": [
-                        obj.model_dump(mode="json", by_alias=False) for obj in result.objects
-                    ],
-                    "relations": [
-                        row.model_dump(mode="json", by_alias=False) for row in result.relations
-                    ],
-                },
-            )
-            return self._detail(c, current)
+                current = self._session(c, session_id, profile_id)
+                if current.status != "analyzingScene":
+                    return
+                self._transition(
+                    c,
+                    current,
+                    "awaitingObjectReview",
+                    session_title=result.title,
+                    session_summary=result.summary,
+                    analysis_draft={
+                        "objects": [
+                            obj.model_dump(mode="json", by_alias=False)
+                            for obj in result.objects
+                        ],
+                        "relations": [
+                            row.model_dump(mode="json", by_alias=False)
+                            for row in result.relations
+                        ],
+                    },
+                )
+        except Exception:
+            logger.exception("Scene analysis failed for session %s.", session_id)
+            try:
+                with self.transaction() as c:
+                    current = self._session(c, session_id)
+                    if current.status == "analyzingScene":
+                        self._transition(
+                            c, current, "failed", failure_code="sceneAnalysisFailed"
+                        )
+            except Exception:
+                logger.exception(
+                    "Could not record the analysis failure for session %s.", session_id
+                )
 
     def _catalog_word(self, c, profile, label):
         match = (
@@ -667,18 +698,30 @@ class PostgresWorkflowRepository:
             return {"available": True}
 
     def review(self, session_id, profile_id, request):
+        detail = self._review(session_id, profile_id, request)
+        self.background.submit(self._run_task_generation, session_id, profile_id)
+        return detail
+
+    def _run_task_generation(self, session_id, profile_id):
+        """Translator + lesson generation, off the request path. Never re-raises."""
         try:
-            return self._review(session_id, profile_id, request)
-        except LearningTaskGenerationError:
-            # The rolled-back review leaves the session un-planned; record why it stopped.
-            with self.transaction() as c:
-                current = self._session(c, session_id)
-                if current.status not in TERMINAL:
-                    self._transition(c, current, "failed", failure_code="taskGenerationFailed")
-            raise
+            self._generate_tasks(session_id, profile_id)
+        except Exception:
+            logger.exception("Task generation failed for session %s.", session_id)
+            try:
+                with self.transaction() as c:
+                    current = self._session(c, session_id)
+                    if current.status not in TERMINAL:
+                        self._transition(
+                            c, current, "failed", failure_code="taskGenerationFailed"
+                        )
+            except Exception:
+                logger.exception(
+                    "Could not record the task generation failure for session %s.",
+                    session_id,
+                )
 
     def _review(self, session_id, profile_id, request):
-        lessons = []
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
             if session.status in TERMINAL:
@@ -789,8 +832,21 @@ class PostgresWorkflowRepository:
                 )
             if session.status not in {"ready", "inProgress"}:
                 session = self._transition(c, session, "generatingTasks")
+            return self._detail(c, session)
+
+    def _generate_tasks(self, session_id, profile_id):
+        lessons = []
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            profile = (
+                c.execute(select(language_profiles).where(language_profiles.c.id == profile_id))
+                .mappings()
+                .one()
+            )
             detail = self._detail(c, session)
-            objects = [obj for obj in detail.scene_objects if obj.id in accepted]
+            # Phase A left exactly the accepted objects; rebuild tasks from scratch.
+            c.execute(delete(session_tasks).where(session_tasks.c.session_id == session_id))
+            objects = list(detail.scene_objects)
             if self.translator:
                 payload = {
                     "targetLanguage": profile["target_language_code"],
@@ -859,7 +915,7 @@ class PostgresWorkflowRepository:
                 )
                 session = session.model_copy(update={"analysis_draft": draft})
                 detail = self._detail(c, session)
-                objects = [obj for obj in detail.scene_objects if obj.id in accepted]
+                objects = list(detail.scene_objects)
             words_by_id = {word.id: word for word in detail.vocabulary}
             translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
             if any(
@@ -888,8 +944,7 @@ class PostgresWorkflowRepository:
             for index, task in enumerate(rebuilt):
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
-            session = self._transition(c, session, "inProgress")
-            return self._detail(c, session)
+            self._transition(c, session, "inProgress")
 
     def finish(self, session_id, profile_id, abandon=False):
         with self.transaction() as c:
