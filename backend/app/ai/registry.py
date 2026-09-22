@@ -7,6 +7,7 @@ deterministic fallbacks.
 
 from __future__ import annotations
 
+from app.ai.features.learning_tasks import LearningTaskService
 from app.ai.features.translation import SceneTranslationService
 from app.ai.observability import AITracer
 from app.ai.settings import AiFeature, AiProvider, AiSettings
@@ -43,5 +44,29 @@ def build_scene_translator(
     )
     client = build_text_client(config.provider, settings, text_config)
     return SceneTranslationService(
+        client, text_config, tracer=tracer, provider=config.provider.value
+    )
+
+
+def build_learning_task_generator(
+    settings: AiSettings, tracer: AITracer
+) -> LearningTaskService | None:
+    """Build the configured learning-task generator, or ``None`` when off.
+
+    ``None`` preserves the workflow's deterministic lesson-plan fallback.
+    Four grammar tasks exceed the shared default output budget, so the
+    default cap is raised here (the old SDK path had no explicit cap).
+    """
+    config = settings.feature(AiFeature.LEARNING_TASK)
+    if config.provider is AiProvider.NONE or not settings.is_configured(config):
+        return None
+    text_config = TextModelConfig(
+        model_name=config.model_name,
+        timeout_seconds=config.timeout_seconds,
+        max_output_tokens=config.max_output_tokens or 4000,
+        max_retries=min(config.max_retries, 1),
+    )
+    client = build_text_client(config.provider, settings, text_config)
+    return LearningTaskService(
         client, text_config, tracer=tracer, provider=config.provider.value
     )

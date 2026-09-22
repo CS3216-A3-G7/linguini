@@ -16,7 +16,10 @@ from app.ai import (
 )
 from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
-from app.ai.registry import build_scene_translator
+from app.ai.registry import (
+    build_learning_task_generator,
+    build_scene_translator,
+)
 from app.ai.vision_gemini import GeminiVisionClient
 from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
@@ -38,7 +41,6 @@ from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
 from app.repositories.scenes import SceneRepository
 from app.repositories.users import UserRepository
-from app.services.gemini_learning_tasks import GeminiLearningTaskGenerator
 from app.services.image_derivatives import ImageDerivatives
 from app.services.image_storage import ImageStorage
 from app.services.journals import JournalService
@@ -47,7 +49,6 @@ from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
 from app.services.openai_ispy_clues import OpenAIISpyClueGenerator
 from app.services.openai_ispy_guess import OpenAIISpyGuessGenerator
-from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
 from app.services.practice import PracticeService
 from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.scenes import SceneService
@@ -249,33 +250,7 @@ def get_practice_repository(
 
     translator = build_scene_translator(settings, tracer)
 
-    learning_task_config = settings.feature(AiFeature.LEARNING_TASK)
-    if learning_task_config.provider is AiProvider.OPENAI:
-        learning_task_generator = (
-            OpenAILearningTaskGenerator(
-                openai_key,
-                learning_task_config.model_name,
-                timeout_seconds=learning_task_config.timeout_seconds,
-            )
-            if settings.is_configured(learning_task_config)
-            else None
-        )
-    elif learning_task_config.provider is AiProvider.GEMINI:
-        learning_task_generator = (
-            GeminiLearningTaskGenerator(
-                gemini_key,
-                learning_task_config.model_name,
-                timeout_seconds=learning_task_config.timeout_seconds,
-            )
-            if settings.is_configured(learning_task_config)
-            else None
-        )
-    elif learning_task_config.provider is AiProvider.NONE:
-        learning_task_generator = None
-    else:
-        raise ValueError(
-            f"Unsupported LEARNING_TASK_PROVIDER: {learning_task_config.provider}"
-        )
+    learning_task_generator = build_learning_task_generator(settings, tracer)
 
     ispy_clue_config = settings.feature(AiFeature.ISPY_CLUE)
     if ispy_clue_config.provider is AiProvider.OPENAI:

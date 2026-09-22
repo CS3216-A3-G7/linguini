@@ -9,6 +9,7 @@ from sqlalchemy import DateTime, and_, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as upsert
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.ai.features.learning_tasks import required_task_focuses
 from app.repositories.postgres.language_profiles import language_profiles
 from app.repositories.postgres.media_assets import media_assets
 from app.repositories.postgres.practice import sessions
@@ -53,7 +54,6 @@ from app.schemas.vocabulary import (
 from app.services.background import InlineBackgroundRunner
 from app.services.ispy_clues import ISpyClueGenerationError
 from app.services.ispy_guess import ISpyGuessError
-from app.services.learning_tasks import required_task_focuses
 from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.session_plan import (
     bootstrap_word,

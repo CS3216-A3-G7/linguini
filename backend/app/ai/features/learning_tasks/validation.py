@@ -1,116 +1,24 @@
-"""Provider-neutral grammar learning-task contract and validation."""
+"""Provider-neutral, deterministic validation for generated learning tasks.
 
-from functools import lru_cache
-from pathlib import Path
-from typing import Any, Literal, Protocol
+No SDK imports: the same rules run regardless of which adapter produced the
+response. ``LearningTaskGenerationError`` stays a ``SceneAnalysisError`` so
+the workflow fallback and learning-error handling are unchanged.
+"""
 
-from pydantic import Field, create_model
+from __future__ import annotations
 
-from app.schemas.base import ApiModel
-from app.schemas.learning_tasks import (
-    REQUIRED_TASK_FOCUS_ORDER,
-    GeneratedDescriptionQuestion,
-    GeneratedLearningTask,
-    GeneratedMultipleChoiceQuestion,
-    GeneratedSentenceBuilderQuestion,
+from typing import Any
+
+from app.ai.features.learning_tasks.schemas import (
+    KEY_FIELDS,
     LearningTaskResult,
+    required_task_focuses,
 )
 from app.services.scene_analysis import SceneAnalysisError
-
-DEFAULT_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "learning_tasks.txt"
-
-KEY_FIELDS = {
-    "objects": "object_keys",
-    "attributes": "attribute_keys",
-    "relationships": "relationship_keys",
-}
 
 
 class LearningTaskGenerationError(SceneAnalysisError):
     """The scene vocabulary could not be turned into usable learning tasks."""
-
-
-class LearningTaskGenerator(Protocol):
-    def generate(self, payload: dict[str, Any]) -> LearningTaskResult: ...
-
-
-def required_task_focuses(payload: dict[str, Any]) -> tuple[str, ...]:
-    """Return the one valid task sequence for the scene's relation count."""
-    relationship_count = len(payload.get("relationships", []))
-    return (
-        REQUIRED_TASK_FOCUS_ORDER
-        if relationship_count >= 1
-        else REQUIRED_TASK_FOCUS_ORDER[:2] + REQUIRED_TASK_FOCUS_ORDER[3:]
-    )
-
-
-@lru_cache(maxsize=32)
-def generation_response_model(
-    focuses: tuple[str, ...],
-    object_keys: tuple[str, ...],
-    attribute_keys: tuple[str, ...],
-    relationship_keys: tuple[str, ...],
-) -> type[ApiModel]:
-    """Express runtime requirements in the provider schema before generation."""
-    fields = {}
-    for focus in focuses:
-        base = (
-            GeneratedSentenceBuilderQuestion if focus == "chainedDescription"
-            else GeneratedDescriptionQuestion if focus == "sceneDescription"
-            else GeneratedMultipleChoiceQuestion
-        )
-        references = {}
-        for name, keys in (
-            ("object_keys", object_keys),
-            ("attribute_keys", attribute_keys),
-            ("relationship_keys", relationship_keys),
-        ):
-            minimum = int(name == "object_keys" or (
-                name == "relationship_keys" and bool(keys)
-                and focus in {"sceneDescription", "chainedDescription"}
-            ))
-            references[name] = (
-                list[Literal.__getitem__(keys)] if keys else list[str],
-                Field(min_length=minimum) if keys else Field(max_length=0),
-            )
-        question = create_model(f"{focus}Question", __base__=base, **references)
-        task = create_model(
-            f"{focus}Task", __base__=GeneratedLearningTask,
-            questions=(list[question], Field(min_length=2, max_length=4)),
-        )
-        fields[focus] = (task, ...)
-    return create_model(
-        f"RequiredLearningTasks{len(focuses)}",
-        __base__=ApiModel,
-        **fields,
-    )
-
-
-def scene_generation_response_model(payload: dict[str, Any]) -> type[ApiModel]:
-    if not payload.get("objects"):
-        raise LearningTaskGenerationError("Learning tasks need at least one scene object.")
-    return generation_response_model(
-        required_task_focuses(payload),
-        *(tuple(dict.fromkeys(row["key"] for row in payload.get(field, [])))
-          for field in KEY_FIELDS),
-    )
-
-
-def unpack_generated_tasks(payload: dict[str, Any], response: ApiModel) -> LearningTaskResult:
-    # The enclosing field owns the focus and order, not model-written metadata.
-    return LearningTaskResult(tasks=[
-        GeneratedLearningTask.model_validate({
-            **getattr(response, focus).model_dump(), "focus": focus,
-        })
-        for focus in required_task_focuses(payload)
-    ])
-
-
-GENERATION_FORMAT_INSTRUCTION = (
-    "\nReturn an object with one required field for each requiredTaskFocuses entry, "
-    "using that focus as the field name and its complete task as the value. "
-    "Do not return a tasks array. Populate every required field with 2–4 questions."
-)
 
 
 def normalize_learning_task_references(
