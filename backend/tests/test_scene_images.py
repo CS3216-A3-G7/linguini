@@ -6,7 +6,12 @@ import pytest
 
 from app.schemas.media import MediaAsset
 from app.schemas.scenes import PreloadedSceneDetail
-from app.services.media_urls import MediaUrlError, PrivateMediaUrls, public_media_url
+from app.services.media_urls import (
+    MediaUrlError,
+    PrivateMediaUrls,
+    SignedUrlCache,
+    public_media_url,
+)
 from app.services.scenes import SceneService
 
 BASE = "https://project.supabase.co/storage/v1/object/public/scenes"
@@ -136,6 +141,41 @@ def test_signing_batches_paths_and_keeps_credentials_on_server(monkeypatch):
     assert calls[0][1]["json"] == {"paths": ["preloaded/scenes/bedroom.jpg"], "expiresIn": 3600}
     assert calls[0][1]["headers"]["Authorization"] == "Bearer server-secret"
     assert "server-secret" not in str(result)
+
+
+def test_signed_url_cache_serves_repeat_resolves(monkeypatch):
+    import httpx
+
+    calls = []
+
+    def post(url, **kwargs):
+        calls.append((url, kwargs))
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", url),
+            json=[
+                {
+                    "path": "preloaded/scenes/bedroom.jpg",
+                    "error": None,
+                    "signedURL": (
+                        "/object/sign/media-assets/preloaded/scenes/bedroom.jpg?token=test"
+                    ),
+                }
+            ],
+        )
+
+    monkeypatch.setattr(httpx, "post", post)
+    resolver = PrivateMediaUrls(
+        "https://project.supabase.co",
+        "media-assets",
+        "server-secret",
+        cache=SignedUrlCache(),
+    )
+    first = resolver.resolve(["preloaded/scenes/bedroom.jpg"])
+    second = resolver.resolve(["preloaded/scenes/bedroom.jpg"])
+    assert first == second
+    assert second["preloaded/scenes/bedroom.jpg"].endswith("bedroom.jpg?token=test")
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("payload", [[], {}, [{"path": "photo.jpg", "error": "missing"}]])

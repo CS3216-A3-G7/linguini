@@ -6,6 +6,7 @@ import { UploadIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
 import { MediaImage } from "../components/MediaImage";
 import { useAppState } from "../state/useAppState";
+import { useVocabularyQuery } from "../state/queries";
 import { getJournalContext } from "../lib/api";
 import type { JournalPhotoOption } from "../lib/api";
 import { queryError, queryKeys } from "../lib/queryKeys";
@@ -26,7 +27,8 @@ export function JournalNew() {
 
 export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: JournalEntry | null; date: string; photoOptions: JournalPhotoOption[]; onSaved?: (entry: JournalEntry) => void }) {
   const navigate = useNavigate();
-  const { saveJournalEntry, journalSaving, journalSaveError, vocabulary, vocabularyError, vocabularyLoading, learner, activeProfile } = useAppState();
+  const { saveJournalEntry, journalSaving, journalSaveError, learner, activeProfile } = useAppState();
+  const { vocabulary, vocabularyError, vocabularyLoading } = useVocabularyQuery();
   const sameLanguage = !entry || entry.languageProfileId === activeProfile?.id;
   const journalWordSuggestions = sameLanguage ? [...new Set(vocabulary.map((item) => item.word))] : [];
   const shownDate = new Date(`${date}T12:00:00`);

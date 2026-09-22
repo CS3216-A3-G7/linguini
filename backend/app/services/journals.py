@@ -28,6 +28,8 @@ from app.services.language_profiles import LanguageProfileService
 from app.services.media_urls import PrivateMediaUrls, public_media_url
 from app.services.users import UserService
 
+DEFAULT_JOURNAL_LIST_LIMIT = 365
+
 
 class JournalService:
     def __init__(
@@ -54,26 +56,47 @@ class JournalService:
             for row in rows
             if row.media
         }
-        assets = self.media.get_by_ids(list(covers.values())) if self.media and covers else {}
-        keys = {}
+        asset_ids = {media.media_asset_id for row in rows for media in row.media}
+        assets = self.media.get_by_ids(list(asset_ids)) if self.media and asset_ids else {}
+        keys: dict[UUID, str] = {}
+        attachment_keys: dict[UUID, dict[UUID, str]] = {}
         for row in rows:
-            asset = assets.get(covers.get(row.journal.id))
-            if (
-                asset
-                and asset.media_type == MediaType.IMAGE
-                and (
-                    asset.owner_user_id == row.journal.user_id
-                    or asset.source == MediaSource.PRELOADED
+            accessible = {
+                media.media_asset_id: assets[media.media_asset_id].storage_key
+                for media in row.media
+                if (
+                    media.media_asset_id in assets
+                    and assets[media.media_asset_id].media_type == MediaType.IMAGE
+                    and (
+                        assets[media.media_asset_id].owner_user_id == row.journal.user_id
+                        or assets[media.media_asset_id].source == MediaSource.PRELOADED
+                    )
                 )
-            ):
-                keys[row.journal.id] = asset.storage_key
+            }
+            attachment_keys[row.journal.id] = accessible
+            cover_id = covers.get(row.journal.id)
+            if cover_id in accessible:
+                keys[row.journal.id] = accessible[cover_id]
+        all_keys = [key for mapping in attachment_keys.values() for key in mapping.values()]
         urls = (
-            self.private_media_urls.resolve(list(keys.values()))
+            self.private_media_urls.resolve(list(dict.fromkeys(all_keys)))
             if self.private_media_urls
-            else {key: public_media_url(key, self.media_public_base_url) for key in keys.values()}
+            else {
+                key: public_media_url(key, self.media_public_base_url) for key in all_keys
+            }
         )
         return [
-            row.model_copy(update={"image_url": urls.get(keys.get(row.journal.id))}) for row in rows
+            row.model_copy(
+                update={
+                    "image_url": urls.get(keys.get(row.journal.id)),
+                    "image_urls": {
+                        asset_id: urls[key]
+                        for asset_id, key in attachment_keys[row.journal.id].items()
+                        if urls.get(key) is not None
+                    },
+                }
+            )
+            for row in rows
         ]
 
     @staticmethod
@@ -105,21 +128,24 @@ class JournalService:
                 "Journal media is missing, inaccessible or has the wrong type."
             )
 
-    def list_entries(self) -> list[JournalDetailResponse]:
+    def list_entries(
+        self, limit: int | None = DEFAULT_JOURNAL_LIST_LIMIT
+    ) -> list[JournalDetailResponse]:
         user = self.users.get_current_user()
         return self._with_images(
-            sorted(
-                (row for row in self.repository.read() if row.journal.user_id == user.id),
-                key=lambda row: row.journal.local_date,
-                reverse=True,
-            )
+            [
+                row
+                for row in self.repository.read_for_user(limit=limit)
+                if row.journal.user_id == user.id
+            ]
         )
 
     def get_entry(self, journal_id: UUID) -> JournalDetailResponse:
-        entry = next((row for row in self.list_entries() if row.journal.id == journal_id), None)
-        if entry is None:
+        user = self.users.get_current_user()
+        entry = self.repository.read_one(journal_id)
+        if entry is None or entry.journal.user_id != user.id:
             raise JournalNotFoundError("Journal not found.")
-        return entry
+        return self._with_images([entry])[0]
 
     def today(self) -> JournalTodayContextResponse:
         return self.day_context(None)
@@ -131,7 +157,9 @@ class JournalService:
         day = day or today
         if day > today:
             raise FutureJournalDateError("Cannot create a journal entry for a future date.")
-        entry = next((row for row in self.list_entries() if row.journal.local_date == day), None)
+        entry = self.repository.read_for_date(day)
+        if entry is not None and entry.journal.user_id != user.id:
+            entry = None
         eligible_photos: list[JournalPhotoOption] = []
         if self.media is not None:
             start = datetime.combine(day, time.min, tzinfo=tz)
