@@ -20,6 +20,7 @@ model User {
   mediaAssets         MediaAsset[]
   vocabularyProgress  UserVocabularyProgress[]
   aiRuns              AiGenerationRun[]
+  xpEvents            XpEvent[]
 
   @@map("users")
 }
@@ -40,6 +41,7 @@ model LanguageProfile {
   updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   sessions           Session[]
   journals           Journal[]
+  xpEvents           XpEvent[]
 
   @@unique([id, userId])
   @@index([userId])
@@ -164,12 +166,34 @@ model Session {
   tasks SessionTask[]
   vocabularyEncounters VocabularyEncounter[]
   aiRuns AiGenerationRun[]
+  xpEvents XpEvent[]
 
   @@unique([id, userId])
   @@unique([userId, languageProfileId, idempotencyKey])
   @@index([languageProfileId, userId])
   @@index([sceneMediaAssetId])
   @@map("sessions")
+}
+
+model XpEvent {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  languageProfileId String?  @map("language_profile_id") @db.Uuid
+  languageProfile   LanguageProfile? @relation(fields: [languageProfileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sessionId         String?  @map("session_id") @db.Uuid
+  session           Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  eventType         String   @map("event_type") @db.VarChar(20)
+  amount            Int
+  idempotencyKey    String   @map("idempotency_key") @db.Text
+  occurredAt        DateTime @map("occurred_at") @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId])
+  @@index([sessionId])
+  @@map("xp_events")
 }
 
 model SceneObject {
@@ -235,9 +259,6 @@ model UserVocabularyProgress {
   masteryScore         Decimal @default(0) @map("mastery_score") @db.Decimal(6, 5)
   firstLearnedAt       DateTime? @map("first_learned_at") @db.Timestamptz(6)
   lastPractisedAt      DateTime? @map("last_practised_at") @db.Timestamptz(6)
-  // Temporary presentation metadata; scenes are still JSON, so no FK yet.
-  sceneId              String? @map("scene_id") @db.Text
-  topic                String? @db.Text
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   encounters           VocabularyEncounter[]

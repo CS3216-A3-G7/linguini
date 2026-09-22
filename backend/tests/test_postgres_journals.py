@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 from encounter_factory import create_encounter_task
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, insert, select, text, update
+from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 from test_postgres_sessions import database as database
 
@@ -23,6 +23,7 @@ from app.repositories.postgres.vocabulary import (
     vocabulary_encounters,
     vocabulary_items,
 )
+from app.repositories.postgres.xp import xp_events
 from app.schemas.journals import (
     Journal,
     JournalDetailResponse,
@@ -91,11 +92,11 @@ def context(database, monkeypatch):
         )
 
 
-def save(client, profile, content="Hola 🌍 mundo"):
-    response = client.put(
-        "/api/v1/journal/today",
-        json={"languageProfileId": str(profile.id), "content": content, "title": "My day"},
-    )
+def save(client, profile, content="Hola 🌍 mundo", words=None):
+    payload = {"languageProfileId": str(profile.id), "content": content, "title": "My day"}
+    if words is not None:
+        payload["selectedWords"] = words
+    response = client.put("/api/v1/journal/today", json=payload)
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -306,3 +307,84 @@ def test_rls_and_cascade(context):
             is None
         )
     assert repository.read() == []
+
+
+def test_journal_words_mark_mastered_and_award_xp_once(context):
+    engine, owner, profile, client, repository, words, *_ = context
+    row = save(client, profile, words=[" Mundo ", "amigo", "not-in-my-bank"])
+    journal_id = row["id"]
+    with engine.connect() as connection:
+        progress = {
+            r["vocabulary_item_id"]: r
+            for r in connection.execute(
+                select(user_vocabulary_progress).where(
+                    user_vocabulary_progress.c.user_id == owner.id
+                )
+            ).mappings()
+        }
+        assert progress[words[0].id]["status"] == "mastered"
+        assert progress[words[0].id]["mastery_score"] == 1
+        assert progress[words[1].id]["status"] == "mastered"
+
+        def journal_xp():
+            return connection.execute(
+                select(func.sum(xp_events.c.amount))
+                .select_from(xp_events)
+                .where(
+                    xp_events.c.user_id == owner.id,
+                    xp_events.c.idempotency_key == f"journal:{journal_id}",
+                )
+            ).scalar_one()
+
+        assert journal_xp() == 20
+    # Editing the same journal never double-awards or double-counts exposures.
+    update = client.patch(
+        f"/api/v1/journals/{journal_id}",
+        json={"selectedWords": ["mundo"], "content": "Segunda versión"},
+    )
+    assert update.status_code == 200, update.text
+    with engine.connect() as connection:
+        assert journal_xp() == 20
+        row = (
+            connection.execute(
+                select(user_vocabulary_progress).where(
+                    user_vocabulary_progress.c.user_id == owner.id,
+                    user_vocabulary_progress.c.vocabulary_item_id == words[0].id,
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assert row["exposure_count"] == 0 and row["status"] == "mastered"
+
+
+def test_journal_entry_xp_independent_of_words(context):
+    engine, owner, profile, client, repository, words, *_ = context
+    row = save(client, profile, words=[])
+    journal_id = row["id"]
+
+    def journal_xp():
+        with engine.connect() as connection:
+            return connection.execute(
+                select(func.sum(xp_events.c.amount))
+                .select_from(xp_events)
+                .where(
+                    xp_events.c.user_id == owner.id,
+                    xp_events.c.idempotency_key == f"journal:{journal_id}",
+                )
+            ).scalar_one()
+
+    # A journal with no picked words still earns the journal award, once.
+    assert journal_xp() == 20
+    # Adding words on a later save marks them mastered but never re-awards.
+    update = client.patch(f"/api/v1/journals/{journal_id}", json={"selectedWords": ["mundo"]})
+    assert update.status_code == 200, update.text
+    assert journal_xp() == 20
+    with engine.connect() as connection:
+        mastered = connection.execute(
+            select(user_vocabulary_progress.c.status).where(
+                user_vocabulary_progress.c.user_id == owner.id,
+                user_vocabulary_progress.c.vocabulary_item_id == words[0].id,
+            )
+        ).scalar_one()
+    assert mastered == "mastered"

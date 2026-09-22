@@ -91,6 +91,7 @@ def get_journal_service(
         get_media_asset_repository(request),
         get_media_public_base_url(),
         get_private_media_urls(),
+        PostgresVocabularyRepository(request.app.state.database_engine),
     )
 
 

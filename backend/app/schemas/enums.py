@@ -172,6 +172,15 @@ class WordMatchMethod(StrEnum):
     USER_CONFIRMED = "userConfirmed"
 
 
+class XpEventType(StrEnum):
+    TASK_COMPLETED = "taskCompleted"
+    ISPY_CORRECT = "ispyCorrect"
+    SESSION_COMPLETED = "sessionCompleted"
+    PERFECT_SESSION = "perfectSession"
+    JOURNAL_ENTRY = "journalEntry"
+    LEGACY_BACKFILL = "legacyBackfill"
+
+
 class AiFeature(StrEnum):
     SCENE_ANALYSIS = "sceneAnalysis"
     VOCABULARY_GENERATION = "vocabularyGeneration"
