@@ -1,8 +1,11 @@
 from uuid import uuid4
 
+from app.schemas.ispy_clues import ISpyClueResult
 from app.schemas.learning_tasks import LearningTaskResult
+from app.schemas.media import SceneObject
 from app.schemas.tasks import SessionTaskPublic
-from app.services.session_plan import build_grammar_lessons
+from app.schemas.vocabulary import VocabularyItem
+from app.services.session_plan import build_grammar_lessons, build_ispy_clue_tasks
 from tests.test_openai_learning_tasks import tasks
 
 
@@ -28,3 +31,29 @@ def test_generated_lessons_become_private_grammar_lesson_tasks():
     assert scene.answer_key.correct_option_ids == {"scene-1": "scene-1-a", "scene-2": "scene-2-a"}
     public = SessionTaskPublic.from_internal(scene).model_dump(mode="json")
     assert "answerKey" not in public and "correctOptionIds" not in str(public)
+
+
+def test_generated_ispy_clues_keep_the_answer_key_private():
+    session_id = uuid4()
+    words = [
+        VocabularyItem(language_code="es", lemma=text, display_text=text, part_of_speech="noun")
+        for text in ["taza", "mesa"]
+    ]
+    objects = [
+        SceneObject(session_id=session_id, label=label, vocabulary_item_id=word.id)
+        for label, word in zip(["cup", "table"], words, strict=True)
+    ]
+    result = ISpyClueResult.model_validate({"clues": [{
+        "clue": "es roja y está a la izquierda",
+        "answerObjectKey": str(objects[0].id),
+        "objectKeys": [str(objects[0].id)],
+        "relationshipKeys": [],
+    }]})
+
+    tasks = build_ispy_clue_tasks(session_id, result, objects, words)
+
+    assert tasks[0].public_content.clue == "es roja y está a la izquierda"
+    assert tasks[0].answer_key.correct_scene_object_id == objects[0].id
+    public = SessionTaskPublic.from_internal(tasks[0]).model_dump(mode="json")
+    assert "answerKey" not in public
+    assert len(public["publicContent"]["options"]) == 2

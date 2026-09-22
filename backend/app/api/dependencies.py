@@ -35,6 +35,7 @@ from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
+from app.services.openai_ispy_clues import OpenAIISpyClueGenerator
 from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
 from app.services.openai_scene_analysis import OpenAISceneAnalyzer
 from app.services.openai_translation import OpenAISceneTranslator
@@ -251,12 +252,28 @@ def get_practice_repository(
         )
     else:
         raise ValueError(f"Unsupported LEARNING_TASK_PROVIDER: {learning_task_provider}")
+    ispy_clue_provider = os.getenv("ISPY_CLUE_PROVIDER", "openai").strip().casefold()
+    ispy_clue_timeout = int(os.getenv("ISPY_CLUE_TIMEOUT_SECONDS", "60"))
+    if ispy_clue_provider == "openai":
+        ispy_clue_model = os.getenv("OPENAI_ISPY_CLUE_MODEL", "gpt-4o-mini").strip()
+        ispy_clue_generator = (
+            OpenAIISpyClueGenerator(
+                openai_key, ispy_clue_model, timeout_seconds=ispy_clue_timeout
+            )
+            if openai_key and ispy_clue_model
+            else None
+        )
+    elif ispy_clue_provider == "none":
+        ispy_clue_generator = None
+    else:
+        raise ValueError(f"Unsupported ISPY_CLUE_PROVIDER: {ispy_clue_provider}")
     return PostgresWorkflowRepository(
         engine,
         demo_user_id,
         analyzer=analyzer,
         translator=translator,
         learning_task_generator=learning_task_generator,
+        ispy_clue_generator=ispy_clue_generator,
         background=getattr(request.app.state, "background_runner", None),
     )
 
