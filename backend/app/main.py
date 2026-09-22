@@ -1,5 +1,6 @@
 """FastAPI application entrypoint."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,6 +12,8 @@ from app.api.router import api_router
 from app.config import get_allowed_origins
 from app.database import create_database_engine
 from app.services.background import ThreadPoolBackgroundRunner
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -26,7 +29,7 @@ async def lifespan(app: FastAPI):
             app.state.ai_tracer.flush()
             app.state.ai_tracer.shutdown()
         except Exception:
-            pass
+            logger.warning("AI tracer shutdown failed", exc_info=True)
         app.state.background_runner.shutdown(wait=True)
         engine.dispose()
 

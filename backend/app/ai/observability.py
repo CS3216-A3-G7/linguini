@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 from typing import Any, Protocol, runtime_checkable
 
-from langfuse import propagate_attributes
+from langfuse import Langfuse, propagate_attributes
 
 from app.ai.settings import AiSettings
 
@@ -349,8 +349,6 @@ def build_tracer(settings: AiSettings) -> AITracer:
         )
         return NoOpAITracer()
     try:
-        from langfuse import Langfuse
-
         client = Langfuse(
             public_key=observability.public_key,
             secret_key=observability.secret_key,

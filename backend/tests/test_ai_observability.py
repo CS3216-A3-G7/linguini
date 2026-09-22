@@ -19,7 +19,7 @@ from app.services.ispy_guess import ISpyGuessError
 
 
 class FakeObservation:
-    def __init__(self, record: list[dict[str, Any]]) -> None:
+    def __init__(self, record: list[tuple[str, dict[str, Any]]]) -> None:
         self.record = record
 
     def update(self, **kwargs: Any) -> None:
@@ -30,10 +30,9 @@ class FakeObservation:
 
 
 class FakeTracer:
-    def __init__(self, capture_content: bool = True) -> None:
-        self.records: list[dict[str, Any]] = []
+    def __init__(self) -> None:
+        self.records: list[tuple[str, dict[str, Any]]] = []
         self.observation = FakeObservation(self.records)
-        self.capture_content = capture_content
 
     @contextmanager
     def generation(self, name: str, **kwargs: Any):
@@ -80,7 +79,7 @@ def _result() -> ISpyGuessResult:
     )
 
 
-def _generator(tracer, inner, capture_content=True):
+def _generator(tracer, inner):
     return TracedISpyGuessGenerator(
         inner, tracer, provider="openai", model="gpt-4o-mini", max_retries=0
     )
@@ -122,42 +121,25 @@ def test_traced_guess_error_records_invalid_and_reraises():
     assert failing and failing[0]["error_code"] == "ISpyGuessError"
 
 
-class ContentAwareObservation(FakeObservation):
-    """Fake that drops content unless capture is enabled (mirrors the seam)."""
-
-    def __init__(self, record, capture: bool):
-        super().__init__(record)
-        self._capture = capture
-
-    def record_content(self, **kwargs):
-        if self._capture:
-            self.record.append(("content", kwargs))
-
-
-class ContentAwareTracer(FakeTracer):
-    def __init__(self, capture_content: bool):
-        super().__init__()
-        self.observation = ContentAwareObservation(
-            self.records, capture_content
-        )
-
-
 def test_content_dropped_unless_capture_opted_in():
-    result = _result()
+    """The real _TracedObservation.record_content gate is the privacy seam."""
     learner_text = "the blue notebook on the table"
-    for capture, expect_content in [(False, False), (True, True)]:
-        tracer = ContentAwareTracer(capture)
-        inner = StubInner(result=result)
-        generator = _generator(tracer, inner)
-        generator.guess({}, learner_text)
-        recorded = repr(tracer.records)
-        if expect_content:
-            assert learner_text in recorded
-            contents = [kw for tag, kw in tracer.records if tag == "content"]
-            assert contents[0]["input"] == {"learnerText": learner_text}
-        else:
-            assert learner_text not in recorded
-            assert "Good description." not in recorded
+    feedback = "Good description."
+
+    client = RecordingClient()
+    tracer = LangfuseAITracer(client, capture_content=False)
+    _generator(tracer, StubInner(result=_result())).guess({}, learner_text)
+    recorded = repr((client.calls, client.updates))
+    assert learner_text not in recorded
+    assert feedback not in recorded
+
+    client = RecordingClient()
+    tracer = LangfuseAITracer(client, capture_content=True)
+    _generator(tracer, StubInner(result=_result())).guess({}, learner_text)
+    payloads = [u for u in client.updates if "input" in u or "output" in u]
+    assert payloads
+    assert payloads[0]["input"] == {"learnerText": learner_text}
+    assert feedback in repr(client.updates)
 
 
 def test_noop_tracer_satisfies_protocol_and_contexts_work():
@@ -270,6 +252,21 @@ def test_langfuse_tracer_maps_dimensions_to_sdk():
     assert any(
         "latencyMs" in u.get("metadata", {}) for u in client.updates
     )
+    assert client.closed == 1
+
+
+def test_langfuse_tracer_trace_propagates_session_id():
+    client = RecordingClient()
+    tracer = LangfuseAITracer(client)
+    ran = []
+    with tracer.trace(
+        "session-work", session_id="session-123", feature="ispyGuess"
+    ) as obs:
+        ran.append(True)
+        obs.update(validation_result="valid")
+    assert ran == [True]
+    assert client.calls[0]["as_type"] == "span"
+    assert client.calls[0]["metadata"]["feature"] == "ispyGuess"
     assert client.closed == 1
 
 

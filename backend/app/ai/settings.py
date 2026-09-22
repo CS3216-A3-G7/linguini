@@ -64,7 +64,7 @@ class AiSettings(BaseModel):
     openai_api_key: str = ""
     gemini_api_key: str = ""
     general_api_key: str = ""
-    observability: ObservabilitySettings
+    observability: ObservabilitySettings = ObservabilitySettings()
     scene_analysis: FeatureModelConfig
     scene_translation: FeatureModelConfig
     learning_task: FeatureModelConfig
