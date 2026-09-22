@@ -18,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.database import read_connection
 from app.repositories.postgres.media_assets import media_assets
 from app.repositories.scenes import SceneStorageError
 from app.schemas.media import MediaAsset
@@ -50,7 +51,7 @@ class PostgresSceneRepository:
 
     def list_scenes(self) -> list[PreloadedSceneDetail]:
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 rows = connection.execute(
                     select(
                         preloaded_scenes,

@@ -251,3 +251,34 @@ test("standing on a page is not re-validated when the session advances", async (
   await go(`${BASE}/learn`);
   assert.equal(shown(), "page-ispy-1");
 });
+
+test("finishing the last learning task keeps the task page showing its feedback", async () => {
+  fixture = detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]);
+  await mount(`${BASE}/learn/learn-0`);
+  assert.equal(shown(), "page-learn-task");
+  // Answering the last unfinished learning task flips the canonical step to
+  // I-Spy, but the learner is reading their result — no auto-forward.
+  await advance(detail("inProgress", [task("learn", "completed", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
+  assert.equal(shown(), "page-learn-task");
+});
+
+test("a session leaving the analysis stage forwards the mic check underneath the learner", async () => {
+  fixture = detail("awaitingObjectReview");
+  await mount(`${BASE}/analysis`);
+  assert.equal(shown(), "page-analysis");
+  await advance(detail("generatingTasks"));
+  assert.equal(shown(), "page-mic-test");
+  await advance(detail("inProgress", [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)]));
+  assert.equal(shown(), "page-mic-test");
+});
+
+test("the analysis page redirects to the mic check once review is submitted", async () => {
+  fixture = detail("generatingTasks");
+  await mount(`${BASE}/analysis`);
+  // Task generation is still in flight, so the session loader polls for up to a
+  // minute before the guard can re-validate and forward to the mic check.
+  for (let i = 0; i < 70 && shown() !== "page-mic-test"; i += 1) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1000)); });
+  }
+  assert.equal(shown(), "page-mic-test");
+});

@@ -24,8 +24,8 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
     case "created":
     case "analyzingScene":
     case "awaitingObjectReview":
-    case "generatingTasks":
       return { path: `${base}/analysis`, notice: null };
+    case "generatingTasks":
     case "ready":
       return { path: `${base}/mic-test`, notice: null };
     case "inProgress": {
@@ -66,6 +66,12 @@ const loadingCopy: Record<string, SessionLoadingCopy> = {
   "ispy-2": { title: "I-Spy", heading: "Setting up your turn to describe...", scan: false },
   summary: { title: "Practice summary", heading: "Gathering your results...", scan: false },
 };
+
+/** Steps before the learner starts tasks: forwarding them when the session advances strands nobody. */
+export function isPreTaskStep(pathname: string): boolean {
+  const step = pathname.split("/practice/sessions/")[1]?.split("/").slice(1)[0] ?? null;
+  return step === "analysis" || step === "mic-test";
+}
 
 export function sessionLoadingCopy(pathname: string): SessionLoadingCopy {
   const step = pathname.split("/practice/sessions/")[1]?.split("/").slice(1)[0] ?? null;

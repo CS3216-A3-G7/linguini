@@ -15,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.database import read_connection
 from app.repositories.postgres.practice import sessions
 from app.repositories.practice import PracticeStorageError
 from app.schemas.media import SceneObject
@@ -70,7 +71,7 @@ class PostgresSceneObjectRepository:
 
     def list_for_session(self, session_id: UUID, user_id: UUID) -> list[SceneObject]:
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 return [
                     parse_object(row)
                     for row in connection.execute(

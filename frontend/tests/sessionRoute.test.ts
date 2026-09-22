@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../src/lib/sessionRoute.ts";
+import { isPreTaskStep, isSessionRouteAllowed, sessionDestination, sessionLoadingCopy } from "../src/lib/sessionRoute.ts";
 import type { PracticeDetail, SessionStatus, SessionTask, TaskContent } from "../src/lib/api.ts";
 
 const contents: Record<string, TaskContent> = {
@@ -25,14 +25,31 @@ function detail(status: SessionStatus, tasks: SessionTask[] = [], failureCode: P
 }
 
 test("every session status maps to its canonical route", () => {
-  for (const status of ["created", "analyzingScene", "awaitingObjectReview", "generatingTasks"] as const) {
+  for (const status of ["created", "analyzingScene", "awaitingObjectReview"] as const) {
     assert.deepEqual(sessionDestination(detail(status)), { path: "/practice/sessions/s1/analysis", notice: null });
   }
-  assert.deepEqual(sessionDestination(detail("ready")), { path: "/practice/sessions/s1/mic-test", notice: null });
+  for (const status of ["generatingTasks", "ready"] as const) {
+    assert.deepEqual(sessionDestination(detail(status)), { path: "/practice/sessions/s1/mic-test", notice: null });
+  }
   assert.deepEqual(sessionDestination(detail("completed")), { path: "/practice/sessions/s1/summary", notice: null });
   assert.equal(sessionDestination(detail("abandoned")).path, "/practice");
   assert.match(sessionDestination(detail("abandoned")).notice ?? "", /discarded/);
   assert.equal(sessionDestination(detail("failed")).path, "/practice");
+});
+
+test("isPreTaskStep marks only the pre-task steps as auto-forwardable", () => {
+  assert.equal(isPreTaskStep("/practice/sessions/s1/analysis"), true);
+  assert.equal(isPreTaskStep("/practice/sessions/s1/mic-test"), true);
+  for (const step of ["learn", "learn/learn-0", "ispy-1", "ispy-2", "summary"]) {
+    assert.equal(isPreTaskStep(`/practice/sessions/s1/${step}`), false, step);
+  }
+  assert.equal(isPreTaskStep("/practice"), false);
+});
+
+test("generatingTasks sends the analysis page to the mic check", () => {
+  const generating = detail("generatingTasks");
+  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/mic-test"), true);
+  assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/analysis"), false);
 });
 
 test("inProgress resumes at the first unfinished stage", () => {
