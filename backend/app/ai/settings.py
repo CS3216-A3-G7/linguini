@@ -159,8 +159,14 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
         provider_default="openai",
         timeout_var="ISPY_CLUE_TIMEOUT_SECONDS",
         timeout_default="60",
-        model_vars={AiProvider.OPENAI: "OPENAI_ISPY_CLUE_MODEL"},
-        model_defaults={AiProvider.OPENAI: "gpt-4o-mini"},
+        model_vars={
+            AiProvider.OPENAI: "OPENAI_ISPY_CLUE_MODEL",
+            AiProvider.GEMINI: "GEMINI_ISPY_CLUE_MODEL",
+        },
+        model_defaults={
+            AiProvider.OPENAI: "gpt-4o-mini",
+            AiProvider.GEMINI: "",
+        },
     ),
     AiFeature.ISPY_GUESS: _LegacySpec(
         provider_var="ISPY_GUESS_PROVIDER",

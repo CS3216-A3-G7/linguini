@@ -17,6 +17,7 @@ from app.ai import (
 from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
 from app.ai.registry import (
+    build_ispy_clue_generator,
     build_learning_task_generator,
     build_scene_translator,
 )
@@ -47,7 +48,6 @@ from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
-from app.services.openai_ispy_clues import OpenAIISpyClueGenerator
 from app.services.openai_ispy_guess import OpenAIISpyGuessGenerator
 from app.services.practice import PracticeService
 from app.services.scene_analysis import DeterministicSceneAnalyzer
@@ -252,21 +252,7 @@ def get_practice_repository(
 
     learning_task_generator = build_learning_task_generator(settings, tracer)
 
-    ispy_clue_config = settings.feature(AiFeature.ISPY_CLUE)
-    if ispy_clue_config.provider is AiProvider.OPENAI:
-        ispy_clue_generator = (
-            OpenAIISpyClueGenerator(
-                openai_key,
-                ispy_clue_config.model_name,
-                timeout_seconds=ispy_clue_config.timeout_seconds,
-            )
-            if settings.is_configured(ispy_clue_config)
-            else None
-        )
-    elif ispy_clue_config.provider is AiProvider.NONE:
-        ispy_clue_generator = None
-    else:
-        raise ValueError(f"Unsupported ISPY_CLUE_PROVIDER: {ispy_clue_config.provider}")
+    ispy_clue_generator = build_ispy_clue_generator(settings, tracer)
     return PostgresWorkflowRepository(
         engine,
         demo_user_id,
