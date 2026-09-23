@@ -3,16 +3,18 @@
 Measuring whether the AI features do what we claim, so that model choice and
 prompt changes are decided by evidence instead of by whoever ran the demo last.
 
-| Directory | Prompt under test | Status |
+| Directory | What it holds | Status |
 |---|---|---|
-| `scene_analysis/` | `scene-analysis.v1` — photo to structured JSON | 14 cases |
-| `scene_translation/` | `scene_translation.txt` — English vocabulary to French/Spanish | 13 cases, 102 scored terms |
-| `judge.py` | shared LLM-as-judge, used by both | rubrics + guardrails |
+| `scene_analysis/` | Labelled photos and scorer for `app/ai/features/scene_analysis` | 14 cases |
+| `scene_translation/` | Cases, gold lexicon and scorer for `app/ai/features/translation` | 13 cases, 102 scored terms |
+| `judge.py` | Shared LLM-as-judge rubrics and guardrails | rubrics + guardrails |
+| `model_comparison/` | Runs candidate models from every provider through all five AI calls | see its README |
 
-Not yet covered: grammar task generation, I-spy clue generation and I-spy clue
-interpretation. The two prompts evaluated here are the two that are settled;
-the task-generation prompt is still being reworked, and writing cases against a
-prompt that is mid-rewrite would mean throwing them away.
+`model_comparison/` reuses the datasets and scorers here and adds cases for
+grammar tasks, I-Spy clues and I-Spy guessing. It replaced the per-eval
+`run_eval.py` scripts, which drove provider adapters that no longer exist: one
+runner now covers every call and provider, and `MODEL_COMPARISON.md` in the
+repository root holds the results.
 
 ## The three strategies, and where each is used
 
