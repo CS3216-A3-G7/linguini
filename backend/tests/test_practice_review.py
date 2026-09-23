@@ -166,7 +166,9 @@ def test_review_rebuilds_tasks_only_for_selected_objects():
         id=session_id, status="inProgress", started_at=None
     )
     repo._tasks = lambda *args: []
-    repo._detail = MagicMock(side_effect=[detail, detail, generated])
+    # Both generation phases read only the accepted objects: translation, then
+    # the task build after the translation checkpoint has committed.
+    repo._detail = MagicMock(side_effect=[detail, detail, generated, generated])
     repo.review(session_id, profile_id, ReviewPracticeRequest(accepted_object_ids=[objects[1].id]))
     inserted = [
         call.args[0].compile().params

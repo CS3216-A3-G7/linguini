@@ -37,11 +37,14 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
         data = await getPractice(id);
       }
     }
-    // Scene analysis can take ~60s, so poll for up to a minute before stalling.
-    for (let attempt = 0; attempt < 40 && PROCESSING.includes(data.session.status); attempt += 1) {
+    // Once task 1 is usable, keep checking in the background through slower
+    // lesson/clue calls and their retries (up to five minutes).
+    if (version === loadVersion.current) setSession(data);
+    for (let attempt = 0; attempt < (data.tasks.length ? 200 : 40) && PROCESSING.includes(data.session.status); attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       if (version !== loadVersion.current) break;
       data = await getPractice(id);
+      if (version === loadVersion.current) setSession(data);
     }
     if (version === loadVersion.current) {
       setSession(data);

@@ -282,3 +282,32 @@ test("resuming generation forwards to mic check after generation finishes", asyn
   }
   assert.equal(shown(), "page-mic-test");
 });
+
+test("translations appear during generation before tasks are ready", async () => {
+  fixture = detail("generatingTasks");
+  await mount(`${BASE}/analysis`);
+  fixture = { ...detail("generatingTasks"), translationPreview: {
+    objects: [{ key: "object-1", source: "table", translation: "mesa", article: null, gender: null }],
+    attributes: [], relationships: [],
+  } };
+  for (let i = 0; i < 5 && !document.body.textContent?.includes("mesa"); i += 1) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1000)); });
+  }
+  assert.match(document.body.textContent ?? "", /mesa/);
+  assert.match(document.body.textContent ?? "", /Generating tasks/);
+  assert.notEqual(shown(), "page-mic-test");
+  fixture = detail("ready");
+  for (let i = 0; i < 5 && shown() !== "page-mic-test"; i += 1) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1000)); });
+  }
+  assert.equal(shown(), "page-mic-test");
+});
+
+test("task 1 is accessible while generation continues and stays open when ready", async () => {
+  fixture = detail("generatingTasks", [task("learn", "pending", 0)]);
+  await mount(`${BASE}/learn/learn-0`);
+  assert.equal(shown(), "page-learn-task");
+  fixture = detail("inProgress", [task("learn", "inProgress", 0), task("clues", "pending", 1)]);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 2000)); });
+  assert.equal(shown(), "page-learn-task");
+});

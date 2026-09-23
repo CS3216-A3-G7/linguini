@@ -2691,8 +2691,12 @@
 
 .vocabulary-learning-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+.vocabulary-learning-grid--swipe {
+  touch-action: pan-y;
 }
 
 .vocabulary-learning-card {
@@ -2706,9 +2710,9 @@
 }
 
 .vocabulary-flow__actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: var(--space-3);
 }
 

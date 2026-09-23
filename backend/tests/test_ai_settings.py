@@ -31,6 +31,13 @@ def test_object_grounding_is_off_by_default_and_can_use_grounding_dino():
     assert settings.object_grounding.threshold == 0.6
 
 
+def test_translation_retries_once_by_default_and_respects_explicit_zero():
+    assert load_ai_settings(env={}).scene_translation.max_retries == 1
+    assert load_ai_settings(env={
+        "AI_SCENE_TRANSLATION_MAX_RETRIES": "0"
+    }).scene_translation.max_retries == 0
+
+
 def test_openai_configuration_all_features():
     settings = load_ai_settings(
         env={

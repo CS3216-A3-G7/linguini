@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { Button, Card, ComboBox } from "../components/ui";
 import { ArrowRightIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
+import { TranslationPreview } from "../components/TranslationPreview";
 import { LeaveSession } from "../components/LeaveSession";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
@@ -46,12 +47,22 @@ export function PracticeAnalysis() {
   }
   if (["created", "analyzingScene", "generatingTasks"].includes(session.session.status)) return <div className="stack analysis-page">
     <h1>Scene analysis</h1>
+    {session.session.status === "generatingTasks" && session.translationPreview ? <>
+      <TranslationPreview preview={session.translationPreview} />
+      <section role="status" className="panel-note">
+        <h2>Generating tasks...</h2>
+        <p className="muted">Explore your translations while we prepare your practice.</p>
+        {practiceStalled ? <Button onClick={() => retryProcessing(session.session.id)}>Check again</Button> : null}
+        {practiceError ? <p role="alert">{practiceError}</p> : null}
+      </section>
+    </> : <>
     {practiceStalled ? <section className="analysis-loading" aria-live="polite">
       <div className="analysis-loading__copy"><h2>Still working on your scene...</h2><p className="muted">This is taking longer than usual. You can check again.</p>{practiceError ? <p role="alert">{practiceError}</p> : null}<Button onClick={() => retryProcessing(session.session.id)}>Retry</Button></div>
     </section> : <section className="analysis-loading" aria-live="polite" aria-busy="true">
       <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={scene} items={[]} /><span className="analysis-scan__line" /></div>
       <div className="analysis-loading__copy"><h2>{session.session.status === "generatingTasks" ? "Translating your scene..." : "Finding objects in your image..."}</h2><p className="muted">{session.session.status === "generatingTasks" ? "Turning your confirmed words into your learning language." : "This will only take a moment."}</p></div>
     </section>}
+    </>}
   </div>;
   const locked = session.tasks.some(task => task.status !== "pending");
   const kept = scene.items.filter(item => !removed.includes(item.id));

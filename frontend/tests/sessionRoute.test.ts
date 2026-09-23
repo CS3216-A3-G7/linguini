@@ -54,6 +54,15 @@ test("generation stays on analysis until ready for the mic check", () => {
   assert.equal(sessionDestination(detail("ready")).path, "/practice/sessions/s1/mic-test");
 });
 
+test("early vocabulary opens learning and never advances to I-Spy while generating", () => {
+  for (const status of ["pending", "completed", "skipped"] as const) {
+    const generating = detail("generatingTasks", [task("learn", status, 0)]);
+    assert.equal(sessionDestination(generating).path, "/practice/sessions/s1/learn");
+    assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/learn/learn-0"), true);
+    assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/ispy-1"), false);
+  }
+});
+
 test("inProgress resumes at the first unfinished stage", () => {
   const pendingLearn = [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)];
   assert.equal(sessionDestination(detail("inProgress", pendingLearn)).path, "/practice/sessions/s1/learn");

@@ -1,7 +1,8 @@
 import { Navigate, useNavigate } from "react-router-dom";
-import { Button, Card } from "../components/ui";
+import { Button } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, CloseIcon } from "../components/icons";
 import { ScenePhoto } from "../components/ScenePhoto";
+import { TranslationPreview } from "../components/TranslationPreview";
 import { useScene } from "../state/useScene";
 import { practiceStages, taskDone, taskTitle, taskDescription } from "../lib/practiceTasks";
 import { useAppState } from "../state/useAppState";
@@ -9,14 +10,15 @@ import { useAppState } from "../state/useAppState";
 export function Learn() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, practiceSaving, practiceError } = useAppState();
+  const { session, practiceSaving, practiceError, practiceStalled, retryProcessing } = useAppState();
   if (!session) return null;
   const base = `/practice/sessions/${scene.sessionId}`;
   if (session.session.status === "completed") return <Navigate to={`${base}/summary`} replace />;
   if (["abandoned", "failed"].includes(session.session.status)) return <div className="stack"><h1>Session closed</h1><Button onClick={() => navigate("/practice")}>Choose an image</Button></div>;
   const tasks = practiceStages(session.tasks).learning;
   const completed = tasks.filter(taskDone);
-  const allDone = tasks.every(taskDone);
+  const generating = session.session.status === "generatingTasks";
+  const allDone = tasks.length > 0 && tasks.every(taskDone) && !generating;
   const nextTask = tasks.find(task => !taskDone(task));
 
   const openTask = (taskId: string) => {
@@ -38,30 +40,7 @@ export function Learn() {
       <ScenePhoto scene={scene} />
       {practiceError ? <p role="alert">{practiceError}</p> : null}
 
-      {session.translationPreview ? (
-        <Card plain className="translation-preview">
-          <div>
-            <h2>Translation preview</h2>
-            <p className="small muted">Temporary testing view</p>
-          </div>
-          {([
-            ["Objects", session.translationPreview.objects],
-            ["Attributes", session.translationPreview.attributes],
-            ["Relationships", session.translationPreview.relationships],
-          ] as const).map(([label, terms]) => terms.length ? (
-            <section key={label} className="translation-preview__group">
-              <h3>{label}</h3>
-              <div className="translation-preview__terms">
-                {terms.map(term => (
-                  <span className="translation-preview__term" key={term.key}>
-                    <span>{term.source}</span><strong>{term.translation}</strong>
-                  </span>
-                ))}
-              </div>
-            </section>
-          ) : null)}
-        </Card>
-      ) : null}
+      {session.translationPreview ? <TranslationPreview preview={session.translationPreview} /> : null}
 
       <div className="task-list" aria-label="Learning tasks">
         {tasks.map((task, index) => {
@@ -86,13 +65,19 @@ export function Learn() {
         })}
       </div>
 
+      {generating ? <section className="panel-note" role="status">
+        <h2>Preparing the remaining tasks...</h2>
+        <p>You can learn and practise your words now.</p>
+        {practiceStalled ? <Button variant="secondary" onClick={() => retryProcessing(session.session.id)}>Check again</Button> : null}
+      </section> : null}
+
       {allDone ? (
         <Button block disabled={practiceSaving} onClick={() => navigate(`${base}/ispy-1`)}>
           Play I-Spy <ArrowRightIcon />
         </Button>
       ) : (
-        <Button block disabled={practiceSaving} onClick={() => nextTask && openTask(nextTask.id)}>
-          {completed.length === 0 ? "Begin tasks" : "Continue tasks"} <ArrowRightIcon />
+        <Button block disabled={practiceSaving || !nextTask} onClick={() => nextTask && openTask(nextTask.id)}>
+          {!nextTask ? "Preparing remaining tasks..." : completed.length === 0 ? "Begin tasks" : "Continue tasks"} <ArrowRightIcon />
         </Button>
       )}
 

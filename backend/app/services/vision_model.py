@@ -95,8 +95,6 @@ _STRIPPED_KEYWORDS = frozenset(
         "maximum",
         "exclusiveMinimum",
         "exclusiveMaximum",
-        "minItems",
-        "maxItems",
         "default",
         "format",
         "title",

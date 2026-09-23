@@ -2,7 +2,7 @@
 
 from uuid import NAMESPACE_URL, uuid5
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.repositories.postgres.vocabulary import vocabulary_items, vocabulary_translations
@@ -30,7 +30,8 @@ UPLOAD_WORDS = {
 
 
 def bootstrap_word(
-    connection, language, source_language, word, translation, part="noun", gender=None, example=None
+    connection, language, source_language, word, translation, part="noun", gender=None,
+    example=None, phonetic_text=None,
 ):
     """Reuse catalog records; deterministic IDs make concurrent bootstrap safe."""
     row = (
@@ -49,6 +50,12 @@ def bootstrap_word(
     )
     if row:
         item = VocabularyItem.model_validate(dict(row))
+        if phonetic_text and not item.phonetic_text:
+            connection.execute(
+                update(vocabulary_items).where(vocabulary_items.c.id == item.id)
+                .values(phonetic_text=phonetic_text)
+            )
+            item = item.model_copy(update={"phonetic_text": phonetic_text})
     else:
         item = VocabularyItem(
             id=uuid5(
@@ -60,6 +67,7 @@ def bootstrap_word(
             part_of_speech=part,
             gender=gender,
             example_sentence=example,
+            phonetic_text=phonetic_text,
         )
         connection.execute(
             insert(vocabulary_items)
@@ -299,6 +307,7 @@ def build_tasks(session_id, objects, words, translations, uploaded, translated_s
             translation=translated.translated_text,
             part_of_speech=item.part_of_speech,
             gender=item.gender,
+            phonetic_text=item.phonetic_text,
             example_sentence=item.example_sentence,
         )
         for scene_object, item, translated in zip(objects, words, translations, strict=True)
@@ -326,6 +335,7 @@ def build_tasks(session_id, objects, words, translations, uploaded, translated_s
                     target_text=term.translation,
                     translation=_display_source(term.source),
                     part_of_speech=part_of_speech,
+                    phonetic_text=term.phonetic_text,
                 )
             )
     questions = []

@@ -59,6 +59,7 @@ export type VocabRecord = {
   topic: string;
   sceneId: string;
   example: string;
+  phoneticText?: string | null;
   scenes?: VocabularyScene[];
 };
 
