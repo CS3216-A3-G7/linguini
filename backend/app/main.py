@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.ai import load_ai_settings
 from app.api.learning_errors import register_learning_errors
 from app.api.router import api_router
 from app.config import get_allowed_origins
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
             "and once-daily journal."
         ),
     )
+    app.state.ai_settings = load_ai_settings()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_allowed_origins(),

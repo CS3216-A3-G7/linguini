@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import Depends, Request
 
+from app.ai import AiFeature, AiProvider, AiSettings, load_ai_settings
 from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
@@ -153,21 +154,27 @@ def get_scene_service(
     return SceneService(repository, get_media_public_base_url(), get_private_media_urls())
 
 
-def get_ispy_guess_generator():
+def get_ai_settings(request: Request) -> AiSettings:
+    """AI settings loaded at app startup; falls back to loading on demand."""
+    settings = getattr(request.app.state, "ai_settings", None)
+    if settings is None:
+        settings = load_ai_settings()
+    return settings
+
+
+def get_ispy_guess_generator(settings: AiSettings):
     """Build the target-blind I-Spy evaluator used by task generation and attempts."""
-    provider = os.getenv("ISPY_GUESS_PROVIDER", "openai").strip().casefold()
-    if provider == "none":
+    config = settings.feature(AiFeature.ISPY_GUESS)
+    if config.provider is AiProvider.NONE:
         return None
-    if provider != "openai":
-        raise ValueError(f"Unsupported ISPY_GUESS_PROVIDER: {provider}")
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    model = os.getenv("OPENAI_ISPY_GUESS_MODEL", "gpt-4o-mini").strip()
-    if not api_key or not model:
+    if config.provider is not AiProvider.OPENAI:
+        raise ValueError(f"Unsupported ISPY_GUESS_PROVIDER: {config.provider}")
+    if not settings.is_configured(config):
         return None
     return OpenAIISpyGuessGenerator(
-        api_key,
-        model,
-        timeout_seconds=int(os.getenv("ISPY_GUESS_TIMEOUT_SECONDS", "60")),
+        settings.openai_api_key,
+        config.model_name,
+        timeout_seconds=config.timeout_seconds,
     )
 
 
@@ -175,117 +182,115 @@ def get_practice_repository(
     request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
 ) -> PostgresWorkflowRepository:
     engine = request.app.state.database_engine
+    settings = get_ai_settings(request)
     deterministic = DeterministicSceneAnalyzer(engine)
-    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-    scene_provider = os.getenv("SCENE_ANALYSIS_PROVIDER", "gemini").strip().casefold()
-    scene_timeout = int(os.getenv("SCENE_ANALYSIS_TIMEOUT_SECONDS", "120").strip())
-    translation_provider = os.getenv("TRANSLATION_PROVIDER", "gemini").strip().casefold()
+    openai_key = settings.openai_api_key
+    gemini_key = settings.gemini_api_key
     analyzer = deterministic
     storage = ImageStorage(
         os.getenv("SUPABASE_URL", "").strip(),
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
     )
-    if scene_provider == "openai":
-        openai_scene_model = os.getenv("OPENAI_SCENE_MODEL", "gpt-4o").strip()
+
+    scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
+    if scene_config.provider is AiProvider.OPENAI:
         uploaded_analyzer = (
             OpenAISceneAnalyzer(
                 storage,
                 openai_key,
-                openai_scene_model,
-                timeout_seconds=scene_timeout,
+                scene_config.model_name,
+                timeout_seconds=scene_config.timeout_seconds,
             )
-            if openai_key and openai_scene_model
+            if settings.is_configured(scene_config)
             else None
         )
-    elif scene_provider == "gemini":
-        gemini_model = os.getenv("GEMINI_SCENE_MODEL", "").strip()
+    elif scene_config.provider is AiProvider.GEMINI:
         uploaded_analyzer = (
             GeminiSceneAnalyzer(
                 storage,
                 gemini_key,
-                gemini_model,
-                timeout_seconds=scene_timeout,
+                scene_config.model_name,
+                timeout_seconds=scene_config.timeout_seconds,
             )
-            if gemini_key and gemini_model
+            if settings.is_configured(scene_config)
             else None
         )
+    elif scene_config.provider is AiProvider.NONE:
+        uploaded_analyzer = None
     else:
-        raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_provider}")
+        raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_config.provider}")
     if uploaded_analyzer:
         analyzer = RoutedSceneAnalyzer(deterministic, uploaded_analyzer)
 
-    translation_timeout = int(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "60"))
-    if translation_provider == "openai":
-        openai_model = os.getenv("OPENAI_TRANSLATION_MODEL", "gpt-4o-mini").strip()
+    translation_config = settings.feature(AiFeature.SCENE_TRANSLATION)
+    if translation_config.provider is AiProvider.OPENAI:
         translator = (
             OpenAISceneTranslator(
                 openai_key,
-                openai_model,
-                timeout_seconds=translation_timeout,
+                translation_config.model_name,
+                timeout_seconds=translation_config.timeout_seconds,
             )
-            if openai_key and openai_model
+            if settings.is_configured(translation_config)
             else None
         )
-    elif translation_provider == "gemini":
-        translation_model = os.getenv(
-            "GEMINI_TRANSLATION_MODEL", "gemini-3.5-flash-lite"
-        ).strip()
+    elif translation_config.provider is AiProvider.GEMINI:
         translator = (
             GeminiSceneTranslator(
                 gemini_key,
-                translation_model,
-                timeout_seconds=translation_timeout,
+                translation_config.model_name,
+                timeout_seconds=translation_config.timeout_seconds,
             )
-            if gemini_key and translation_model
+            if settings.is_configured(translation_config)
             else None
         )
+    elif translation_config.provider is AiProvider.NONE:
+        translator = None
     else:
-        raise ValueError(f"Unsupported TRANSLATION_PROVIDER: {translation_provider}")
+        raise ValueError(f"Unsupported TRANSLATION_PROVIDER: {translation_config.provider}")
 
-    learning_task_provider = os.getenv("LEARNING_TASK_PROVIDER", "openai").strip().casefold()
-    learning_task_timeout = int(os.getenv("LEARNING_TASK_TIMEOUT_SECONDS", "60"))
-    if learning_task_provider == "openai":
-        openai_learning_model = os.getenv("OPENAI_LEARNING_TASK_MODEL", "gpt-4o-mini").strip()
+    learning_task_config = settings.feature(AiFeature.LEARNING_TASK)
+    if learning_task_config.provider is AiProvider.OPENAI:
         learning_task_generator = (
             OpenAILearningTaskGenerator(
                 openai_key,
-                openai_learning_model,
-                timeout_seconds=learning_task_timeout,
+                learning_task_config.model_name,
+                timeout_seconds=learning_task_config.timeout_seconds,
             )
-            if openai_key and openai_learning_model
+            if settings.is_configured(learning_task_config)
             else None
         )
-    elif learning_task_provider == "gemini":
-        gemini_learning_model = os.getenv(
-            "GEMINI_LEARNING_TASK_MODEL", "gemini-3.5-flash-lite"
-        ).strip()
+    elif learning_task_config.provider is AiProvider.GEMINI:
         learning_task_generator = (
             GeminiLearningTaskGenerator(
                 gemini_key,
-                gemini_learning_model,
-                timeout_seconds=learning_task_timeout,
+                learning_task_config.model_name,
+                timeout_seconds=learning_task_config.timeout_seconds,
             )
-            if gemini_key and gemini_learning_model
+            if settings.is_configured(learning_task_config)
             else None
         )
+    elif learning_task_config.provider is AiProvider.NONE:
+        learning_task_generator = None
     else:
-        raise ValueError(f"Unsupported LEARNING_TASK_PROVIDER: {learning_task_provider}")
-    ispy_clue_provider = os.getenv("ISPY_CLUE_PROVIDER", "openai").strip().casefold()
-    ispy_clue_timeout = int(os.getenv("ISPY_CLUE_TIMEOUT_SECONDS", "60"))
-    if ispy_clue_provider == "openai":
-        ispy_clue_model = os.getenv("OPENAI_ISPY_CLUE_MODEL", "gpt-4o-mini").strip()
+        raise ValueError(
+            f"Unsupported LEARNING_TASK_PROVIDER: {learning_task_config.provider}"
+        )
+
+    ispy_clue_config = settings.feature(AiFeature.ISPY_CLUE)
+    if ispy_clue_config.provider is AiProvider.OPENAI:
         ispy_clue_generator = (
             OpenAIISpyClueGenerator(
-                openai_key, ispy_clue_model, timeout_seconds=ispy_clue_timeout
+                openai_key,
+                ispy_clue_config.model_name,
+                timeout_seconds=ispy_clue_config.timeout_seconds,
             )
-            if openai_key and ispy_clue_model
+            if settings.is_configured(ispy_clue_config)
             else None
         )
-    elif ispy_clue_provider == "none":
+    elif ispy_clue_config.provider is AiProvider.NONE:
         ispy_clue_generator = None
     else:
-        raise ValueError(f"Unsupported ISPY_CLUE_PROVIDER: {ispy_clue_provider}")
+        raise ValueError(f"Unsupported ISPY_CLUE_PROVIDER: {ispy_clue_config.provider}")
     return PostgresWorkflowRepository(
         engine,
         demo_user_id,
@@ -293,7 +298,7 @@ def get_practice_repository(
         translator=translator,
         learning_task_generator=learning_task_generator,
         ispy_clue_generator=ispy_clue_generator,
-        ispy_guess_generator=get_ispy_guess_generator(),
+        ispy_guess_generator=get_ispy_guess_generator(settings),
         background=getattr(request.app.state, "background_runner", None),
     )
 
@@ -313,7 +318,7 @@ def get_task_service(
         PostgresTaskRepository(request.app.state.database_engine),
         users,
         request.app.state.database_engine,
-        ispy_guess_generator=get_ispy_guess_generator(),
+        ispy_guess_generator=get_ispy_guess_generator(get_ai_settings(request)),
     )
 
 
