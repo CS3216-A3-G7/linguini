@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 from uuid import UUID
 
-from test_postgres_sessions import create_run
+from test_postgres_sessions import create_run, vocabulary_answer
 from test_postgres_sessions import database as database
 
 from app.ai.features.translation.schemas import SceneTranslationResult
@@ -26,6 +26,8 @@ def test_translations_are_committed_before_lesson_generation(database):
     engine, owner, profile, client = database
     runner = DeferringRunner()
     observed = []
+    attempts = []
+    completions = []
 
     def translate(payload):
         return SceneTranslationResult.model_validate({
@@ -39,6 +41,15 @@ def test_translations_are_committed_before_lesson_generation(database):
     def generate(_payload):
         # A separate reader must see the checkpoint before this slow call ends.
         observed.append(repo.get(sid, profile.id))
+        intro = observed[-1].tasks[0]
+        # Exercise the public API during generation; this would block if the
+        # generation call still held the user's database lock.
+        attempts.append(client.post(
+            f"/api/v1/tasks/{intro.id}/attempts",
+            json=vocabulary_answer(intro.public_content.model_dump(mode="json"))
+            | {"idempotencyKey": "early-vocabulary-test"},
+        ))
+        completions.append(client.post(f"/api/v1/sessions/{sid}/complete"))
         raise ValueError("Use deterministic tasks for this test")
 
     repo = PostgresWorkflowRepository(
@@ -55,12 +66,17 @@ def test_translations_are_committed_before_lesson_generation(database):
     assert len(observed) == 1
     assert observed[0].session.status == "generatingTasks"
     assert observed[0].translation_preview.objects[0].translation == "mesa"
-    assert not observed[0].tasks
+    assert len(observed[0].tasks) == 1
+    assert observed[0].tasks[0].kind == "vocabularyIntroduction"
+    assert attempts[0].status_code == 200, attempts[0].text
+    assert completions[0].status_code == 409
     settled = repo.get(sid, profile.id)
     assert settled.session.status == "inProgress"
     assert settled.tasks
     assert settled.vocabulary[0].phonetic_text == "/ˈmesa/"
     intro = next(task for task in settled.tasks if task.kind == "vocabularyIntroduction")
+    assert intro.id == observed[0].tasks[0].id
+    assert intro.status == "completed"
     assert intro.public_content.words[0].phonetic_text == "/ˈmesa/"
 
 

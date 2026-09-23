@@ -22,7 +22,7 @@ export function LearningTaskPage() {
   if (!task || ["abandoned", "failed"].includes(session.session.status)) return <Navigate to={`${base}/learn`} replace />;
   const next = tasks[index + 1];
   return <div className="stack learning-task-page"><LearningTaskContent key={task.id} task={task} index={index} total={tasks.length}
-    onNext={() => navigate(next ? `${base}/learn/${next.id}` : `${base}/ispy-1`)} onClose={() => navigate(`${base}/learn`)} onExit={() => navigate("/home")} /></div>;
+    onNext={() => navigate(next ? `${base}/learn/${next.id}` : session.session.status === "generatingTasks" ? `${base}/learn` : `${base}/ispy-1`)} onClose={() => navigate(`${base}/learn`)} onExit={() => navigate("/home")} /></div>;
 }
 
 function LearningTaskContent({ task, index, total, onNext, onClose, onExit }: { task: SessionTask; index: number; total: number; onNext: () => void; onClose: () => void; onExit: () => void }) {
@@ -90,7 +90,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose, onExit }: { 
 
 function VocabularyLearningFlow({ task, index, total, onNext, onExit }: { task: SessionTask; index: number; total: number; onNext: () => void; onExit: () => void }) {
   const scene = useScene();
-  const { actOnTask, practiceSaving, practiceError } = useAppState();
+  const { actOnTask, practiceSaving, practiceError, session } = useAppState();
   const [stage, setStage] = useState<"review" | "quiz" | "typing">("review");
   const [page, setPage] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -182,7 +182,7 @@ function VocabularyLearningFlow({ task, index, total, onNext, onExit }: { task: 
     </div></Card> : null}
     {feedback ? <Feedback><p role="status">{feedback}</p></Feedback> : null}
     {practiceError ? <p role="alert">{practiceError}</p> : null}
-    {terminal ? <Button block onClick={onNext}>{index < total - 1 ? "Next task" : "Go to I-Spy"}</Button> : null}
+    {terminal ? <Button block onClick={onNext}>{session?.session.status === "generatingTasks" ? "Back to tasks" : index < total - 1 ? "Next task" : "Go to I-Spy"}</Button> : null}
   </div>;
 }
 

@@ -24,8 +24,9 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
     case "created":
     case "analyzingScene":
     case "awaitingObjectReview":
-    case "generatingTasks":
       return { path: `${base}/analysis`, notice: null };
+    case "generatingTasks":
+      return { path: `${base}/${detail.tasks.some(task => task.kind === "vocabularyIntroduction") ? "learn" : "analysis"}`, notice: null };
     case "ready":
       return { path: `${base}/mic-test`, notice: null };
     case "inProgress": {

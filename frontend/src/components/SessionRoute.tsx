@@ -44,19 +44,21 @@ function SessionLoader({ id }: { id: string }) {
   });
   const error = queryError(queryErrorValue);
   const copy = sessionLoadingCopy(location.pathname);
-  if (loading && session?.session.id === id && session.session.status === "generatingTasks" && session.translationPreview) return <div className="stack analysis-page">
+  const earlyReady = session?.session.id === id && ["generatingTasks", "ready", "inProgress"].includes(session.session.status)
+    && session.tasks.some(task => task.kind === "vocabularyIntroduction");
+  if (loading && !earlyReady && session?.session.id === id && session.session.status === "generatingTasks" && session.translationPreview) return <div className="stack analysis-page">
     <h1>Scene analysis</h1>
     <TranslationPreview preview={session.translationPreview} />
     <section role="status" className="panel-note"><h2>Generating tasks...</h2><p className="muted">Explore your translations while we prepare your practice.</p></section>
   </div>;
-  if (loading) return copy.scan && preview ? <div className="stack analysis-page">
+  if (loading && !earlyReady) return copy.scan && preview ? <div className="stack analysis-page">
     <h1>{copy.title}</h1>
     <section className="analysis-loading" aria-live="polite" aria-busy="true">
       <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={preview} items={[]} /><span className="analysis-scan__line" /></div>
       <div className="analysis-loading__copy"><h2>{copy.heading}</h2><p className="muted">This will only take a moment.</p></div>
     </section>
   </div> : <LoadingScreen label={copy.heading} />;
-  if (!data || error) return <div className="stack"><p role="alert">{error ?? "Session unavailable."}</p><button onClick={() => window.location.reload()}>Retry</button><Link to="/practice">Choose an image</Link></div>;
+  if ((!data && !earlyReady) || error) return <div className="stack"><p role="alert">{error ?? "Session unavailable."}</p><button onClick={() => window.location.reload()}>Retry</button><Link to="/practice">Choose an image</Link></div>;
   const current = session?.session.id === id
     ? practiceScene(session, mediaImageUrl(session.mediaAsset.id, 1280), learner.language)
     : data;

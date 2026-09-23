@@ -774,6 +774,8 @@ class PostgresWorkflowRepository:
     def _review(self, session_id, profile_id, request):
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
+            if session.status == "generatingTasks":
+                raise PracticeConflictError("The confirmed scene is already generating tasks.")
             if session.status in TERMINAL:
                 raise PracticeConflictError("This session cannot be edited.")
             tasks = self._tasks(c, session_id)
@@ -942,24 +944,6 @@ class PostgresWorkflowRepository:
             detail = self._detail(c, session)
             objects = list(detail.scene_objects)
             if self.translator:
-                if self.learning_task_generator:
-                    try:
-                        lessons = build_grammar_lessons(
-                            session_id,
-                            self.learning_task_generator.generate(
-                                _learning_task_payload(
-                                    payload, translated_scene, detail.scene_object_relations
-                                )
-                            ),
-                        )
-                    except Exception:
-                        # AI grammar is an enhancement. A bad provider response
-                        # must not abandon a learner's otherwise valid session.
-                        logger.exception(
-                            "Learning-task generation failed for session %s; "
-                            "using the deterministic lesson plan.",
-                            session_id,
-                        )
                 translated_objects = {row.key: row for row in translated_scene.objects}
                 for obj in objects:
                     translated = translated_objects[str(obj.id)]
@@ -979,33 +963,6 @@ class PostgresWorkflowRepository:
                     )
                 detail = self._detail(c, session)
                 objects = list(detail.scene_objects)
-                words_by_id = {word.id: word for word in detail.vocabulary}
-                if self.ispy_clue_generator:
-                    try:
-                        ispy_clues = build_ispy_clue_tasks(
-                            session_id,
-                            self.ispy_clue_generator.generate(
-                                _ispy_clue_payload(
-                                    payload, translated_scene, objects,
-                                    detail.scene_object_relations,
-                                )
-                            ),
-                            objects,
-                            [words_by_id[obj.vocabulary_item_id] for obj in objects],
-                        )
-                    except ISpyClueGenerationError:
-                        # A clue is additive. Keep the deterministic round instead of
-                        # failing a learner's complete practice session.
-                        logger.exception("I-Spy clue generation failed for session %s.", session_id)
-                if self.ispy_guess_generator:
-                    ispy_descriptions = build_ispy_description_tasks(
-                        session_id,
-                        objects,
-                        [words_by_id[obj.vocabulary_item_id] for obj in objects],
-                        _ispy_guess_context(
-                            payload, translated_scene, objects, detail.scene_object_relations
-                        ),
-                    )
             words_by_id = {word.id: word for word in detail.vocabulary}
             translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
             if any(
@@ -1024,6 +981,53 @@ class PostgresWorkflowRepository:
                 False,
                 getattr(detail, "translation_preview", None),
             )
+            introduction = next(task for task in rebuilt if task.kind == "vocabularyIntroduction")
+            introduction.order_index = 0
+            c.execute(insert(session_tasks).values(**entity_values(introduction)))
+
+        # No transaction or user lock spans these slow calls: task 1 is committed
+        # and can be started, answered and completed while the rest is generated.
+        if self.translator:
+            if self.learning_task_generator:
+                try:
+                    lessons = build_grammar_lessons(
+                        session_id,
+                        self.learning_task_generator.generate(
+                            _learning_task_payload(
+                                payload, translated_scene, detail.scene_object_relations
+                            )
+                        ),
+                    )
+                except Exception:
+                    logger.exception(
+                        "Learning-task generation failed for session %s; "
+                        "using the deterministic lesson plan.", session_id,
+                    )
+            if self.ispy_clue_generator:
+                try:
+                    ispy_clues = build_ispy_clue_tasks(
+                        session_id,
+                        self.ispy_clue_generator.generate(
+                            _ispy_clue_payload(
+                                payload, translated_scene, objects, detail.scene_object_relations
+                            )
+                        ),
+                        objects, words,
+                    )
+                except ISpyClueGenerationError:
+                    logger.exception("I-Spy clue generation failed for session %s.", session_id)
+            if self.ispy_guess_generator:
+                ispy_descriptions = build_ispy_description_tasks(
+                    session_id, objects, words,
+                    _ispy_guess_context(
+                        payload, translated_scene, objects, detail.scene_object_relations
+                    ),
+                )
+
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.status in TERMINAL:
+                return
             learning = [
                 task for task in rebuilt if task.kind not in {"ispyRound", "reflection"}
             ]
@@ -1038,6 +1042,9 @@ class PostgresWorkflowRepository:
                 ] + lessons
             rebuilt = [*learning, *clues, *descriptions]
             for index, task in enumerate(rebuilt):
+                if task.id == introduction.id:
+                    # Preserve any progress/attempts already made in task 1.
+                    continue
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
             self._transition(c, session, "inProgress")
@@ -1052,7 +1059,8 @@ class PostgresWorkflowRepository:
                 raise PracticeConflictError("Session is already terminal.")
             tasks = self._tasks(c, session.id)
             if not abandon and (
-                not tasks or any(t.status not in {"completed", "skipped"} for t in tasks)
+                session.status == "generatingTasks"
+                or not tasks or any(t.status not in {"completed", "skipped"} for t in tasks)
             ):
                 raise PracticeConflictError("Complete or skip every task first.")
             session = self._transition(c, session, target)
@@ -1204,7 +1212,12 @@ class PostgresWorkflowRepository:
                 or (action == "skip" and task.status == "skipped")
             )
             if not retry:
-                if session.status != "inProgress" or task.status in {"completed", "skipped"}:
+                early_vocabulary = (
+                    session.status == "generatingTasks" and task.kind == "vocabularyIntroduction"
+                )
+                if (session.status != "inProgress" and not early_vocabulary) or task.status in {
+                    "completed", "skipped"
+                }:
                     raise PracticeConflictError(
                         f"Task or session is not active; session is '{session.status}'."
                     )

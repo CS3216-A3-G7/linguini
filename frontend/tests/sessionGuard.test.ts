@@ -302,3 +302,12 @@ test("translations appear during generation before tasks are ready", async () =>
   }
   assert.equal(shown(), "page-mic-test");
 });
+
+test("task 1 is accessible while generation continues and stays open when ready", async () => {
+  fixture = detail("generatingTasks", [task("learn", "pending", 0)]);
+  await mount(`${BASE}/learn/learn-0`);
+  assert.equal(shown(), "page-learn-task");
+  fixture = detail("inProgress", [task("learn", "inProgress", 0), task("clues", "pending", 1)]);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 2000)); });
+  assert.equal(shown(), "page-learn-task");
+});
