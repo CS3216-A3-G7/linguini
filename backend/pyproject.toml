@@ -21,7 +21,8 @@ dependencies = [
   "httpx>=0.28,<1",
   "Pillow>=12.1,<13",
   "google-genai>=1,<2",
-  "openai>=2,<3"
+  "openai>=2,<3",
+  "langfuse>=4.15,<5"
 ]
 
 [project.optional-dependencies]

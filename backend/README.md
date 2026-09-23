@@ -262,6 +262,29 @@ Tables use UUID identities and timezone-aware timestamps. Migrations define fore
 keys, checks, update triggers, RLS, and revoked browser-role grants. All access is
 through backend repositories; the frontend must not query these tables directly.
 
+### AI observability
+
+AI calls can be traced to Langfuse. Tracing is off by default and strictly
+best-effort: without keys the app runs a no-op tracer, and a tracing failure
+never affects a learner request or blocks the request path (export is
+asynchronous). Today exactly one operation is instrumented — I-Spy
+description evaluation (`ispy-description-evaluation`), recorded as a
+generation with provider/model dimensions, validation outcome, latency and
+error codes.
+
+Canonical variables (the Langfuse-native `LANGFUSE_*` names are accepted as
+aliases when the canonical one is unset): `AI_OBSERVABILITY_ENABLED`,
+`AI_OBSERVABILITY_BASE_URL`, `AI_OBSERVABILITY_PUBLIC_KEY`,
+`AI_OBSERVABILITY_SECRET_KEY`, `AI_OBSERVABILITY_ENVIRONMENT`, and
+`AI_OBSERVABILITY_CAPTURE_CONTENT`.
+
+Content capture is opt-in. With `AI_OBSERVABILITY_CAPTURE_CONTENT=false`
+(the default) no learner text or model output leaves the process: the
+client is constructed with a mask that redacts any input/output payload.
+Image bytes, base64, keys, signed URLs, raw learner text and full model
+responses are never traced by default; observations carry only scalar
+dimensions and caller-supplied metadata.
+
 ## Remaining integration work
 
 Authentication, real image analysis, AI generation and speech evaluation

@@ -4,13 +4,18 @@ import json
 
 import httpx
 import pytest
-from openai import OpenAI
 from openai.lib._pydantic import to_strict_json_schema
 from pydantic import ValidationError
 
-from app.services.learning_tasks import scene_generation_response_model
-from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
-from tests.test_openai_learning_tasks import INPUT, tasks
+from app.ai.features.learning_tasks import (
+    LearningTaskService,
+    scene_generation_response_model,
+)
+from app.ai.observability import NoOpAITracer
+from app.ai.text_model import TextModelConfig
+from app.ai.text_openai import OpenAITextClient
+from app.services.vision_model import build_strict_json_schema
+from tests.test_learning_task_service import INPUT, tasks
 
 
 @pytest.mark.parametrize("focus", ["sceneDescription", "chainedDescription"])
@@ -62,8 +67,8 @@ def test_schema_rejects_ids_from_another_scene():
         model.model_validate(payload)
 
 
-def test_real_sdk_parsing_preserves_translations_through_provider(tmp_path):
-    """Exercise SDK serialization/parsing and our normalization without network/credits."""
+def test_strict_schema_parsing_preserves_translations_through_provider():
+    """Exercise the real adapter + service end to end without network/credits."""
     calls = []
     lesson = {task["focus"]: task for task in tasks()["tasks"]}
 
@@ -80,23 +85,27 @@ def test_real_sdk_parsing_preserves_translations_through_provider(tmp_path):
                     "type": "output_text", "text": json.dumps(lesson), "annotations": [],
                 }],
             }],
+            "usage": {"input_tokens": 100, "output_tokens": 50},
         })
 
-    prompt = tmp_path / "prompt.txt"
-    prompt.write_text("Generate lessons.")
-    with OpenAI(
-        api_key="not-a-real-key",
-        http_client=httpx.Client(transport=httpx.MockTransport(respond)),
-    ) as client:
-        provider = OpenAILearningTaskGenerator(
-            "not-a-real-key", "test-model", client=client, prompt_path=prompt,
-        )
-        result = provider.generate(INPUT)
+    client = OpenAITextClient(
+        "not-a-real-key",
+        TextModelConfig(model_name="test-model"),
+        client=httpx.Client(transport=httpx.MockTransport(respond)),
+    )
+    result = LearningTaskService(
+        client,
+        TextModelConfig(model_name="test-model"),
+        tracer=NoOpAITracer(),
+        provider="openai",
+    ).generate(INPUT)
 
     assert len(calls) == 1
     sent_format = calls[0]["text"]["format"]
     assert sent_format["strict"] is True
-    assert sent_format["schema"] == to_strict_json_schema(scene_generation_response_model(INPUT))
+    assert sent_format["schema"] == build_strict_json_schema(
+        scene_generation_response_model(INPUT)
+    )
     assert result.tasks[2].questions[0].translation == "The cup is red."
     assert result.tasks[3].questions[0].translation == "The red cup is on the table."
     assert result.tasks[3].questions[0].token_bank

@@ -5,6 +5,7 @@ and never performs network I/O.
 """
 
 import os
+import re
 from collections.abc import Mapping
 from enum import StrEnum
 
@@ -45,6 +46,17 @@ class FeatureModelConfig(BaseModel):
     max_retries: int = Field(default=0, ge=0)
 
 
+class ObservabilitySettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    base_url: str = "https://cloud.langfuse.com"
+    public_key: str = ""
+    secret_key: str = ""
+    environment: str = "development"
+    capture_content: bool = False
+
+
 class AiSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -52,6 +64,7 @@ class AiSettings(BaseModel):
     openai_api_key: str = ""
     gemini_api_key: str = ""
     general_api_key: str = ""
+    observability: ObservabilitySettings = ObservabilitySettings()
     scene_analysis: FeatureModelConfig
     scene_translation: FeatureModelConfig
     learning_task: FeatureModelConfig
@@ -146,8 +159,14 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
         provider_default="openai",
         timeout_var="ISPY_CLUE_TIMEOUT_SECONDS",
         timeout_default="60",
-        model_vars={AiProvider.OPENAI: "OPENAI_ISPY_CLUE_MODEL"},
-        model_defaults={AiProvider.OPENAI: "gpt-4o-mini"},
+        model_vars={
+            AiProvider.OPENAI: "OPENAI_ISPY_CLUE_MODEL",
+            AiProvider.GEMINI: "GEMINI_ISPY_CLUE_MODEL",
+        },
+        model_defaults={
+            AiProvider.OPENAI: "gpt-4o-mini",
+            AiProvider.GEMINI: "",
+        },
     ),
     AiFeature.ISPY_GUESS: _LegacySpec(
         provider_var="ISPY_GUESS_PROVIDER",
@@ -161,6 +180,19 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
 
 _ALLOWED_PROVIDERS = ", ".join(provider.value for provider in AiProvider)
 _ALLOWED_MODES = ", ".join(mode.value for mode in AiMode)
+
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+_FALSE_VALUES = {"0", "false", "no", "off"}
+_ENVIRONMENT_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+
+_OBSERVABILITY_ALIASES: dict[str, tuple[str, ...]] = {
+    "AI_OBSERVABILITY_ENABLED": ("LANGFUSE_TRACING_ENABLED",),
+    "AI_OBSERVABILITY_BASE_URL": ("LANGFUSE_BASE_URL", "LANGFUSE_HOST"),
+    "AI_OBSERVABILITY_PUBLIC_KEY": ("LANGFUSE_PUBLIC_KEY",),
+    "AI_OBSERVABILITY_SECRET_KEY": ("LANGFUSE_SECRET_KEY",),
+    "AI_OBSERVABILITY_ENVIRONMENT": ("LANGFUSE_TRACING_ENVIRONMENT",),
+    "AI_OBSERVABILITY_CAPTURE_CONTENT": (),
+}
 
 
 def _read(env: Mapping[str, str], name: str) -> str | None:
@@ -217,6 +249,54 @@ def _parse_int(
         raise AiConfigurationError(
             f"Invalid {kind} for {feature.value}: {raw!r} ({name} must be an integer)"
         ) from exc
+
+
+def _read_with_aliases(env: Mapping[str, str], canonical: str) -> str | None:
+    value = _read(env, canonical)
+    if value is not None:
+        return value
+    for alias in _OBSERVABILITY_ALIASES[canonical]:
+        value = _read(env, alias)
+        if value is not None:
+            return value
+    return None
+
+
+def _parse_bool(env: Mapping[str, str], canonical: str, default: bool) -> bool:
+    raw = _read_with_aliases(env, canonical)
+    if raw is None or raw == "":
+        return default
+    lowered = raw.casefold()
+    if lowered in _TRUE_VALUES:
+        return True
+    if lowered in _FALSE_VALUES:
+        return False
+    raise AiConfigurationError(
+        f"Invalid boolean for {canonical}: {raw!r} "
+        "(allowed: 1/true/yes/on or 0/false/no/off)"
+    )
+
+
+def _parse_observability(env: Mapping[str, str]) -> ObservabilitySettings:
+    environment = (
+        _read_with_aliases(env, "AI_OBSERVABILITY_ENVIRONMENT") or "development"
+    )
+    if not _ENVIRONMENT_PATTERN.fullmatch(environment) or environment.startswith(
+        "langfuse"
+    ):
+        raise AiConfigurationError(
+            f"Invalid observability environment: {environment!r} "
+            "(must match ^[a-z0-9][a-z0-9_-]*$ and not start with 'langfuse')"
+        )
+    return ObservabilitySettings(
+        enabled=_parse_bool(env, "AI_OBSERVABILITY_ENABLED", False),
+        base_url=_read_with_aliases(env, "AI_OBSERVABILITY_BASE_URL")
+        or "https://cloud.langfuse.com",
+        public_key=_read_with_aliases(env, "AI_OBSERVABILITY_PUBLIC_KEY") or "",
+        secret_key=_read_with_aliases(env, "AI_OBSERVABILITY_SECRET_KEY") or "",
+        environment=environment,
+        capture_content=_parse_bool(env, "AI_OBSERVABILITY_CAPTURE_CONTENT", False),
+    )
 
 
 def _parse_model(
@@ -284,6 +364,7 @@ def load_ai_settings(env: Mapping[str, str] | None = None) -> AiSettings:
         or _read(env, "GEMINI_API_KEY")
         or "",
         general_api_key=_read(env, "AI_API_KEY") or "",
+        observability=_parse_observability(env),
         **{
             field: _load_feature(env, feature)
             for feature, field in _FEATURE_FIELDS.items()
@@ -306,6 +387,18 @@ def load_ai_settings(env: Mapping[str, str] | None = None) -> AiSettings:
                 problems.append(
                     f"{feature.value}: missing {config.provider.value} API key "
                     f"(set {key_var})"
+                )
+        observability = settings.observability
+        if observability.enabled:
+            if not observability.public_key:
+                problems.append(
+                    "observability: missing Langfuse public key "
+                    "(set AI_OBSERVABILITY_PUBLIC_KEY)"
+                )
+            if not observability.secret_key:
+                problems.append(
+                    "observability: missing Langfuse secret key "
+                    "(set AI_OBSERVABILITY_SECRET_KEY)"
                 )
         if problems:
             raise AiConfigurationError(

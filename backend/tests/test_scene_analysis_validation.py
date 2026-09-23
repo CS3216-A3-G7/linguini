@@ -4,19 +4,20 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.enums import SceneRelationType
-from app.schemas.scene_analysis import (
+from app.ai.features.scene_analysis.schemas import (
+    ModelAnchorPoint,
     ModelBoundingBox,
     ModelSceneObject,
     ModelSceneRelation,
     SceneAnalysisIssueCode,
     SceneAnalysisModelResult,
 )
-from app.services.scene_analysis_validation import (
+from app.ai.features.scene_analysis.validation import (
     SceneAnalysisValidationError,
     parse_scene_analysis,
     validate_scene_analysis,
 )
+from app.schemas.enums import SceneRelationType
 
 
 def object_payload(key: str = "chair", **box: float) -> dict:
@@ -318,6 +319,88 @@ def test_validator_collects_violations_across_the_whole_payload() -> None:
         SceneAnalysisIssueCode.UNKNOWN_RELATION_OBJECT,
         SceneAnalysisIssueCode.SELF_RELATION,
     }
+
+
+def test_relation_aliases_resolve_to_canonical_types() -> None:
+    for alias, expected in [
+        ("in", SceneRelationType.INSIDE),
+        ("insideOf", SceneRelationType.INSIDE),
+        ("inside_of", SceneRelationType.INSIDE),
+        ("beside", SceneRelationType.NEXT_TO),
+        ("leftOf", SceneRelationType.LEFT_OF),
+        ("rightOf", SceneRelationType.RIGHT_OF),
+        ("inFrontOf", SceneRelationType.IN_FRONT_OF),
+        ("nextTo", SceneRelationType.NEXT_TO),
+    ]:
+        payload = valid_payload()
+        payload["relations"][0]["relation"] = alias
+        assert parse_scene_analysis(payload).relations[0].relation is expected
+
+
+def test_non_finite_and_out_of_range_anchor_points() -> None:
+    scene_object = valid_result().objects[0]
+    scene_object.anchor_point = ModelAnchorPoint(x=math.nan, y=0.5)
+    with pytest.raises(SceneAnalysisValidationError) as raised:
+        validate_scene_analysis(valid_result(objects=[scene_object]))
+    assert (
+        SceneAnalysisIssueCode.NON_FINITE_ANCHOR_POINT in issue_codes(raised.value)
+    )
+
+    scene_object.anchor_point = ModelAnchorPoint(x=1.5, y=0.5)
+    with pytest.raises(SceneAnalysisValidationError) as raised:
+        validate_scene_analysis(valid_result(objects=[scene_object]))
+    assert (
+        SceneAnalysisIssueCode.ANCHOR_POINT_OUT_OF_RANGE in issue_codes(raised.value)
+    )
+
+
+def test_in_box_anchor_outside_image_bounds_is_out_of_range() -> None:
+    scene_object = valid_result().objects[0]
+    scene_object.anchor_point = ModelAnchorPoint(x=-0.2, y=0.5)
+    with pytest.raises(SceneAnalysisValidationError) as raised:
+        validate_scene_analysis(valid_result(objects=[scene_object]))
+    assert (
+        SceneAnalysisIssueCode.ANCHOR_POINT_OUT_OF_RANGE in issue_codes(raised.value)
+    )
+
+
+def test_non_finite_confidence_is_reported() -> None:
+    scene_object = valid_result().objects[0]
+    object.__setattr__(scene_object, "confidence_score", math.nan)
+    with pytest.raises(SceneAnalysisValidationError) as raised:
+        validate_scene_analysis(valid_result(objects=[scene_object]))
+    assert SceneAnalysisIssueCode.NON_FINITE_CONFIDENCE in issue_codes(raised.value)
+
+
+def test_inverse_duplicate_relation() -> None:
+    relations = [
+        model_relation(key="first", relation=SceneRelationType.LEFT_OF),
+        model_relation(
+            key="second",
+            relation=SceneRelationType.RIGHT_OF,
+            subject="table",
+            reference="chair",
+        ),
+    ]
+    with pytest.raises(SceneAnalysisValidationError) as raised:
+        validate_scene_analysis(valid_result(relations=relations))
+    assert (
+        SceneAnalysisIssueCode.INVERSE_DUPLICATE_RELATION
+        in issue_codes(raised.value)
+    )
+
+
+def test_non_inverse_reversed_relation_is_allowed() -> None:
+    relations = [
+        model_relation(key="first", relation=SceneRelationType.LEFT_OF),
+        model_relation(
+            key="second",
+            relation=SceneRelationType.LEFT_OF,
+            subject="table",
+            reference="chair",
+        ),
+    ]
+    validate_scene_analysis(valid_result(relations=relations))
 
 
 def test_invalid_result_is_rejected_without_repairing_or_mutating_it() -> None:

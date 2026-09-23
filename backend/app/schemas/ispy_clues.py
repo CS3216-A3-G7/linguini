@@ -1,22 +1,8 @@
-"""Structured output returned for Linguini's Phase 1 I-Spy clues."""
+"""Structured output returned for Linguini's Phase 1 I-Spy clues.
 
-from typing import Annotated
+Re-export shim: the models now live in ``app.ai.features.ispy_clues.schemas``.
+"""
 
-from pydantic import Field
+from app.ai.features.ispy_clues.schemas import GeneratedISpyClue, ISpyClueResult
 
-from app.schemas.base import ApiModel, NonEmptyText
-
-
-class GeneratedISpyClue(ApiModel):
-    """One clue ending and its private scene-object answer."""
-
-    clue: NonEmptyText = Field(
-        description="Only the phrase completing 'I spy with my little eye, something that …'."
-    )
-    answer_object_key: NonEmptyText
-    object_keys: Annotated[list[NonEmptyText], Field(min_length=1, max_length=1)]
-    relationship_keys: list[NonEmptyText] = Field(default_factory=list)
-
-
-class ISpyClueResult(ApiModel):
-    clues: Annotated[list[GeneratedISpyClue], Field(min_length=1, max_length=2)]
+__all__ = ["GeneratedISpyClue", "ISpyClueResult"]
