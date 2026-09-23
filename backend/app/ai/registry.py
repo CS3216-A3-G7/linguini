@@ -12,6 +12,7 @@ from app.ai.features.learning_tasks import LearningTaskService
 from app.ai.features.object_grounding import GroundingDinoObjectGrounder, ObjectGrounder
 from app.ai.features.translation import SceneTranslationService
 from app.ai.observability import AITracer
+from app.ai.openrouter import OPENROUTER_BASE_URL
 from app.ai.settings import (
     AiFeature,
     AiProvider,
@@ -21,6 +22,9 @@ from app.ai.settings import (
 from app.ai.text_gemini import GeminiTextClient
 from app.ai.text_model import TextModelClient, TextModelConfig
 from app.ai.text_openai import OpenAITextClient
+from app.ai.vision_gemini import GeminiVisionClient
+from app.services.vision_model import VisionModelClient, VisionModelConfig
+from app.services.vision_openai import OpenAIVisionClient
 
 
 def build_text_client(
@@ -30,7 +34,26 @@ def build_text_client(
         return OpenAITextClient(settings.openai_api_key, config)
     if provider is AiProvider.GEMINI:
         return GeminiTextClient(settings.gemini_api_key, config)
+    if provider is AiProvider.OPENROUTER:
+        # OpenRouter speaks the OpenAI Responses API; only the host differs.
+        return OpenAITextClient(
+            settings.openrouter_api_key, config, base_url=OPENROUTER_BASE_URL
+        )
     raise ValueError(f"unsupported text provider {provider!r}")
+
+
+def build_vision_client(
+    provider: AiProvider, settings: AiSettings, config: VisionModelConfig
+) -> VisionModelClient:
+    if provider is AiProvider.OPENAI:
+        return OpenAIVisionClient(settings.openai_api_key, config)
+    if provider is AiProvider.GEMINI:
+        return GeminiVisionClient(settings.gemini_api_key, config)
+    if provider is AiProvider.OPENROUTER:
+        return OpenAIVisionClient(
+            settings.openrouter_api_key, config, base_url=OPENROUTER_BASE_URL
+        )
+    raise ValueError(f"unsupported vision provider {provider!r}")
 
 
 def build_object_grounder(settings: AiSettings) -> ObjectGrounder | None:
