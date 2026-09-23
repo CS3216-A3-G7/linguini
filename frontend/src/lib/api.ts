@@ -1,4 +1,5 @@
-import type { LeaderboardRow, ScenarioProgress, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
+import { GENDER_ARTICLES } from "../data/types.ts";
+import type { Gender, LeaderboardRow, ScenarioProgress, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";
 
@@ -227,7 +228,7 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
     word: item.vocabulary.displayText,
     translation: item.translation?.translatedText ?? "Translation unavailable",
     wordClass: item.vocabulary.partOfSpeech,
-    gender: item.vocabulary.gender === "la" || item.vocabulary.gender === "el" ? item.vocabulary.gender : null,
+    gender: item.vocabulary.gender != null && GENDER_ARTICLES.has(item.vocabulary.gender) ? item.vocabulary.gender as Gender : null,
     status: item.progress?.status ?? "new",
     topic: item.topic ?? "Uncategorised",
     sceneId: item.sceneId ?? "",

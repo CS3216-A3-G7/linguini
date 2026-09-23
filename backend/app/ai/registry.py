@@ -11,6 +11,7 @@ from app.ai.features.ispy_clues import ISpyClueService
 from app.ai.features.learning_tasks import LearningTaskService
 from app.ai.features.moderation import ImageModerator, OpenAIImageModerator
 from app.ai.features.object_grounding import GroundingDinoObjectGrounder, ObjectGrounder
+from app.ai.features.scene_analysis import UploadedSceneAnalyzer
 from app.ai.features.translation import SceneTranslationService
 from app.ai.observability import AITracer
 from app.ai.settings import (
@@ -23,6 +24,10 @@ from app.ai.settings import (
 from app.ai.text_gemini import GeminiTextClient
 from app.ai.text_model import TextModelClient, TextModelConfig
 from app.ai.text_openai import OpenAITextClient
+from app.ai.vision_gemini import GeminiVisionClient
+from app.services.image_storage import ImageStorage
+from app.services.vision_model import VisionModelClient, VisionModelConfig
+from app.services.vision_openai import OpenAIVisionClient
 
 
 def build_text_client(
@@ -33,6 +38,47 @@ def build_text_client(
     if provider is AiProvider.GEMINI:
         return GeminiTextClient(settings.gemini_api_key, config)
     raise ValueError(f"unsupported text provider {provider!r}")
+
+
+def build_uploaded_scene_analyzer(
+    settings: AiSettings,
+    storage: ImageStorage,
+    tracer: AITracer,
+    object_grounder: ObjectGrounder | None = None,
+    image_moderator: ImageModerator | None = None,
+) -> UploadedSceneAnalyzer | None:
+    """Build the configured uploaded-photo analyzer, or ``None`` when off.
+
+    ``None`` preserves the workflow's deterministic scene fallback. The
+    caller routes only non-preloaded media through the returned analyzer.
+    """
+    scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
+    if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
+        if not settings.is_configured(scene_config):
+            return None
+        vision_config = VisionModelConfig(
+            model_name=scene_config.model_name,
+            timeout_seconds=scene_config.timeout_seconds,
+            max_output_tokens=scene_config.max_output_tokens or 1500,
+            max_retries=min(scene_config.max_retries, 1),
+        )
+        client: VisionModelClient = (
+            OpenAIVisionClient(settings.openai_api_key, vision_config)
+            if scene_config.provider is AiProvider.OPENAI
+            else GeminiVisionClient(settings.gemini_api_key, vision_config)
+        )
+        return UploadedSceneAnalyzer(
+            storage,
+            client,
+            vision_config,
+            tracer=tracer,
+            provider=scene_config.provider.value,
+            object_grounder=object_grounder,
+            image_moderator=image_moderator,
+        )
+    if scene_config.provider is AiProvider.NONE:
+        return None
+    raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_config.provider}")
 
 
 def build_object_grounder(settings: AiSettings) -> ObjectGrounder | None:

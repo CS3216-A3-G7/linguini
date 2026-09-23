@@ -16,7 +16,7 @@ from app.ai import (
     load_ai_settings,
 )
 from app.ai.features.object_grounding import ObjectGroundingError
-from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
+from app.ai.features.scene_analysis import RoutedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
 from app.ai.registry import (
     build_image_moderator,
@@ -24,8 +24,8 @@ from app.ai.registry import (
     build_learning_task_generator,
     build_object_grounder,
     build_scene_translator,
+    build_uploaded_scene_analyzer,
 )
-from app.ai.vision_gemini import GeminiVisionClient
 from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
@@ -58,8 +58,6 @@ from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.scenes import SceneService
 from app.services.tasks import TaskService
 from app.services.users import UserService
-from app.services.vision_model import VisionModelConfig
-from app.services.vision_openai import OpenAIVisionClient
 
 
 def get_user_repository(request: Request) -> UserRepository:
@@ -246,52 +244,22 @@ def get_practice_repository(
     engine = request.app.state.database_engine
     settings = get_ai_settings(request)
     deterministic = DeterministicSceneAnalyzer(engine)
-    openai_key = settings.openai_api_key
-    gemini_key = settings.gemini_api_key
     analyzer = deterministic
     storage = ImageStorage(
         os.getenv("SUPABASE_URL", "").strip(),
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
     )
 
-    scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
     tracer = get_ai_tracer(request)
     object_grounder = get_object_grounder(request, settings)
     image_moderator = get_image_moderator(request, settings)
-    if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
-        if not settings.is_configured(scene_config):
-            uploaded_analyzer = None
-        else:
-            vision_config = VisionModelConfig(
-                model_name=scene_config.model_name,
-                timeout_seconds=scene_config.timeout_seconds,
-                max_output_tokens=scene_config.max_output_tokens or 1500,
-                max_retries=min(scene_config.max_retries, 1),
-            )
-            if scene_config.provider is AiProvider.OPENAI:
-                uploaded_analyzer = UploadedSceneAnalyzer(
-                    storage,
-                    OpenAIVisionClient(openai_key, vision_config),
-                    vision_config,
-                    tracer=tracer,
-                    provider=scene_config.provider.value,
-                    object_grounder=object_grounder,
-                    image_moderator=image_moderator,
-                )
-            else:
-                uploaded_analyzer = UploadedSceneAnalyzer(
-                    storage,
-                    GeminiVisionClient(gemini_key, vision_config),
-                    vision_config,
-                    tracer=tracer,
-                    provider=scene_config.provider.value,
-                    object_grounder=object_grounder,
-                    image_moderator=image_moderator,
-                )
-    elif scene_config.provider is AiProvider.NONE:
-        uploaded_analyzer = None
-    else:
-        raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_config.provider}")
+    uploaded_analyzer = build_uploaded_scene_analyzer(
+        settings,
+        storage,
+        tracer,
+        object_grounder=object_grounder,
+        image_moderator=image_moderator,
+    )
     if uploaded_analyzer:
         analyzer = RoutedSceneAnalyzer(deterministic, uploaded_analyzer)
 
