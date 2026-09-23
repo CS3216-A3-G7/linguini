@@ -87,7 +87,96 @@ for each call.
 
 RECOMMENDATIONS = """## Recommendations
 
-Filled in once the full stage and the parameter sweep have run.
+| Call | Chosen | Replaces |
+|---|---|---|
+| Scene analysis | `openrouter:anthropic/claude-haiku-4.5` | gemini-3.7-flash |
+| Translation | `openrouter:mistralai/mistral-small-2603` | gemini-3.5-flash-lite |
+| Learning tasks | `openai:gpt-5.4-mini` | gpt-4o-mini |
+| I-Spy clues | `gemini:gemini-3.1-flash-lite` | gpt-4o-mini |
+| I-Spy guess | `openai:gpt-4.1-mini` | gpt-4o-mini |
+
+**Scene analysis — Claude Haiku 4.5.** Highest quality (0.79), found every
+anchor object, and the only candidate the app accepted every time, at a third
+of gpt-4o's cost. gpt-4.1-mini is the budget alternative at 0.68 and a third
+of the price. Today's default failed every call.
+
+**Translation — Mistral Small.** Joint best quality (0.97) at the lowest cost
+($0.24 per 1,000 sessions) and the fastest median response (2.2 s). Claude
+Haiku matched its quality with perfectly repeatable output, but at eleven
+times the price.
+
+Two caveats make this the closest call of the five. Mistral's lead over
+gpt-4o-mini is 0.02, against its own run-to-run spread of 0.016 — inside the
+noise. And OpenRouter rate-limited it on 12 of 51 calls (all recovered on
+retry), where the direct providers were never throttled. **If throttling shows
+up in production, switch to `openai:gpt-4o-mini`**: 0.95 at the same price,
+from a provider we call directly.
+
+**Learning tasks — GPT-5.4-mini.** The only candidate that reliably satisfies
+the lesson schema (75% accepted against 0–12% for everything else) and the
+highest quality (0.92). It is the most expensive choice here, so revisit it
+once the schema defect below is fixed.
+
+**I-Spy clues — Gemini 3.1 Flash-Lite.** 0.98 quality and a perfect language
+score at a fifth of Claude's cost, and it never leaked an answer word. Keeping
+gpt-4o-mini would also be defensible: 0.97 at half the price, but a weaker
+language score (4.25 against 5.00).
+
+**I-Spy guess — GPT-4.1-mini.** Best guess accuracy (0.97 against 0.94 for
+today's model), and it reads the directional traps correctly.
+
+Three of the five recommendations change the current default, and the two
+Gemini defaults are replaced outright. Together the chosen set costs about
+**$13 per 1,000 learning sessions**, most of it scene analysis and lessons.
+
+**Provider spread is deliberate.** No provider won everywhere: Anthropic took
+vision, Mistral translation, OpenAI the two reasoning-heavy text calls and
+Gemini the creative one. Each call is a separate setting, so a provider outage
+downgrades one feature rather than the app.
+
+### Model parameters
+
+Temperature is the only sampling parameter the seams expose, and it was zero
+everywhere before this work. The sweep results appear beside the production
+rows in each table.
+
+- **Zero everywhere, including clue writing.** Raising temperature hurt every
+  call that was swept: scene analysis 0.79 to 0.74 at 0.3, clue writing 0.92
+  to 0.77 at 0.3 and 0.75 at 0.7, with clue acceptance dropping from 100% to
+  83%. Variety was the one argument for a higher temperature on clues, and it
+  costs more than it returns: the model drifts off the supplied scene facts
+  and the validator rejects the result.
+- **Translation was inconclusive.** Its sweep was spoiled by rate limiting,
+  and it is left at zero on the extraction argument.
+- **Reasoning models ignore it.** gpt-5.x rejects a temperature, so the
+  lesson generator is tuned by output budget instead.
+- **Output budget.** Lessons need far more room than the shared 1,500-token
+  default (observed peak above 3,000), which is why the harness raises the cap
+  for that call; scene analysis and the short text calls stay at the default.
+
+### Defects this comparison found
+
+1. **Lessons are rejected for returning one question.** The prompt asks for
+   two to four questions per task, the schema enforces a minimum of two
+   locally, and providers do not enforce `minItems` in strict mode. Models
+   return a single "Build a sentence" question and the whole lesson is thrown
+   away: 0–12% accepted for every model except gpt-5.4-mini. Either accept one
+   question for that task type or state the count per task in the prompt.
+2. **Japanese and Korean translation is broken.** The prompt claims French and
+   Spanish only, and the validator demands a definite article on every object.
+   Gemini answered a Japanese scene in Spanish and the app accepted it;
+   gpt-4o-mini invented the article "the" with fabricated genders. Models that
+   answered correctly (Claude, gpt-4.1-mini) were rejected for omitting an
+   article that those languages do not have.
+3. **Gemini Flash-Lite returns 0–1000 bounding boxes.** Gemini 3.1 and 3.5
+   Flash-Lite use Gemini's native coordinate scale, so the validator rejects
+   every usable photo. Scaling in the adapter would recover both models.
+4. **The current scene-analysis default is unusable.** gemini-3.7-flash failed
+   every call across two sessions: provider overload (503) and free-tier quota
+   (429).
+5. **Anthropic cannot serve the lesson schema at all** — "the compiled grammar
+   is too large" from every host OpenRouter tried — and Qwen never produced a
+   schema-valid scene analysis.
 """
 
 PER_CALL_NOTES = {
