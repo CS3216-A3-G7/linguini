@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai import build_tracer, load_ai_settings
 from app.ai.features.object_grounding import ObjectGroundingError
-from app.ai.registry import build_object_grounder
+from app.ai.registry import build_image_moderator, build_object_grounder
 from app.api.learning_errors import register_learning_errors
 from app.api.router import api_router
 from app.config import get_allowed_origins
@@ -43,6 +43,23 @@ async def lifespan(app: FastAPI):
         app.state.object_grounder = None
         server_logger.warning(
             "Grounding DINO is unavailable; using vision-model marker locations.",
+            exc_info=True,
+        )
+    moderation_config = app.state.ai_settings.image_moderation
+    server_logger.info(
+        "Image moderation configuration: provider=%s model=%s",
+        moderation_config.provider.value, moderation_config.model_name,
+    )
+    try:
+        app.state.image_moderator = build_image_moderator(app.state.ai_settings)
+        if app.state.image_moderator is None:
+            server_logger.warning(
+                "Image moderation is disabled; uploads skip the moderation check."
+            )
+    except Exception:
+        app.state.image_moderator = None
+        server_logger.warning(
+            "Image moderation is unavailable; uploads skip the moderation check.",
             exc_info=True,
         )
     try:

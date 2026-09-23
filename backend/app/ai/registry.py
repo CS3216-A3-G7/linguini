@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from app.ai.features.ispy_clues import ISpyClueService
 from app.ai.features.learning_tasks import LearningTaskService
+from app.ai.features.moderation import ImageModerator, OpenAIImageModerator
 from app.ai.features.object_grounding import GroundingDinoObjectGrounder, ObjectGrounder
 from app.ai.features.scene_analysis import UploadedSceneAnalyzer
 from app.ai.features.translation import SceneTranslationService
@@ -17,6 +18,7 @@ from app.ai.settings import (
     AiFeature,
     AiProvider,
     AiSettings,
+    ImageModerationProvider,
     ObjectGroundingProvider,
 )
 from app.ai.text_gemini import GeminiTextClient
@@ -43,6 +45,7 @@ def build_uploaded_scene_analyzer(
     storage: ImageStorage,
     tracer: AITracer,
     object_grounder: ObjectGrounder | None = None,
+    image_moderator: ImageModerator | None = None,
 ) -> UploadedSceneAnalyzer | None:
     """Build the configured uploaded-photo analyzer, or ``None`` when off.
 
@@ -71,6 +74,7 @@ def build_uploaded_scene_analyzer(
             tracer=tracer,
             provider=scene_config.provider.value,
             object_grounder=object_grounder,
+            image_moderator=image_moderator,
         )
     if scene_config.provider is AiProvider.NONE:
         return None
@@ -83,8 +87,29 @@ def build_object_grounder(settings: AiSettings) -> ObjectGrounder | None:
     if config.provider is ObjectGroundingProvider.NONE:
         return None
     if config.provider is ObjectGroundingProvider.GROUNDING_DINO:
-        return GroundingDinoObjectGrounder(config.model_name, config.threshold)
+        return GroundingDinoObjectGrounder(
+            config.model_name,
+            config.threshold,
+            max_labels=config.max_labels,
+            max_image_side=config.max_image_side,
+        )
     raise ValueError(f"unsupported object grounding provider {config.provider!r}")
+
+
+def build_image_moderator(settings: AiSettings) -> ImageModerator | None:
+    """Build the configured image moderator, or ``None`` when turned off."""
+    config = settings.image_moderation
+    if config.provider is ImageModerationProvider.NONE:
+        return None
+    if config.provider is ImageModerationProvider.OPENAI:
+        if not settings.openai_api_key:
+            return None
+        return OpenAIImageModerator(
+            settings.openai_api_key,
+            config.model_name,
+            timeout_seconds=config.timeout_seconds,
+        )
+    raise ValueError(f"unsupported image moderation provider {config.provider!r}")
 
 
 def build_scene_translator(

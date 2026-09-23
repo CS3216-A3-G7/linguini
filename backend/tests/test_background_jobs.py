@@ -108,6 +108,36 @@ def test_analyzer_failure_fails_the_session_without_escaping(database):
     assert session.failure_code == "sceneAnalysisFailed"
 
 
+def test_moderation_rejection_fails_the_session_with_moderation_code(database):
+    from app.ai.features.scene_analysis import (
+        SceneAnalysisModelError,
+        SceneAnalysisModelErrorCode,
+    )
+
+    engine, owner, profile, client = database
+    runner = DeferringRunner()
+
+    def analyze(*args):
+        raise SceneAnalysisModelError(
+            SceneAnalysisModelErrorCode.IMAGE_REJECTED,
+            "scene image was rejected by moderation",
+        )
+
+    repo = PostgresWorkflowRepository(
+        engine,
+        owner.id,
+        analyzer=SimpleNamespace(analyze=analyze),
+        background=runner,
+    )
+    sid = UUID(create_run(client, profile)["session"]["id"])
+    assert repo.analyze(sid, profile.id).session.status == "analyzingScene"
+    runner.jobs.pop()()
+    detail = repo.get(sid, profile.id)
+    assert detail.session.status == "failed"
+    assert detail.session.failure_code == "imageModerationFailed"
+    assert not detail.scene_objects
+
+
 def test_review_claims_then_defers_task_generation(database):
     engine, owner, profile, client = database
     runner = DeferringRunner()

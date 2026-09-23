@@ -700,14 +700,21 @@ class PostgresWorkflowRepository:
                         ],
                     },
                 )
-        except Exception:
+        except Exception as error:
             logger.exception("Scene analysis failed for session %s.", session_id)
             try:
+                # Compare by value: the enum is a StrEnum and importing the
+                # scene-analysis feature here would create an import cycle.
+                failure_code = (
+                    "imageModerationFailed"
+                    if getattr(error, "code", None) == "imageModerationFailed"
+                    else "sceneAnalysisFailed"
+                )
                 with self.transaction() as c:
                     current = self._session(c, session_id)
                     if current.status == "analyzingScene":
                         self._transition(
-                            c, current, "failed", failure_code="sceneAnalysisFailed"
+                            c, current, "failed", failure_code=failure_code
                         )
             except Exception:
                 logger.exception(

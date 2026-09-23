@@ -10,6 +10,7 @@ from app.ai import (
     AiProvider,
     AiSettings,
     FeatureModelConfig,
+    ImageModerationProvider,
     ObjectGroundingProvider,
     load_ai_settings,
 )
@@ -29,6 +30,88 @@ def test_object_grounding_is_off_by_default_and_can_use_grounding_dino():
     assert settings.object_grounding.provider is ObjectGroundingProvider.GROUNDING_DINO
     assert settings.object_grounding.model_name == "my-detector"
     assert settings.object_grounding.threshold == 0.6
+
+
+def test_object_grounding_batch_and_resize_limits_parse_as_positive_ints():
+    settings = load_ai_settings(
+        env={
+            "AI_OBJECT_GROUNDING_MAX_LABELS": "20",
+            "AI_OBJECT_GROUNDING_MAX_IMAGE_SIDE": "512",
+        }
+    )
+    assert settings.object_grounding.max_labels == 20
+    assert settings.object_grounding.max_image_side == 512
+
+    with pytest.raises(AiConfigurationError, match="AI_OBJECT_GROUNDING_MAX_LABELS"):
+        load_ai_settings(env={"AI_OBJECT_GROUNDING_MAX_LABELS": "many"})
+    with pytest.raises(AiConfigurationError, match="AI_OBJECT_GROUNDING_MAX_LABELS"):
+        load_ai_settings(env={"AI_OBJECT_GROUNDING_MAX_LABELS": "0"})
+    with pytest.raises(
+        AiConfigurationError, match="AI_OBJECT_GROUNDING_MAX_IMAGE_SIDE"
+    ):
+        load_ai_settings(env={"AI_OBJECT_GROUNDING_MAX_IMAGE_SIDE": "-4"})
+
+
+def test_image_moderation_is_off_by_default_and_parses_openai_config():
+    assert load_ai_settings(env={}).image_moderation.provider is ImageModerationProvider.NONE
+
+    settings = load_ai_settings(
+        env={
+            "AI_OPENAI_API_KEY": "sk-openai",
+            "AI_IMAGE_MODERATION_PROVIDER": "openai",
+            "AI_IMAGE_MODERATION_MODEL": "custom-moderation",
+            "AI_IMAGE_MODERATION_TIMEOUT_SECONDS": "10",
+        }
+    )
+    assert settings.image_moderation.provider is ImageModerationProvider.OPENAI
+    assert settings.image_moderation.model_name == "custom-moderation"
+    assert settings.image_moderation.timeout_seconds == 10
+
+    defaulted = load_ai_settings(env={"AI_IMAGE_MODERATION_PROVIDER": "openai"})
+    assert defaulted.image_moderation.model_name == "omni-moderation-latest"
+    assert defaulted.image_moderation.timeout_seconds == 30
+
+    with pytest.raises(AiConfigurationError, match="image moderation provider"):
+        load_ai_settings(env={"AI_IMAGE_MODERATION_PROVIDER": "gemini"})
+    with pytest.raises(
+        AiConfigurationError, match="AI_IMAGE_MODERATION_TIMEOUT_SECONDS"
+    ):
+        load_ai_settings(env={"AI_IMAGE_MODERATION_TIMEOUT_SECONDS": "soon"})
+    with pytest.raises(
+        AiConfigurationError, match="AI_IMAGE_MODERATION_TIMEOUT_SECONDS"
+    ):
+        load_ai_settings(env={"AI_IMAGE_MODERATION_TIMEOUT_SECONDS": "0"})
+
+
+def test_real_mode_requires_openai_key_for_openai_moderation():
+    with pytest.raises(AiConfigurationError, match="imageModeration"):
+        load_ai_settings(
+            env={
+                "AI_MODE": "real",
+                "AI_GEMINI_API_KEY": "gem-key",
+                "AI_SCENE_ANALYSIS_MODEL": "m",
+                "AI_SCENE_TRANSLATION_MODEL": "m",
+                "AI_LEARNING_TASK_PROVIDER": "none",
+                "AI_ISPY_CLUE_PROVIDER": "none",
+                "AI_ISPY_GUESS_PROVIDER": "none",
+                "AI_IMAGE_MODERATION_PROVIDER": "openai",
+            }
+        )
+    # With the OpenAI key present the same configuration loads cleanly.
+    settings = load_ai_settings(
+        env={
+            "AI_MODE": "real",
+            "AI_GEMINI_API_KEY": "gem-key",
+            "AI_OPENAI_API_KEY": "sk-openai",
+            "AI_SCENE_ANALYSIS_MODEL": "m",
+            "AI_SCENE_TRANSLATION_MODEL": "m",
+            "AI_LEARNING_TASK_MODEL": "m",
+            "AI_ISPY_CLUE_MODEL": "m",
+            "AI_ISPY_GUESS_MODEL": "m",
+            "AI_IMAGE_MODERATION_PROVIDER": "openai",
+        }
+    )
+    assert settings.image_moderation.provider is ImageModerationProvider.OPENAI
 
 
 def test_translation_retries_once_by_default_and_respects_explicit_zero():
