@@ -400,32 +400,69 @@ _SER = re.compile(r"\b(es|son|eres|soy|somos)\b", re.IGNORECASE)
 _ESTAR = re.compile(r"\b(est[áa]n?|estoy|est[áa]s|estamos)\b", re.IGNORECASE)
 
 
-def _lesson_checks(payload: dict[str, Any], result: Any) -> dict[str, Any]:
+def _lesson_from_raw(payload: dict[str, Any], raw: str | None) -> dict[str, Any] | None:
+    """The model's lesson as plain JSON, whether or not the app accepted it."""
+    try:
+        data = json.loads(raw or "")
+    except Exception:  # noqa: BLE001
+        return None
+    if isinstance(data, dict) and isinstance(data.get("tasks"), list):
+        return data
+    if not isinstance(data, dict):
+        return None
+    tasks = []
+    for focus in payload["requiredTaskFocuses"]:
+        task = data.get(focus)
+        if isinstance(task, dict):
+            tasks.append({**task, "focus": focus})
+    return {"tasks": tasks} if tasks else None
+
+
+def _lesson_checks(payload: dict[str, Any], lesson: dict[str, Any]) -> dict[str, bool]:
+    """Rules the prompt states, checked on the lesson as returned."""
+    tasks = lesson["tasks"]
+    questions = [q for t in tasks for q in t.get("questions", [])]
     checks: dict[str, bool] = {}
-    tasks = result.tasks
-    checks["focus_order"] = [t.focus for t in tasks] == payload["requiredTaskFocuses"]
-    objects_used = {k for t in tasks for q in t.questions for k in q.object_keys}
-    checks["covers_3_objects"] = len(objects_used) >= min(3, len(payload["objects"]))
-    checks["no_blanks"] = not any("___" in q.prompt for t in tasks for q in t.questions)
-    checks["short_explanations"] = all(
-        len([s for s in re.split(r"[.!?]+", t.explanation) if s.strip()]) <= 2 for t in tasks
+    checks["focus_order"] = [t.get("focus") for t in tasks] == payload["requiredTaskFocuses"]
+    checks["two_to_four_questions"] = all(
+        2 <= len(t.get("questions", [])) <= 4 for t in tasks
     )
-    builders = [q for t in tasks for q in t.questions if q.interaction_type == "sentenceBuilding"]
+    objects_used = {k for q in questions for k in q.get("objectKeys", [])}
+    checks["covers_3_objects"] = len(objects_used) >= min(3, len(payload["objects"]))
+    checks["no_blanks"] = not any("___" in (q.get("prompt") or "") for q in questions)
+    checks["prompts_present"] = all((q.get("prompt") or "").strip() for q in questions)
+    checks["short_explanations"] = all(
+        len([s for s in re.split(r"[.!?]+", t.get("explanation") or "") if s.strip()]) <= 2
+        for t in tasks
+    )
+    choice_questions = [
+        q for q in questions if q.get("interactionType", "multipleChoice") == "multipleChoice"
+    ]
+    checks["four_options_one_answer"] = all(
+        len(q.get("options") or []) == 4
+        and q.get("correctOptionId") in {o.get("optionId") for o in q.get("options") or []}
+        for q in choice_questions
+    )
+    builders = [q for q in questions if q.get("interactionType") == "sentenceBuilding"]
     checks["builder_tokens_complete"] = all(
-        sorted(q.token_bank) == sorted(
-            re.findall(r"[\w'’À-ÿ-]+|[^\w\s]", q.correct_text or "")
-        ) or set(re.findall(r"[\w'’À-ÿ-]+", q.correct_text or "")) <= set(q.token_bank)
+        set(re.findall(r"[\w'’À-ÿ-]+", q.get("correctText") or ""))
+        <= set(q.get("tokenBank") or [])
         for q in builders
     ) if builders else True
     if payload["targetLanguage"] == "es":
-        scene_qs = [q for t in tasks if t.focus == "sceneDescription" for q in t.questions]
+        scene_questions = [
+            q for t in tasks if t.get("focus") == "sceneDescription"
+            for q in t.get("questions", [])
+        ]
         ok_estar, ok_ser = True, True
-        for q in scene_qs:
-            options = {o.option_id: o.label for o in q.options}
-            correct = options.get(q.correct_option_id, "")
+        for q in scene_questions:
+            options = {o.get("optionId"): o.get("label", "") for o in q.get("options") or []}
+            correct = options.get(q.get("correctOptionId"), "")
             ok_estar &= bool(_ESTAR.search(correct)) and not _SER.search(correct)
-            ok_ser &= any(_SER.search(label) for oid, label in options.items()
-                          if oid != q.correct_option_id)
+            ok_ser &= any(
+                _SER.search(label) for oid, label in options.items()
+                if oid != q.get("correctOptionId")
+            )
         checks["es_correct_uses_estar"] = ok_estar
         checks["es_has_ser_distractor"] = ok_ser
     return checks
@@ -450,20 +487,28 @@ def run_learning_tasks(
         error = f"{type(exc).__name__}: {exc}"
     rec = client.record
     quality: dict[str, Any] = {"validator_pass": result is not None}
+    # Quality is scored from the lesson the model returned, so a model is not
+    # ranked zero purely because the app's schema rejected it.
+    lesson = (
+        result.model_dump(mode="json", by_alias=True) if result is not None
+        else _lesson_from_raw(payload, rec.raw_text)
+    )
     judge_cost = None
-    if result is not None:
-        checks = _lesson_checks(payload, result)
+    if lesson is not None:
+        checks = _lesson_checks(payload, lesson)
         quality["checks"] = checks
         quality["check_pass_rate"] = sum(checks.values()) / len(checks)
-        quality["questions"] = sum(len(t.questions) for t in result.tasks)
+        quality["questions"] = sum(len(t.get("questions", [])) for t in lesson["tasks"])
+        quality["tasks"] = len(lesson["tasks"])
         if judge:
-            judge_cost = judge_lesson(quality, payload, result)
+            judge_cost = judge_lesson(quality, payload, lesson)
     return _row(rec, ok=result is not None, adapter_error=error,
                 primary=lesson_primary(quality), quality=quality, judge_cost_usd=judge_cost)
 
 
 def lesson_primary(quality: dict[str, Any]) -> float:
-    if not quality.get("validator_pass"):
+    """Half the prompt's own rules, half the judge; zero only if nothing parsed."""
+    if "check_pass_rate" not in quality:
         return 0.0
     judged = quality.get("judge")
     if judged:
@@ -471,31 +516,21 @@ def lesson_primary(quality: dict[str, Any]) -> float:
     return quality["check_pass_rate"]
 
 
-def judge_lesson(quality: dict[str, Any], payload: dict[str, Any], result: Any) -> float | None:
+def judge_lesson(
+    quality: dict[str, Any], payload: dict[str, Any], lesson: dict[str, Any]
+) -> float | None:
     verdict, record = _judge(
-        LESSON_RUBRIC,
-        {"scene": payload, "lesson": result.model_dump(mode="json", by_alias=True)},
-        LessonVerdict,
+        LESSON_RUBRIC, {"scene": payload, "lesson": lesson}, LessonVerdict
     )
     if verdict is not None:
         quality["judge"] = verdict.model_dump()
     return record.cost_usd
 
 
-def rebuild_lesson(scene: dict[str, Any], raw: str) -> Any:
-    """Re-create the adapter's validated result from a saved raw response."""
-    from app.ai.features.learning_tasks import (
-        normalize_learning_task_option_ids,
-        normalize_learning_task_references,
-        scene_generation_response_model,
-        unpack_generated_tasks,
-    )
-
+def rebuild_lesson(scene: dict[str, Any], raw: str) -> tuple[dict[str, Any], Any]:
+    """Recover the lesson from a saved raw response, for later judging."""
     payload = learning_payload(scene)
-    model = scene_generation_response_model(payload)
-    result = unpack_generated_tasks(payload, model.model_validate_json(raw))
-    result = normalize_learning_task_references(payload, result)
-    return payload, normalize_learning_task_option_ids(result)
+    return payload, _lesson_from_raw(payload, raw)
 
 
 # --------------------------------------------------------------------- I-Spy clues

@@ -24,22 +24,39 @@ def _rejudge(row: dict, ledger: Ledger) -> dict:
         row["quality"] = calls._score_cjk(case, row.get("raw_text"))
         row["primary"] = row["quality"].get("term_accuracy") or 0.0
         return row
-    if row["call"] not in calls.JUDGED or not row.get("ok") or row["quality"].get("judge"):
-        return row
-    if not ledger.reserve(0.02):
+    if row["call"] not in calls.JUDGED or not row.get("raw_text"):
         return row
     scene = calls.scenes()[row["case_id"]]
+    if row["call"] == "learning_tasks":
+        # Re-score from the returned lesson, which may predate lenient scoring.
+        payload, lesson = calls.rebuild_lesson(scene, row["raw_text"])
+        if lesson is not None:
+            checks = calls._lesson_checks(payload, lesson)
+            row["quality"]["checks"] = checks
+            row["quality"]["check_pass_rate"] = sum(checks.values()) / len(checks)
+            row["quality"]["questions"] = sum(
+                len(t.get("questions", [])) for t in lesson["tasks"]
+            )
+            row["quality"]["tasks"] = len(lesson["tasks"])
+            row["primary"] = calls.lesson_primary(row["quality"])
+    if row["quality"].get("judge") or not ledger.reserve(0.02):
+        return row
     cost = None
     try:
         if row["call"] == "learning_tasks":
-            payload, result = calls.rebuild_lesson(scene, row["raw_text"])
-            cost = calls.judge_lesson(row["quality"], payload, result)
+            payload, lesson = calls.rebuild_lesson(scene, row["raw_text"])
+            if lesson is None:
+                return row
+            cost = calls.judge_lesson(row["quality"], payload, lesson)
             row["primary"] = calls.lesson_primary(row["quality"])
         else:
             from app.ai.features.ispy_clues import ISpyClueResult
 
             payload = calls.clue_payload(scene)
-            result = ISpyClueResult.model_validate_json(row["raw_text"])
+            try:
+                result = ISpyClueResult.model_validate_json(row["raw_text"])
+            except Exception:  # noqa: BLE001 - output the app rejected outright
+                return row
             names = {o["key"]: o["translation"].casefold() for o in payload["objects"]}
             row["quality"]["answers"] = [c.answer_object_key for c in result.clues]
             row["quality"]["leaked"] = [
