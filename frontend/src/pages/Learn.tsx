@@ -1,7 +1,6 @@
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, CloseIcon } from "../components/icons";
-import { ScenePhoto } from "../components/ScenePhoto";
 import { TranslationPreview } from "../components/TranslationPreview";
 import { useScene } from "../state/useScene";
 import { practiceStages, taskDone, taskTitle, taskDescription } from "../lib/practiceTasks";
@@ -37,10 +36,9 @@ export function Learn() {
         <p className="muted">Build confidence with each short activity.</p>
       </div>
 
-      <ScenePhoto scene={scene} />
       {practiceError ? <p role="alert">{practiceError}</p> : null}
 
-      {session.translationPreview ? <TranslationPreview preview={session.translationPreview} /> : null}
+      {session.translationPreview ? <TranslationPreview preview={session.translationPreview} scene={scene} /> : null}
 
       <div className="task-list" aria-label="Learning tasks">
         {tasks.map((task, index) => {

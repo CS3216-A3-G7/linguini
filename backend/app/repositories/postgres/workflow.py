@@ -951,6 +951,39 @@ class PostgresWorkflowRepository:
                     update(sessions).where(sessions.c.id == session.id)
                     .values(analysis_draft=draft)
                 )
+                # The translation checkpoint also publishes task 1. Keep the
+                # vocabulary bootstrap in this transaction so the learner can
+                # start as soon as the translation response is committed.
+                for obj in objects:
+                    translated = {row.key: row for row in translated_scene.objects}[str(obj.id)]
+                    word, _source_translation = bootstrap_word(
+                        c,
+                        profile["target_language_code"],
+                        profile["source_language_code"],
+                        translated.translation,
+                        obj.label,
+                        gender=translated.gender,
+                        phonetic_text=translated.phonetic_text,
+                    )
+                    c.execute(
+                        update(scene_objects)
+                        .where(scene_objects.c.id == obj.id)
+                        .values(vocabulary_item_id=word.id)
+                    )
+                detail = self._detail(c, session)
+                objects = list(detail.scene_objects)
+                words_by_id = {word.id: word for word in detail.vocabulary}
+                translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
+                words = [words_by_id[obj.vocabulary_item_id] for obj in objects]
+                translations = [translations_by_id[obj.vocabulary_item_id] for obj in objects]
+                rebuilt = build_tasks(
+                    session_id, objects, words, translations, False, translated_scene
+                )
+                introduction = next(
+                    task for task in rebuilt if task.kind == "vocabularyIntroduction"
+                )
+                introduction.order_index = 0
+                c.execute(insert(session_tasks).values(**entity_values(introduction)))
 
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
@@ -996,9 +1029,6 @@ class PostgresWorkflowRepository:
                 False,
                 getattr(detail, "translation_preview", None),
             )
-            introduction = next(task for task in rebuilt if task.kind == "vocabularyIntroduction")
-            introduction.order_index = 0
-            c.execute(insert(session_tasks).values(**entity_values(introduction)))
 
         # No transaction or user lock spans these slow calls: task 1 is committed
         # and can be started, answered and completed while the rest is generated.

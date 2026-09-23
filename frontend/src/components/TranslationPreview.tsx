@@ -1,8 +1,11 @@
 import type { PracticeDetail } from "../lib/api";
+import type { Scene } from "../data/types";
 import { Card } from "./ui";
+import { ScenePhoto } from "./ScenePhoto";
 
-export function TranslationPreview({ preview }: { preview: NonNullable<PracticeDetail["translationPreview"]> }) {
+export function TranslationPreview({ preview, scene }: { preview: NonNullable<PracticeDetail["translationPreview"]>; scene?: Scene }) {
   return <Card plain className="translation-preview">
+    {scene ? <ScenePhoto scene={scene} items={[]} /> : null}
     <h2>Your translations</h2>
     {([
       ["Objects", preview.objects],
