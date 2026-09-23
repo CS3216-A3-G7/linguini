@@ -22,7 +22,11 @@ Fill these variables in `backend/.env.local`:
 | --- | --- |
 | `DATABASE_URL` | Backend PostgreSQL URI. In Supabase's Connect dialog, copy the direct or **session pooler** connection URI, replace the password, and use `sslmode=require`. Session pooler port is 5432; transaction pooler port 6543 is not supported by this backend. URL-encode special characters in credentials. |
 | `DIRECT_URL` | Prisma migration URI: direct connection or session pooler. Use a database role permitted to apply DDL. |
-| `DEMO_USER_ID` | UUID of an existing `users` row. The default example UUID must exist in your database to use `/me`. This is temporary demo identity, not authentication. |
+| `DEMO_USER_ID` | Only applies when `AUTH_MODE=demo` (local dev/tests): UUID of the `users` row used for requests without a bearer token. Must not be set in deployed environments. |
+| `AUTH_MODE` | `supabase` (default) verifies `Authorization: Bearer` tokens against the project JWKS; `demo` keeps the unauthenticated `DEMO_USER_ID` fallback. |
+| `SUPABASE_JWT_AUDIENCE` | Expected JWT `aud`; defaults to `authenticated`. |
+| `SUPABASE_JWT_SECRET` | Legacy HS256-signing projects only; asymmetric projects verify via JWKS. |
+| `AUTH_ALLOW_ANONYMOUS` | `true` accepts Supabase anonymous-sign-in tokens (`is_anonymous` claim). |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins, including the port; defaults to `http://localhost:5173`. |
 | `MEDIA_PUBLIC_BASE_URL` | Public Supabase Storage bucket URL, e.g. `https://PROJECT.supabase.co/storage/v1/object/public/media-assets`. Shared base URL for public media assets in this bucket. |
 
@@ -52,9 +56,8 @@ engine per process and disposes it at shutdown.
 
 ### Image uploads
 
-Uploads currently use the existing `DEMO_USER_ID` identity, as explicitly chosen
-for this demo. This is not authentication; replace the current-user dependency
-with verified authentication before making user-owned uploads publicly available.
+Uploads use the authenticated user's identity: requests must carry a Supabase
+`Authorization: Bearer` access token (or run with `AUTH_MODE=demo` locally).
 The server requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; uploads use the
 private `media-assets` bucket. Install backend dependencies to include Pillow.
 
@@ -239,8 +242,9 @@ This supports fresh installations without a JSON file or an import command.
 
 The legacy `app/import_*.py` tools, JSON fixtures, and file-backed test adapters
 have been removed. Existing migrated user data stays in PostgreSQL. Fresh databases
-contain the catalog but no demo users or learner history; provision a user and set
-`DEMO_USER_ID` to that user's UUID before using the demo API.
+contain the catalog but no demo users or learner history; the API provisions a
+`users` row on the first authenticated request, or set `AUTH_MODE=demo` with
+`DEMO_USER_ID` pointing at an existing row for local development.
 
 Repository interfaces and shared errors remain in `app/repositories/`;
 SQLAlchemy implementations live in `app/repositories/postgres/`. Services depend
@@ -324,7 +328,7 @@ dimensions and caller-supplied metadata.
 
 ## Remaining integration work
 
-Authentication, real image analysis, AI generation and speech evaluation
+Real image analysis, AI generation and speech evaluation
 are not implemented. Uploaded images use validated storage uploads and deterministic
 placeholder objects. Vocabulary "Move" is still local frontend state. Session learning credit comes from persisted
 vocabulary encounters; analysis and skipped tasks award none. Daily vocabulary, home aggregation, and other unfinished
