@@ -1,4 +1,4 @@
-import { GENDER_ARTICLES } from "../data/types";
+import { GENDER_ARTICLES } from "../data/types.ts";
 import type { Gender, Scene } from "../data/types";
 import type { PracticeDetail } from "./api";
 

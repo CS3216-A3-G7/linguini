@@ -1,4 +1,4 @@
-import { GENDER_ARTICLES } from "../data/types";
+import { GENDER_ARTICLES } from "../data/types.ts";
 import type { Gender, LeaderboardRow, ScenarioProgress, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";

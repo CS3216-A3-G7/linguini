@@ -31,7 +31,8 @@ from typing import Annotated, Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pydantic import Field, ValidationError
-from sqlalchemy import insert, select
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from app.ai.features.translation.schemas import TranslatedTerm
 from app.ai.model_errors import ProviderError
