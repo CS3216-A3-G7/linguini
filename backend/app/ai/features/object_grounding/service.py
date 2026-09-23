@@ -64,39 +64,37 @@ class GroundingDinoObjectGrounder:
         if not labels:
             return {}
         try:
-            from PIL import Image
+            from PIL import Image, ImageOps
 
-            source = Image.open(BytesIO(image.data)).convert("RGB")
+            source = ImageOps.exif_transpose(Image.open(BytesIO(image.data))).convert("RGB")
             width, height = source.size
-            prompt = " ".join(f"a {label}." for label in labels)
-            inputs = self._processor(images=source, text=prompt, return_tensors="pt")
-            with self._torch.no_grad():
-                outputs = self._model(**inputs)
-            results = self._processor.post_process_grounded_object_detection(
-                outputs,
-                inputs.input_ids,
-                threshold=self._threshold,
-                text_threshold=self._threshold,
-                target_sizes=[(height, width)],
-            )[0]
+            best: dict[str, GroundedBox] = {}
+            # A single query identifies the requested class without relying on
+            # generated text_labels (which may drop words or merge phrases).
+            for label in dict.fromkeys(labels):
+                inputs = self._processor(
+                    images=source, text=f"{_canonical_label(label)}.", return_tensors="pt"
+                )
+                with self._torch.no_grad():
+                    outputs = self._model(**inputs)
+                results = self._processor.post_process_grounded_object_detection(
+                    outputs,
+                    inputs.input_ids,
+                    threshold=self._threshold,
+                    text_threshold=self._threshold,
+                    target_sizes=[(height, width)],
+                )[0]
+                for box, score in zip(results["boxes"], results["scores"], strict=True):
+                    left, top, right, bottom = (float(value) for value in box.tolist())
+                    normalized = _normalize_box(
+                        left, top, right, bottom, width, height, float(score)
+                    )
+                    if normalized is not None and (
+                        label not in best or normalized.score > best[label].score
+                    ):
+                        best[label] = normalized
         except Exception as error:
             raise ObjectGroundingError("Grounding DINO could not process this image") from error
-
-        requested = {_canonical_label(label): label for label in labels}
-        best: dict[str, GroundedBox] = {}
-        for box, score, detected_label in zip(
-            results["boxes"], results["scores"], results["text_labels"], strict=True
-        ):
-            label = requested.get(_canonical_label(str(detected_label)))
-            if label is None:
-                continue
-            left, top, right, bottom = (float(value) for value in box.tolist())
-            normalized = _normalize_box(left, top, right, bottom, width, height, float(score))
-            if normalized is None or (
-                label in best and best[label].score >= normalized.score
-            ):
-                continue
-            best[label] = normalized
         return best
 
 

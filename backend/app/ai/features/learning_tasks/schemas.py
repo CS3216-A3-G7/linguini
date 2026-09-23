@@ -186,7 +186,16 @@ def generation_response_model(
             ))
             references[name] = (
                 list[Literal.__getitem__(keys)] if keys else list[str],
-                Field(min_length=minimum) if keys else Field(max_length=0),
+                Field(
+                    min_length=minimum,
+                    description=(
+                        "Include at least one supplied object key used in the correct answer; "
+                        "never return an empty array. Copy object keys from the input, "
+                        "including objects linked by selected attributes and relationships."
+                        if name == "object_keys" else
+                        "Keys of supplied vocabulary used in the correct answer."
+                    ),
+                ) if keys else Field(max_length=0),
             )
         question = create_model(f"{focus}Question", __base__=base, **references)
         task = create_model(

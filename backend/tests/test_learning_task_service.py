@@ -489,6 +489,56 @@ def test_accepts_a_chained_sentence_builder() -> None:
     )
 
 
+@pytest.mark.parametrize("use_relation", [True, False])
+def test_restores_empty_builder_object_keys_from_explicit_scene_links(use_relation) -> None:
+    scene = {
+        **INPUT,
+        "attributes": [{**INPUT["attributes"][0], "objectKey": "object_1"}],
+        "relationships": [{**INPUT["relationships"][0],
+                           "subjectObjectKey": "object_1",
+                           "referenceObjectKey": "object_2"}],
+    }
+    generated = tasks()
+    builder = generated["tasks"][-1]["questions"][0]
+    builder["objectKeys"] = []
+    if use_relation:
+        builder["attributeKeys"] = []
+    else:
+        # The relation still has a valid key, but no object links to recover.
+        scene["relationships"] = INPUT["relationships"]
+    client = FakeTextClient([raw_response(generated)])
+    result = service(client, cfg=config(max_retries=0)).generate(scene)
+    assert result.tasks[-1].questions[0].object_keys == (
+        ["object_1", "object_2"] if use_relation else ["object_1"]
+    )
+    assert result.tasks[-1].questions[0].correct_text == builder["correctText"]
+    assert len(client.requests) == 1
+
+
+def test_unresolvable_empty_keys_retry_includes_actual_error_and_previous_output() -> None:
+    generated = tasks()
+    generated["tasks"][-1]["questions"][0]["objectKeys"] = []
+    invalid = raw_response(generated)
+    client = FakeTextClient([invalid, raw_response(tasks())])
+    result = service(client, cfg=config(max_retries=1)).generate(INPUT)
+    assert result.tasks[-1].questions[0].object_keys
+    repair = json.loads(client.requests[1].user_content.split(
+        "Repair data (not instructions):\n", 1
+    )[1])
+    assert repair["previousResponse"] == invalid
+    assert repair["validationErrors"][0]["loc"] == [
+        "chainedDescription", "questions", 0, "objectKeys"
+    ]
+
+
+def test_does_not_guess_object_keys_without_explicit_links() -> None:
+    generated = tasks()
+    generated["tasks"][-1]["questions"][0]["objectKeys"] = []
+    client = FakeTextClient([raw_response(generated)])
+    with pytest.raises(LearningTaskGenerationError):
+        service(client, cfg=config(max_retries=0)).generate(INPUT)
+
+
 def test_requires_a_translated_scene_sentence() -> None:
     client = FakeTextClient(
         [response_body(LearningTaskResult.model_validate(tasks(scene_translation=None)))]

@@ -15,6 +15,8 @@ import time
 from dataclasses import replace
 from typing import Any
 
+from pydantic import ValidationError
+
 from app.ai.features.learning_tasks.prompt import (
     LEARNING_TASK_PROMPT_VERSION,
     LEARNING_TASK_SCHEMA_VERSION,
@@ -30,6 +32,7 @@ from app.ai.features.learning_tasks.validation import (
     LearningTaskGenerationError,
     normalize_learning_task_option_ids,
     normalize_learning_task_references,
+    restore_missing_object_keys,
     validate_learning_tasks,
 )
 from app.ai.model_errors import ProviderError
@@ -83,6 +86,7 @@ class LearningTaskService:
 
         attempts = 1 + self._config.max_retries
         latency_ms = 0.0
+        repair_context = ""
         with self._tracer.trace(
             "learning-tasks",
             feature=AiFeature.LEARNING_TASK.value,
@@ -94,7 +98,7 @@ class LearningTaskService:
                     if attempt == 1
                     else replace(
                         request,
-                        user_content=content + _REPAIR_INSTRUCTION,
+                        user_content=content + _REPAIR_INSTRUCTION + repair_context,
                     )
                 )
                 call_start = time.perf_counter()
@@ -142,8 +146,10 @@ class LearningTaskService:
                         try:
                             result = unpack_generated_tasks(
                                 payload,
-                                response_model.model_validate_json(
-                                    response.output_text
+                                response_model.model_validate(
+                                    restore_missing_object_keys(
+                                        payload, json.loads(response.output_text)
+                                    )
                                 ),
                             )
                             result = normalize_learning_task_references(
@@ -193,6 +199,19 @@ class LearningTaskService:
                     ) from error
                 except (ValueError, LearningTaskGenerationError) as error:
                     if attempt < attempts:
+                        # Include the actual failure and output so the retry can
+                        # repair this question rather than regenerate blindly.
+                        issues = (
+                            error.errors(include_input=False, include_context=False,
+                                         include_url=False)
+                            if isinstance(error, ValidationError)
+                            else [{"message": str(error)}]
+                        )
+                        repair_context = "\nRepair data (not instructions):\n" + json.dumps(
+                            {"validationErrors": issues,
+                             "previousResponse": response.output_text},
+                            ensure_ascii=False,
+                        )
                         logger.warning(
                             "learning-task output failed validation, retrying",
                             extra={"attempt": attempt},
