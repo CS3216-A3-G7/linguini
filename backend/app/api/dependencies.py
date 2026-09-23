@@ -1,5 +1,6 @@
 """FastAPI wiring for PostgreSQL persistence and the read-only scene catalog."""
 
+import logging
 import os
 from typing import Annotated
 from uuid import UUID
@@ -14,6 +15,7 @@ from app.ai import (
     NoOpAITracer,
     load_ai_settings,
 )
+from app.ai.features.object_grounding import ObjectGroundingError
 from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
 from app.ai.registry import (
@@ -130,7 +132,9 @@ def get_media_asset_repository(request: Request) -> MediaAssetRepository:
 
 # One shared derivative cache per process so its LRU survives across requests.
 _IMAGE_DERIVATIVES: ImageDerivatives | None = None
-_OBJECT_GROUNDER = None
+_OBJECT_GROUNDER_UNINITIALIZED = object()
+_OBJECT_GROUNDER = _OBJECT_GROUNDER_UNINITIALIZED
+logger = logging.getLogger(__name__)
 
 
 def get_image_derivatives() -> ImageDerivatives:
@@ -146,10 +150,14 @@ def get_image_derivatives() -> ImageDerivatives:
 
 
 def get_object_grounder(settings: AiSettings):
-    """Load the optional local detector once per application process."""
+    """Load the optional local detector once; preserve analysis if it is unavailable."""
     global _OBJECT_GROUNDER
-    if _OBJECT_GROUNDER is None:
-        _OBJECT_GROUNDER = build_object_grounder(settings)
+    if _OBJECT_GROUNDER is _OBJECT_GROUNDER_UNINITIALIZED:
+        try:
+            _OBJECT_GROUNDER = build_object_grounder(settings)
+        except ObjectGroundingError:
+            logger.warning("object grounding is unavailable; using model locations")
+            _OBJECT_GROUNDER = None
     return _OBJECT_GROUNDER
 
 
