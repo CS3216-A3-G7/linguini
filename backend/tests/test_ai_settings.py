@@ -10,8 +10,25 @@ from app.ai import (
     AiProvider,
     AiSettings,
     FeatureModelConfig,
+    ObjectGroundingProvider,
     load_ai_settings,
 )
+
+
+def test_object_grounding_is_off_by_default_and_can_use_grounding_dino():
+    assert load_ai_settings(env={}).object_grounding.provider is ObjectGroundingProvider.NONE
+
+    settings = load_ai_settings(
+        env={
+            "AI_OBJECT_GROUNDING_PROVIDER": "groundingDino",
+            "AI_OBJECT_GROUNDING_MODEL": "my-detector",
+            "AI_OBJECT_GROUNDING_THRESHOLD": "0.6",
+        }
+    )
+
+    assert settings.object_grounding.provider is ObjectGroundingProvider.GROUNDING_DINO
+    assert settings.object_grounding.model_name == "my-detector"
+    assert settings.object_grounding.threshold == 0.6
 
 
 def test_openai_configuration_all_features():
@@ -171,13 +188,16 @@ def test_empty_env_reproduces_legacy_defaults():
     assert learning.provider is AiProvider.OPENAI
     assert learning.model_name == "gpt-4o-mini"
     assert learning.timeout_seconds == 60
+    assert learning.max_retries == 1
 
     for config in (settings.ispy_clue, settings.ispy_guess):
         assert config.provider is AiProvider.OPENAI
         assert config.model_name == "gpt-4o-mini"
         assert config.timeout_seconds == 60
         assert config.max_output_tokens is None
-        assert config.max_retries == 0
+        assert config.max_retries == (
+            1 if config.feature is AiFeature.ISPY_CLUE else 0
+        )
 
 
 def test_legacy_aliases_produce_identical_settings():

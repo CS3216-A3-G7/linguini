@@ -132,11 +132,14 @@ class GeneratedSentenceBuilderQuestion(GeneratedQuestion):
     )
 
 
-class GeneratedLearningTask(ApiModel):
-    focus: LearningTaskFocus
+class GeneratedLearningTaskContent(ApiModel):
     title: NonEmptyText = Field(max_length=80)
     explanation: NonEmptyText = Field(max_length=400)
     questions: Annotated[list[GeneratedQuestion], Field(min_length=2, max_length=4)]
+
+
+class GeneratedLearningTask(GeneratedLearningTaskContent):
+    focus: LearningTaskFocus
 
 
 class LearningTaskResult(ApiModel):
@@ -183,11 +186,20 @@ def generation_response_model(
             ))
             references[name] = (
                 list[Literal.__getitem__(keys)] if keys else list[str],
-                Field(min_length=minimum) if keys else Field(max_length=0),
+                Field(
+                    min_length=minimum,
+                    description=(
+                        "Include at least one supplied object key used in the correct answer; "
+                        "never return an empty array. Copy object keys from the input, "
+                        "including objects linked by selected attributes and relationships."
+                        if name == "object_keys" else
+                        "Keys of supplied vocabulary used in the correct answer."
+                    ),
+                ) if keys else Field(max_length=0),
             )
         question = create_model(f"{focus}Question", __base__=base, **references)
         task = create_model(
-            f"{focus}Task", __base__=GeneratedLearningTask,
+            f"{focus}Task", __base__=GeneratedLearningTaskContent,
             questions=(list[question], Field(min_length=2, max_length=4)),
         )
         fields[focus] = (task, ...)

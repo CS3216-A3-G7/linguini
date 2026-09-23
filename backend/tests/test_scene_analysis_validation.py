@@ -30,6 +30,7 @@ def object_payload(key: str = "chair", **box: float) -> dict:
             "width": box.get("width", 0.2),
             "height": box.get("height", 0.2),
         },
+        "anchorPoint": {"x": box.get("anchor_x", 0.2), "y": box.get("anchor_y", 0.2)},
         "attributes": [],
         "confidenceScore": 0.9,
     }
@@ -71,6 +72,7 @@ def valid_result(
                 object_key="chair",
                 label="chair",
                 bounding_box=ModelBoundingBox(x=0.1, y=0.1, width=0.2, height=0.2),
+                anchor_point={"x": 0.2, "y": 0.2},
                 attributes=[],
                 confidence_score=0.9,
             ),
@@ -78,6 +80,7 @@ def valid_result(
                 object_key="table",
                 label="table",
                 bounding_box=ModelBoundingBox(x=0.4, y=0.1, width=0.2, height=0.2),
+                anchor_point={"x": 0.5, "y": 0.2},
                 attributes=[],
                 confidence_score=0.9,
             ),

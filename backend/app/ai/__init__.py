@@ -14,6 +14,8 @@ from app.ai.settings import (
     AiProvider,
     AiSettings,
     FeatureModelConfig,
+    ObjectGroundingProvider,
+    ObjectGroundingSettings,
     ObservabilitySettings,
     load_ai_settings,
 )
@@ -29,6 +31,8 @@ __all__ = [
     "FeatureModelConfig",
     "LangfuseAITracer",
     "NoOpAITracer",
+    "ObjectGroundingProvider",
+    "ObjectGroundingSettings",
     "ObservabilitySettings",
     "build_tracer",
     "load_ai_settings",

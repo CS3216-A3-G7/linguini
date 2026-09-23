@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from dataclasses import replace
 from typing import Any
 
 from app.ai.features.ispy_clues.prompt import (
@@ -37,6 +38,12 @@ from app.services.vision_model import build_strict_json_schema
 logger = logging.getLogger(__name__)
 
 _ISPY_CLUES_INVALID = "ispyCluesInvalid"
+_REPAIR_INSTRUCTION = """
+
+Your previous response was invalid. Return a complete replacement JSON object.
+Every clue must help identify its assigned object without naming that object's
+answer word or translation anywhere in the clue.
+"""
 
 
 class ISpyClueService:
@@ -76,6 +83,14 @@ class ISpyClueService:
             metadata={"objectCount": len(payload.get("objects", []))},
         ) as root:
             for attempt in range(1, attempts + 1):
+                attempt_request = (
+                    request
+                    if attempt == 1
+                    else replace(
+                        request,
+                        user_content=content + _REPAIR_INSTRUCTION,
+                    )
+                )
                 call_start = time.perf_counter()
                 try:
                     with self._tracer.generation(
@@ -92,7 +107,7 @@ class ISpyClueService:
                         metadata={"attempt": attempt},
                     ) as generation:
                         try:
-                            response = self._client.generate(request)
+                            response = self._client.generate(attempt_request)
                         except ProviderError as error:
                             generation.update(
                                 error_code=error.code.value,
@@ -107,7 +122,8 @@ class ISpyClueService:
                             retry_count=attempt - 1,
                         )
                         generation.record_content(
-                            input=content, output=response.output_text
+                            input=attempt_request.user_content,
+                            output=response.output_text,
                         )
 
                     with self._tracer.span(

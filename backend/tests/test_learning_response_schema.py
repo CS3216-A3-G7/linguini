@@ -70,7 +70,10 @@ def test_schema_rejects_ids_from_another_scene():
 def test_strict_schema_parsing_preserves_translations_through_provider():
     """Exercise the real adapter + service end to end without network/credits."""
     calls = []
-    lesson = {task["focus"]: task for task in tasks()["tasks"]}
+    lesson = {
+        task["focus"]: {key: value for key, value in task.items() if key != "focus"}
+        for task in tasks()["tasks"]
+    }
 
     def respond(request):
         calls.append(json.loads(request.content))

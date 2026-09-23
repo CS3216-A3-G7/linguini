@@ -1118,16 +1118,22 @@ class PostgresWorkflowRepository:
     def _encounter(
         self, c, task, event_id, outcome, introduced=False, vocabulary_item_id=None
     ):
-        vocabulary_item_id = vocabulary_item_id or task.vocabulary_item_id
-        if not vocabulary_item_id:
+        explicit_vocabulary_item_id = vocabulary_item_id
+        resolved_vocabulary_item_id = vocabulary_item_id or task.vocabulary_item_id
+        if not resolved_vocabulary_item_id:
             return
+        # A grouped vocabulary-introduction attempt writes one encounter per
+        # taught word. Give explicitly supplied words distinct event IDs even
+        # when the task itself also has a primary vocabulary-item ID.
+        event_scope = (
+            "vocabulary"
+            if explicit_vocabulary_item_id is None and task.vocabulary_item_id
+            else f"vocabulary:{resolved_vocabulary_item_id}"
+        )
         event = VocabularyEncounter(
-            id=uuid5(
-                event_id,
-                "vocabulary" if task.vocabulary_item_id else f"vocabulary:{vocabulary_item_id}",
-            ),
+            id=uuid5(event_id, event_scope),
             user_id=self.user_id,
-            vocabulary_item_id=vocabulary_item_id,
+            vocabulary_item_id=resolved_vocabulary_item_id,
             session_id=task.session_id,
             session_task_id=task.id,
             encounter_type="introduced" if introduced else "practised",
@@ -1136,7 +1142,7 @@ class PostgresWorkflowRepository:
         record_vocabulary_evidence(
             c,
             user_id=self.user_id,
-            vocabulary_item_id=vocabulary_item_id,
+            vocabulary_item_id=resolved_vocabulary_item_id,
             encounter=event,
         )
 

@@ -12,6 +12,8 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any
 
+from app.ai.features.object_grounding import ObjectGrounder, ObjectGroundingError
+from app.ai.features.object_grounding.mapping import apply_object_grounding
 from app.ai.features.scene_analysis.mapping import model_result_to_domain
 from app.ai.features.scene_analysis.prompt import (
     SCENE_ANALYSIS_PROMPT_VERSION,
@@ -76,12 +78,14 @@ class UploadedSceneAnalyzer:
         *,
         tracer: AITracer,
         provider: str,
+        object_grounder: ObjectGrounder | None = None,
     ) -> None:
         self._storage = storage
         self._client = client
         self._config = config
         self._tracer = tracer
         self._provider = provider
+        self._object_grounder = object_grounder
         self._json_schema = build_scene_analysis_schema()
 
     def analyze(
@@ -201,6 +205,21 @@ class UploadedSceneAnalyzer:
                                 "modelObjectCount": len(parsed.objects),
                             }
                         )
+                    if self._object_grounder is not None:
+                        with self._tracer.span("object-grounding") as grounding:
+                            try:
+                                domain = apply_object_grounding(
+                                    domain, image, self._object_grounder
+                                )
+                            except ObjectGroundingError as error:
+                                logger.warning("object grounding failed", exc_info=error)
+                                grounding.update(
+                                    error_code="objectGroundingUnavailable"
+                                )
+                            else:
+                                grounding.update(
+                                    metadata={"objectCount": len(domain.objects)}
+                                )
                     root.update(
                         retry_count=attempts_used - 1, validation_result="valid"
                     )

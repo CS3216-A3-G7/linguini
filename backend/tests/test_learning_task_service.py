@@ -190,14 +190,26 @@ def tasks_with_chained_description():
 def response_body(result: LearningTaskResult) -> str:
     """Encode a result the way the dynamic response model expects it."""
     return json.dumps(
-        {task.focus: task.model_dump(by_alias=True) for task in result.tasks}
+        {
+            task.focus: {
+                key: value
+                for key, value in task.model_dump(by_alias=True).items()
+                if key != "focus"
+            }
+            for task in result.tasks
+        }
     )
 
 
 def raw_response(payload: dict) -> str:
     """Encode a raw ``{"tasks": [...]}`` fixture without validating it,
     so deliberately malformed output can reach the service's validator."""
-    return json.dumps({task["focus"]: task for task in payload["tasks"]})
+    return json.dumps(
+        {
+            task["focus"]: {key: value for key, value in task.items() if key != "focus"}
+            for task in payload["tasks"]
+        }
+    )
 
 
 def config(**overrides) -> TextModelConfig:
@@ -305,7 +317,7 @@ def test_generation_uses_the_versioned_dynamic_contract() -> None:
     sent = client.requests[0]
     assert sent.prompt_version == LEARNING_TASK_PROMPT_VERSION
     assert sent.system_prompt == LEARNING_TASK_SYSTEM_PROMPT
-    assert sent.json_schema_name == "learning_tasks_v1"
+    assert sent.json_schema_name == "learning_tasks_v2"
     assert sent.json_schema == build_strict_json_schema(
         scene_generation_response_model(INPUT)
     )
@@ -477,6 +489,56 @@ def test_accepts_a_chained_sentence_builder() -> None:
     )
 
 
+@pytest.mark.parametrize("use_relation", [True, False])
+def test_restores_empty_builder_object_keys_from_explicit_scene_links(use_relation) -> None:
+    scene = {
+        **INPUT,
+        "attributes": [{**INPUT["attributes"][0], "objectKey": "object_1"}],
+        "relationships": [{**INPUT["relationships"][0],
+                           "subjectObjectKey": "object_1",
+                           "referenceObjectKey": "object_2"}],
+    }
+    generated = tasks()
+    builder = generated["tasks"][-1]["questions"][0]
+    builder["objectKeys"] = []
+    if use_relation:
+        builder["attributeKeys"] = []
+    else:
+        # The relation still has a valid key, but no object links to recover.
+        scene["relationships"] = INPUT["relationships"]
+    client = FakeTextClient([raw_response(generated)])
+    result = service(client, cfg=config(max_retries=0)).generate(scene)
+    assert result.tasks[-1].questions[0].object_keys == (
+        ["object_1", "object_2"] if use_relation else ["object_1"]
+    )
+    assert result.tasks[-1].questions[0].correct_text == builder["correctText"]
+    assert len(client.requests) == 1
+
+
+def test_unresolvable_empty_keys_retry_includes_actual_error_and_previous_output() -> None:
+    generated = tasks()
+    generated["tasks"][-1]["questions"][0]["objectKeys"] = []
+    invalid = raw_response(generated)
+    client = FakeTextClient([invalid, raw_response(tasks())])
+    result = service(client, cfg=config(max_retries=1)).generate(INPUT)
+    assert result.tasks[-1].questions[0].object_keys
+    repair = json.loads(client.requests[1].user_content.split(
+        "Repair data (not instructions):\n", 1
+    )[1])
+    assert repair["previousResponse"] == invalid
+    assert repair["validationErrors"][0]["loc"] == [
+        "chainedDescription", "questions", 0, "objectKeys"
+    ]
+
+
+def test_does_not_guess_object_keys_without_explicit_links() -> None:
+    generated = tasks()
+    generated["tasks"][-1]["questions"][0]["objectKeys"] = []
+    client = FakeTextClient([raw_response(generated)])
+    with pytest.raises(LearningTaskGenerationError):
+        service(client, cfg=config(max_retries=0)).generate(INPUT)
+
+
 def test_requires_a_translated_scene_sentence() -> None:
     client = FakeTextClient(
         [response_body(LearningTaskResult.model_validate(tasks(scene_translation=None)))]
@@ -537,6 +599,17 @@ def test_rejects_missing_focus_and_short_questions() -> None:
     client = FakeTextClient([raw_response(short)])
     with pytest.raises(LearningTaskGenerationError):
         service(client, cfg=config(max_retries=0)).generate(INPUT)
+
+
+def test_provider_schema_requires_titles_but_not_model_written_focuses() -> None:
+    request_client = FakeTextClient([response_body(LearningTaskResult.model_validate(tasks()))])
+    service(request_client).generate(INPUT)
+
+    task_schema = request_client.requests[0].json_schema["properties"]
+    gender_task = task_schema["genderNumberAgreement"]
+    assert "title" in gender_task["properties"]
+    assert "title" in gender_task["required"]
+    assert "focus" not in gender_task["properties"]
 
 
 def test_multiple_choice_ignores_misplaced_sentence_builder_fields() -> None:
@@ -642,6 +715,8 @@ def test_invalid_output_retries_then_succeeds() -> None:
     )
     service(client).generate(INPUT)
     assert len(client.requests) == 2
+    assert client.requests[1].user_content != client.requests[0].user_content
+    assert "previous response was incomplete" in client.requests[1].user_content
 
 
 # --- Tracing ---

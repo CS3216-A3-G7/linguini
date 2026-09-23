@@ -78,7 +78,6 @@ class PartOfSpeech(StrEnum):
 class VocabularyLearningStatus(StrEnum):
     NEW = "new"
     LEARNING = "learning"
-    FAMILIAR = "familiar"
     MASTERED = "mastered"
 
 

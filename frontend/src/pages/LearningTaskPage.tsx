@@ -198,7 +198,6 @@ function GrammarLessonFlow({ task, index, total, onNext, onClose }: { task: Sess
       <span className="label muted">Question {position + 1} of {content.questions.length}</span>
       {question.interactionType === "sentenceBuilding" ? <>
         {question.translation ? <h2>{question.translation}</h2> : null}
-        <p className="muted">{question.prompt}</p>
         <div className="sentence-builder__answer" aria-label="Your sentence">
           {(builtTokenIndexes[question.questionId] ?? []).length ? (builtTokenIndexes[question.questionId] ?? []).map((tokenIndex, tokenPosition) => <button key={`${tokenIndex}-${tokenPosition}`} className="sentence-builder__token" disabled={terminal || practiceSaving}
             onClick={() => setBuiltTokenIndexes(value => ({ ...value, [question.questionId]: (value[question.questionId] ?? []).filter((_, index) => index !== tokenPosition) }))}>{question.tokenBank[tokenIndex]}</button>) : <span className="muted">Choose the words to build your sentence.</span>}
@@ -209,8 +208,7 @@ function GrammarLessonFlow({ task, index, total, onNext, onClose }: { task: Sess
             onClick={() => setBuiltTokenIndexes(value => ({ ...value, [question.questionId]: [...(value[question.questionId] ?? []), tokenIndex] }))}>{token}</button>;
         })}</div>
       </> : <>
-        <h2>{question.prompt}</h2>
-        {question.translation ? <p className="muted">{question.translation}</p> : null}
+        <h2>{content.focus === "sceneDescription" ? question.translation || "Choose the sentence that describes the scene." : question.prompt}</h2>
         <div className="choice-grid">{question.options.map(option => <button key={option.optionId} className="choice" aria-pressed={answers[question.questionId] === option.optionId} disabled={terminal || practiceSaving}
           onClick={() => setAnswers(value => ({ ...value, [question.questionId]: option.optionId }))}>{answers[question.questionId] === option.optionId ? <CheckIcon size={16} /> : null}{option.label}</button>)}</div>
       </>}

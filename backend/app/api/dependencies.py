@@ -1,5 +1,6 @@
 """FastAPI wiring for PostgreSQL persistence and the read-only scene catalog."""
 
+import logging
 import os
 from typing import Annotated
 from uuid import UUID
@@ -14,11 +15,13 @@ from app.ai import (
     NoOpAITracer,
     load_ai_settings,
 )
+from app.ai.features.object_grounding import ObjectGroundingError
 from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
 from app.ai.registry import (
     build_ispy_clue_generator,
     build_learning_task_generator,
+    build_object_grounder,
     build_scene_translator,
 )
 from app.ai.vision_gemini import GeminiVisionClient
@@ -129,6 +132,9 @@ def get_media_asset_repository(request: Request) -> MediaAssetRepository:
 
 # One shared derivative cache per process so its LRU survives across requests.
 _IMAGE_DERIVATIVES: ImageDerivatives | None = None
+_OBJECT_GROUNDER_UNINITIALIZED = object()
+_OBJECT_GROUNDER = _OBJECT_GROUNDER_UNINITIALIZED
+logger = logging.getLogger(__name__)
 
 
 def get_image_derivatives() -> ImageDerivatives:
@@ -141,6 +147,22 @@ def get_image_derivatives() -> ImageDerivatives:
             )
         )
     return _IMAGE_DERIVATIVES
+
+
+def get_object_grounder(request: Request, settings: AiSettings):
+    """Load the optional local detector once; preserve analysis if it is unavailable."""
+    if hasattr(request.app.state, "object_grounder"):
+        return request.app.state.object_grounder
+    global _OBJECT_GROUNDER
+    if _OBJECT_GROUNDER is _OBJECT_GROUNDER_UNINITIALIZED:
+        try:
+            _OBJECT_GROUNDER = build_object_grounder(settings)
+            if _OBJECT_GROUNDER is not None:
+                logger.info("Grounding DINO object detector loaded.")
+        except ObjectGroundingError:
+            logger.warning("object grounding is unavailable; using model locations")
+            _OBJECT_GROUNDER = None
+    return _OBJECT_GROUNDER
 
 
 def get_media_asset_service(
@@ -215,6 +237,7 @@ def get_practice_repository(
 
     scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
     tracer = get_ai_tracer(request)
+    object_grounder = get_object_grounder(request, settings)
     if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
         if not settings.is_configured(scene_config):
             uploaded_analyzer = None
@@ -232,6 +255,7 @@ def get_practice_repository(
                     vision_config,
                     tracer=tracer,
                     provider=scene_config.provider.value,
+                    object_grounder=object_grounder,
                 )
             else:
                 uploaded_analyzer = UploadedSceneAnalyzer(
@@ -240,6 +264,7 @@ def get_practice_repository(
                     vision_config,
                     tracer=tracer,
                     provider=scene_config.provider.value,
+                    object_grounder=object_grounder,
                 )
     elif scene_config.provider is AiProvider.NONE:
         uploaded_analyzer = None

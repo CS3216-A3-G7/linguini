@@ -3415,10 +3415,4 @@
     margin-top: var(--space-4);
   }
 
-  @media (min-height: 800px) {
-    .analysis-layout {
-      max-height: calc(100vh - 220px);
-      grid-template-rows: minmax(0, 1fr);
-    }
-  }
 }

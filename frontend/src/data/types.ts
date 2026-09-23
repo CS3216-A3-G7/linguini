@@ -1,5 +1,5 @@
 export type WordClass = "noun" | "verb" | "adjective" | "adverb" | "pronoun" | "preposition" | "conjunction" | "interjection" | "determiner" | "phrase" | "other";
-export type VocabStatus = "new" | "learning" | "familiar" | "mastered";
+export type VocabStatus = "new" | "learning" | "mastered";
 export type Gender = "la" | "el" | null;
 
 export type LanguageItem = {
@@ -43,6 +43,12 @@ export type ScenarioProgress = {
   level: string;
 };
 
+export type VocabularyScene = {
+  mediaAssetId: string;
+  title: string;
+  sceneId: string | null;
+};
+
 export type VocabRecord = {
   id: string;
   word: string;
@@ -53,6 +59,7 @@ export type VocabRecord = {
   topic: string;
   sceneId: string;
   example: string;
+  scenes?: VocabularyScene[];
 };
 
 export type JournalEntry = {

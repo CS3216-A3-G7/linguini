@@ -407,6 +407,8 @@ def test_invalid_output_retries_then_succeeds() -> None:
     client = FakeTextClient(["not json", raw(clues())])
     service(client).generate(INPUT)
     assert len(client.requests) == 2
+    assert client.requests[1].user_content != client.requests[0].user_content
+    assert "previous response was invalid" in client.requests[1].user_content
 
 
 # --- Tracing ---

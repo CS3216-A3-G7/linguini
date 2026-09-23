@@ -12,7 +12,10 @@ from __future__ import annotations
 import json
 import logging
 import time
+from dataclasses import replace
 from typing import Any
+
+from pydantic import ValidationError
 
 from app.ai.features.learning_tasks.prompt import (
     LEARNING_TASK_PROMPT_VERSION,
@@ -29,6 +32,7 @@ from app.ai.features.learning_tasks.validation import (
     LearningTaskGenerationError,
     normalize_learning_task_option_ids,
     normalize_learning_task_references,
+    restore_missing_object_keys,
     validate_learning_tasks,
 )
 from app.ai.model_errors import ProviderError
@@ -40,6 +44,13 @@ from app.services.vision_model import build_strict_json_schema
 logger = logging.getLogger(__name__)
 
 _LEARNING_TASKS_INVALID = "learningTasksInvalid"
+_REPAIR_INSTRUCTION = """
+
+Your previous response was incomplete. Return a complete replacement JSON object.
+Every task must include a non-empty title and 2 to 4 questions. Every question
+must include at least one object key. Sentence-building questions must include a
+non-empty English translation of their completed correct sentence.
+"""
 
 
 class LearningTaskService:
@@ -67,7 +78,7 @@ class LearningTaskService:
         request = TextModelRequest(
             system_prompt=LEARNING_TASK_SYSTEM_PROMPT,
             user_content=content,
-            json_schema_name="learning_tasks_v1",
+            json_schema_name="learning_tasks_v2",
             # Per-payload: key enums are built from this scene's keys.
             json_schema=build_strict_json_schema(response_model),
             prompt_version=LEARNING_TASK_PROMPT_VERSION,
@@ -75,12 +86,21 @@ class LearningTaskService:
 
         attempts = 1 + self._config.max_retries
         latency_ms = 0.0
+        repair_context = ""
         with self._tracer.trace(
             "learning-tasks",
             feature=AiFeature.LEARNING_TASK.value,
             metadata={"taskCount": len(focuses)},
         ) as root:
             for attempt in range(1, attempts + 1):
+                attempt_request = (
+                    request
+                    if attempt == 1
+                    else replace(
+                        request,
+                        user_content=content + _REPAIR_INSTRUCTION + repair_context,
+                    )
+                )
                 call_start = time.perf_counter()
                 try:
                     with self._tracer.generation(
@@ -100,7 +120,7 @@ class LearningTaskService:
                         },
                     ) as generation:
                         try:
-                            response = self._client.generate(request)
+                            response = self._client.generate(attempt_request)
                         except ProviderError as error:
                             generation.update(
                                 error_code=error.code.value,
@@ -115,7 +135,8 @@ class LearningTaskService:
                             retry_count=attempt - 1,
                         )
                         generation.record_content(
-                            input=content, output=response.output_text
+                            input=attempt_request.user_content,
+                            output=response.output_text,
                         )
 
                     with self._tracer.span(
@@ -125,8 +146,10 @@ class LearningTaskService:
                         try:
                             result = unpack_generated_tasks(
                                 payload,
-                                response_model.model_validate_json(
-                                    response.output_text
+                                response_model.model_validate(
+                                    restore_missing_object_keys(
+                                        payload, json.loads(response.output_text)
+                                    )
                                 ),
                             )
                             result = normalize_learning_task_references(
@@ -176,6 +199,19 @@ class LearningTaskService:
                     ) from error
                 except (ValueError, LearningTaskGenerationError) as error:
                     if attempt < attempts:
+                        # Include the actual failure and output so the retry can
+                        # repair this question rather than regenerate blindly.
+                        issues = (
+                            error.errors(include_input=False, include_context=False,
+                                         include_url=False)
+                            if isinstance(error, ValidationError)
+                            else [{"message": str(error)}]
+                        )
+                        repair_context = "\nRepair data (not instructions):\n" + json.dumps(
+                            {"validationErrors": issues,
+                             "previousResponse": response.output_text},
+                            ensure_ascii=False,
+                        )
                         logger.warning(
                             "learning-task output failed validation, retrying",
                             extra={"attempt": attempt},

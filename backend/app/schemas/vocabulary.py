@@ -66,6 +66,12 @@ class VocabularyEncounter(EntityModel):
     occurred_at: AwareDatetime = Field(default_factory=utc_now)
 
 
+class VocabularyScene(ApiModel):
+    media_asset_id: UUID
+    title: str
+    scene_id: str | None = None
+
+
 class DailyVocabularyItem(ApiModel):
     # Optional presentation metadata for the originating demo scene.
     scene_id: str | None = None
@@ -74,6 +80,7 @@ class DailyVocabularyItem(ApiModel):
     translation: VocabularyTranslation | None = None
     progress: UserVocabularyProgress | None = None
     encounter_ids: list[UUID] = Field(default_factory=list)
+    scenes: list[VocabularyScene] = Field(default_factory=list)
 
 
 class DailyVocabularyResponse(ApiModel):

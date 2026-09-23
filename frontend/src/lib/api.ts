@@ -1,4 +1,4 @@
-import type { LeaderboardRow, ScenarioProgress, VocabRecord, VocabStatus, WordClass } from "../data/types";
+import type { LeaderboardRow, ScenarioProgress, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";
 
@@ -178,6 +178,7 @@ interface DailyVocabularyItem {
   progress: { status: VocabStatus } | null;
   sceneId: string | null;
   topic: string | null;
+  scenes?: VocabularyScene[];
 }
 
 export function getProgress(signal?: AbortSignal): Promise<ProgressResponse> {
@@ -229,6 +230,7 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
     status: item.progress?.status ?? "new",
     topic: item.topic ?? "Uncategorised",
     sceneId: item.sceneId ?? "",
+    scenes: item.scenes ?? [],
     example: item.vocabulary.exampleSentence ?? "",
   }));
 }

@@ -21,6 +21,47 @@ class LearningTaskGenerationError(SceneAnalysisError):
     """The scene vocabulary could not be turned into usable learning tasks."""
 
 
+def restore_missing_object_keys(payload: dict[str, Any], response: Any) -> Any:
+    """Recover omitted object references from explicit scene links, before parsing.
+
+    Never guess from sentence text or replace an invalid, nonempty key list.
+    The dynamic response model still validates every recovered reference.
+    """
+    if not isinstance(response, dict):
+        return response
+    objects = {row["key"] for row in payload.get("objects", [])}
+    links = {
+        "attributeKeys": {
+            row["key"]: [row.get("objectKey")]
+            for row in payload.get("attributes", [])
+        },
+        "relationshipKeys": {
+            row["key"]: [row.get("subjectObjectKey"), row.get("referenceObjectKey")]
+            for row in payload.get("relationships", [])
+        },
+    }
+    for focus in required_task_focuses(payload):
+        task = response.get(focus)
+        if not isinstance(task, dict) or not isinstance(task.get("questions"), list):
+            continue
+        for question in task["questions"]:
+            if not isinstance(question, dict) or question.get("objectKeys") != []:
+                continue
+            recovered = []
+            for field, references in links.items():
+                keys = question.get(field, [])
+                if not isinstance(keys, list):
+                    continue
+                for key in keys:
+                    if isinstance(key, str):
+                        recovered.extend(
+                            value for value in references.get(key, []) if value in objects
+                        )
+            if recovered:
+                question["objectKeys"] = list(dict.fromkeys(recovered))
+    return response
+
+
 def normalize_learning_task_references(
     payload: dict[str, Any], result: LearningTaskResult
 ) -> LearningTaskResult:

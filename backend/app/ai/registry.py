@@ -9,9 +9,15 @@ from __future__ import annotations
 
 from app.ai.features.ispy_clues import ISpyClueService
 from app.ai.features.learning_tasks import LearningTaskService
+from app.ai.features.object_grounding import GroundingDinoObjectGrounder, ObjectGrounder
 from app.ai.features.translation import SceneTranslationService
 from app.ai.observability import AITracer
-from app.ai.settings import AiFeature, AiProvider, AiSettings
+from app.ai.settings import (
+    AiFeature,
+    AiProvider,
+    AiSettings,
+    ObjectGroundingProvider,
+)
 from app.ai.text_gemini import GeminiTextClient
 from app.ai.text_model import TextModelClient, TextModelConfig
 from app.ai.text_openai import OpenAITextClient
@@ -25,6 +31,16 @@ def build_text_client(
     if provider is AiProvider.GEMINI:
         return GeminiTextClient(settings.gemini_api_key, config)
     raise ValueError(f"unsupported text provider {provider!r}")
+
+
+def build_object_grounder(settings: AiSettings) -> ObjectGrounder | None:
+    """Build the configured local detector, or leave model coordinates alone."""
+    config = settings.object_grounding
+    if config.provider is ObjectGroundingProvider.NONE:
+        return None
+    if config.provider is ObjectGroundingProvider.GROUNDING_DINO:
+        return GroundingDinoObjectGrounder(config.model_name, config.threshold)
+    raise ValueError(f"unsupported object grounding provider {config.provider!r}")
 
 
 def build_scene_translator(

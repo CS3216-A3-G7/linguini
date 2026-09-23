@@ -34,6 +34,7 @@ from app.schemas.vocabulary import (
     UserVocabularyProgress,
     VocabularyEncounter,
     VocabularyItem,
+    VocabularyScene,
     VocabularyTranslation,
 )
 
@@ -107,7 +108,7 @@ class VocabularyEncounterConflictError(Exception):
     """An existing event ID was reused with different event data."""
 
 
-STATUS_RANK = {"new": 0, "learning": 1, "familiar": 2, "mastered": 3}
+STATUS_RANK = {"new": 0, "learning": 1, "mastered": 2}
 STATUS_BY_ENCOUNTER_TYPE = {
     "introduced": "new",
     "practised": "learning",
@@ -266,6 +267,7 @@ class PostgresVocabularyRepository:
                 }
                 encounters: dict[UUID, list[UUID]] = {}
                 latest_session: dict[UUID, UUID] = {}
+                word_sessions: dict[UUID, set[UUID]] = {}
                 for row in connection.execute(
                     select(vocabulary_encounters)
                     .where(
@@ -276,14 +278,24 @@ class PostgresVocabularyRepository:
                 ).mappings():
                     encounters.setdefault(row["vocabulary_item_id"], []).append(row["id"])
                     latest_session[row["vocabulary_item_id"]] = row["session_id"]
+                    word_sessions.setdefault(row["vocabulary_item_id"], set()).add(
+                        row["session_id"]
+                    )
                 # scene_id/topic describe the word's most recent encounter scene.
                 scene_assets = (
                     {
-                        row["id"]: row["scene_media_asset_id"]
+                        row["id"]: row
                         for row in connection.execute(
-                            select(sessions.c.id, sessions.c.scene_media_asset_id).where(
-                                sessions.c.id.in_(set(latest_session.values()))
-                            )
+                            select(
+                                sessions.c.id,
+                                sessions.c.scene_media_asset_id,
+                                sessions.c.session_title,
+                            ).where(
+                                sessions.c.user_id == user_id,
+                                sessions.c.id.in_(
+                                    {sid for ids in word_sessions.values() for sid in ids}
+                                ),
+                            ).order_by(sessions.c.id)
                         ).mappings()
                     }
                     if latest_session
@@ -297,7 +309,11 @@ class PostgresVocabularyRepository:
                                 preloaded_scenes.c.media_asset_id,
                                 preloaded_scenes.c.slug,
                                 preloaded_scenes.c.title,
-                            ).where(preloaded_scenes.c.media_asset_id.in_(scene_assets.values()))
+                            ).where(
+                                preloaded_scenes.c.media_asset_id.in_(
+                                    [row["scene_media_asset_id"] for row in scene_assets.values()]
+                                )
+                            )
                         ).mappings()
                     }
                     if scene_assets
@@ -306,9 +322,27 @@ class PostgresVocabularyRepository:
 
                 def scene(row):
                     scene_row = scene_rows.get(
-                        scene_assets.get(latest_session.get(row["vocabulary_item_id"]))
+                        scene_assets.get(latest_session.get(row["vocabulary_item_id"]), {}).get(
+                            "scene_media_asset_id"
+                        )
                     )
                     return scene_row
+
+                def word_scenes(item_id):
+                    photos = {}
+                    for session_id, session in scene_assets.items():
+                        if session_id not in word_sessions.get(item_id, set()):
+                            continue
+                        asset_id = session["scene_media_asset_id"]
+                        ready_scene = scene_rows.get(asset_id, {})
+                        photos[asset_id] = VocabularyScene(
+                            media_asset_id=asset_id,
+                            title=(
+                                ready_scene.get("title") or session["session_title"] or "Your photo"
+                            ),
+                            scene_id=ready_scene.get("slug"),
+                        )
+                    return list(photos.values())
 
                 return [
                     DailyVocabularyItem(
@@ -320,6 +354,7 @@ class PostgresVocabularyRepository:
                         scene_id=(scene(row) or {}).get("slug"),
                         topic=(scene(row) or {}).get("title"),
                         encounter_ids=encounters.get(row["vocabulary_item_id"], []),
+                        scenes=word_scenes(row["vocabulary_item_id"]),
                     )
                     for row in rows
                 ]
