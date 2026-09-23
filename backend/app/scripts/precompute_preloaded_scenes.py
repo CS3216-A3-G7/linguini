@@ -38,6 +38,7 @@ from app.ai.features.translation.schemas import TranslatedTerm
 from app.ai.model_errors import ProviderError
 from app.ai.observability import NoOpAITracer
 from app.ai.registry import (
+    build_object_grounder,
     build_scene_translator,
     build_text_client,
     build_uploaded_scene_analyzer,
@@ -252,6 +253,10 @@ def build_items(
                 "marker": index,
                 "x": x,
                 "y": y,
+                "attributes": {
+                    key: value for key, value in (obj.attributes or {}).items()
+                    if isinstance(value, str) and value.strip()
+                },
                 "example": example,
                 "exampleTranslation": example_translation,
             }
@@ -269,6 +274,7 @@ def build_scene_content(
     difficulty: str,
     media_asset: MediaAsset | dict[str, Any],
     items: list[dict[str, Any]],
+    relations: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Validate a full scene row; return the stored content payload."""
     detail = PreloadedSceneDetail.model_validate(
@@ -281,11 +287,12 @@ def build_scene_content(
             "difficulty": difficulty,
             "mediaAsset": media_asset,
             "items": items,
+            "relations": relations or [],
             **placeholder_activities(items),
         }
     )
     return detail.model_dump(
-        mode="json", by_alias=True, include={"items", "tasks", "rounds", "prompts"}
+        mode="json", by_alias=True, include={"items", "tasks", "rounds", "prompts", "relations"}
     )
 
 
@@ -546,7 +553,9 @@ def _compute_rows(
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
     )
     tracer = NoOpAITracer()
-    analyzer = build_uploaded_scene_analyzer(settings, storage, tracer)
+    analyzer = build_uploaded_scene_analyzer(
+        settings, storage, tracer, object_grounder=build_object_grounder(settings)
+    )
     if analyzer is None:
         raise RuntimeError(
             "SCENE_ANALYSIS is not configured; set AI_SCENE_ANALYSIS_PROVIDER/"
@@ -629,6 +638,17 @@ def _compute_rows(
                 items = build_items(
                     objects, translated.objects, examples, language_code
                 )
+                item_ids = {str(obj.id): item["id"] for obj, item in zip(objects, items, strict=True)}
+                relations = [
+                    {
+                        "subjectItemId": item_ids[str(relation.subject_scene_object_id)],
+                        "relation": relation.relation,
+                        "referenceItemId": item_ids[str(relation.reference_scene_object_id)],
+                    }
+                    for relation in analysis.relations
+                    if str(relation.subject_scene_object_id) in item_ids
+                    and str(relation.reference_scene_object_id) in item_ids
+                ]
                 if language_code == "es":
                     slug, title = base["slug"], base["title"]
                 else:
@@ -642,6 +662,7 @@ def _compute_rows(
                     difficulty=base["difficulty"],
                     media_asset=asset,
                     items=items,
+                    relations=relations,
                 )
             except Exception as error:
                 failures += 1

@@ -138,6 +138,8 @@ def build_objects(connection, session, asset, profile, scene):
                     "width": 0.05,
                     "height": 0.05,
                 },
+                anchor_point={"x": float(entry["x"]) / 100, "y": float(entry["y"]) / 100},
+                attributes=entry.get("attributes") or None,
             )
             objects.append(obj)
             words.append(word)

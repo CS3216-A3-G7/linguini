@@ -59,7 +59,6 @@ def test_translations_are_committed_before_lesson_generation(database):
     )
     sid = UUID(create_run(client, profile)["session"]["id"])
     repo.analyze(sid, profile.id)
-    runner.jobs.pop()()
     objects = repo.get(sid, profile.id).scene_objects
     repo.review(sid, profile.id, ReviewPracticeRequest(accepted_object_ids=[objects[0].id]))
     runner.jobs.pop()()
@@ -80,17 +79,14 @@ def test_translations_are_committed_before_lesson_generation(database):
     assert intro.public_content.words[0].phonetic_text == "/ˈmesa/"
 
 
-def test_analyze_claims_then_defers_the_model_call(database):
+def test_preloaded_analysis_is_ready_without_a_background_job(database):
     engine, owner, profile, client = database
     runner = DeferringRunner()
     repo = PostgresWorkflowRepository(engine, owner.id, background=runner)
     sid = UUID(create_run(client, profile)["session"]["id"])
     detail = repo.analyze(sid, profile.id)
-    assert detail.session.status == "analyzingScene"
-    assert len(runner.jobs) == 1
-    # The model has not run yet, so no objects are persisted.
-    assert repo.get(sid, profile.id).session.status == "analyzingScene"
-    runner.jobs.pop()()
+    assert detail.session.status == "awaitingObjectReview"
+    assert not runner.jobs
     settled = repo.get(sid, profile.id)
     assert settled.session.status == "awaitingObjectReview"
     assert settled.scene_objects
@@ -106,8 +102,7 @@ def test_analyzer_failure_fails_the_session_without_escaping(database):
         background=runner,
     )
     sid = UUID(create_run(client, profile)["session"]["id"])
-    assert repo.analyze(sid, profile.id).session.status == "analyzingScene"
-    runner.jobs.pop()()  # The background job swallows the provider failure.
+    assert repo.analyze(sid, profile.id).session.status == "failed"
     session = repo.get(sid, profile.id).session
     assert session.status == "failed"
     assert session.failure_code == "sceneAnalysisFailed"
@@ -119,7 +114,6 @@ def test_review_claims_then_defers_task_generation(database):
     repo = PostgresWorkflowRepository(engine, owner.id, background=runner)
     sid = UUID(create_run(client, profile)["session"]["id"])
     repo.analyze(sid, profile.id)
-    runner.jobs.pop()()
     objects = repo.get(sid, profile.id).scene_objects
     detail = repo.review(
         sid, profile.id, ReviewPracticeRequest(accepted_object_ids=[objects[0].id])
@@ -144,7 +138,6 @@ def test_task_generation_failure_fails_the_session_without_escaping(database):
     )
     sid = UUID(create_run(client, profile)["session"]["id"])
     repo.analyze(sid, profile.id)
-    runner.jobs.pop()()
     objects = repo.get(sid, profile.id).scene_objects
     detail = repo.review(
         sid, profile.id, ReviewPracticeRequest(accepted_object_ids=[objects[0].id])
