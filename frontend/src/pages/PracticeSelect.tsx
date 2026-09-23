@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { CameraIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
-import { ApiError, createPractice, getActivePractice, mediaImageUrl } from "../lib/api";
+import { ApiError, createPractice, getActivePractice } from "../lib/api";
 import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { sessionDestination } from "../lib/sessionRoute";
@@ -93,7 +93,7 @@ export function PracticeSelect() {
     <div className="grid-2">
       {scenes.map(scene => <button key={scene.id} type="button" className="scene-pick"
         disabled={interactionDisabled || uploading} aria-label={`Choose ${scene.title}`} onClick={() => void start(scene.mediaAssetId)}>
-        <SceneVisual scene={{ ...scene, imageUrl: mediaImageUrl(scene.mediaAssetId, 640) }} lazy />
+        <SceneVisual scene={scene} />
         <span className="small items-center justify-center" style={{ fontWeight: 700 }}>{scene.title}</span>
       </button>)}
     </div>

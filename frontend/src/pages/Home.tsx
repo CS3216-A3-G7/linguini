@@ -8,10 +8,16 @@ import { getActivePractice } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
+import { useVocabularyQuery } from "../state/queries";
 
 export function Home() {
   const navigate = useNavigate();
   const { learner, activeProfile, progress, progressLoading, progressError } = useAppState();
+  const { vocabulary, vocabularyLoading, vocabularyError } = useVocabularyQuery();
+  const collected = vocabularyLoading || vocabularyError ? null : vocabulary.length;
+  const mastered = vocabularyLoading || vocabularyError ? null : vocabulary.filter(word => word.status === "mastered").length;
+  const scenes = progressLoading || progressError ? null : progress?.scenarios.length ?? 0;
+  const marks = (count: number | null, symbol: string) => Array.from({ length: 5 }, (_, index) => <span key={index} className={count !== null && index < Math.min(5, Math.ceil(count / 5)) ? "is-filled" : ""}>{symbol}</span>);
   const queryClient = useQueryClient();
   const profileId = activeProfile?.id ?? "";
   const { data: resume, error: resumeQueryError, isPending: resumeLoading } = useQuery({
@@ -52,14 +58,7 @@ export function Home() {
 
       <div className="home-dashboard">
         <div className="home-dashboard__left">
-      <section className="home-streak" aria-label="Your learning goal">
-        <div className="home-streak__heading">
-          <strong>Your daily goal</strong>
-          <span>{learner.dailyMinutes ? `${learner.dailyMinutes} minutes` : "Not set"}</span>
-        </div>
-        <p>Learning {learner.language}</p>
-        {progress ? <p>{progress.xp} XP earned</p> : null}
-      </section>
+     
 
       {hasSessionToContinue ? (
         <Button
@@ -129,9 +128,16 @@ export function Home() {
 
       </section>
       </div>
+      <section className="home-journey" aria-label="Your learning journey">
+        <div className="home-journey__heading"><div><h2>Your learning journey</h2><p>Every small step adds up.</p></div><strong>{progressLoading || progressError ? "--" : progress?.xp ?? 0} XP</strong></div>
+        <div className="home-journey__milestones">
+          <div><span className="home-journey__marks" aria-hidden="true">{marks(collected, "●")}</span><strong>{collected ?? "--"} words collected</strong></div>
+          <div><span className="home-journey__marks" aria-hidden="true">{marks(mastered, "★")}</span><strong>{mastered ?? "--"} words mastered</strong></div>
+          <div><span className="home-journey__marks" aria-hidden="true">{marks(scenes, "▣")}</span><strong>{scenes ?? "--"} scenes explored</strong></div>
+        </div>
+      </section>
       <section className="stack-2" aria-labelledby="home-word-bank">
-        <h2 id="home-word-bank">Your word bank</h2>
-        <p>Review the words you've collected.</p>
+       
         <Button variant="secondary" onClick={() => navigate("/vocabulary")}>
           <BookIcon size={20} /> Explore your words
         </Button>

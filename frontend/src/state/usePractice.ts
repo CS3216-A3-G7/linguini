@@ -41,7 +41,9 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     // lesson/clue calls and their retries (up to five minutes).
     if (version === loadVersion.current) setSession(data);
     for (let attempt = 0; attempt < (data.tasks.length ? 200 : 40) && PROCESSING.includes(data.session.status); attempt += 1) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Poll quickly until the first vocabulary task is committed, then use a
+      // slower cadence while the remaining AI calls finish in the background.
+      await new Promise(resolve => setTimeout(resolve, data.tasks.length ? 1500 : 300));
       if (version !== loadVersion.current) break;
       data = await getPractice(id);
       if (version === loadVersion.current) setSession(data);

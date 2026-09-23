@@ -48,7 +48,7 @@ function SessionLoader({ id }: { id: string }) {
     && session.tasks.some(task => task.kind === "vocabularyIntroduction");
   if (loading && !earlyReady && session?.session.id === id && session.session.status === "generatingTasks" && session.translationPreview) return <div className="stack analysis-page">
     <h1>Scene analysis</h1>
-    <TranslationPreview preview={session.translationPreview} />
+    <TranslationPreview preview={session.translationPreview} scene={preview ?? undefined} />
     <section role="status" className="panel-note"><h2>Generating tasks...</h2><p className="muted">Explore your translations while we prepare your practice.</p></section>
   </div>;
   if (loading && !earlyReady) return copy.scan && preview ? <div className="stack analysis-page">

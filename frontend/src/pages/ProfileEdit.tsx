@@ -1,92 +1,38 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
-import { languages } from "../config/languages";
 import { useAppState } from "../state/useAppState";
+
+const AVATARS = ["farfalle", "fusilli", "penne", "macaroni"] as const;
 
 export function ProfileEdit() {
   const navigate = useNavigate();
   const { learner, activeProfile, startProfileSettingsSave, profileSaving, profileError } = useAppState();
   const [name, setName] = useState(learner.name);
-  const [language, setLanguageDraft] = useState(learner.languageCode || "es");
-  const [dailyMinutes, setDailyMinutes] = useState(learner.dailyMinutes ?? 10);
-  const [practicePreference, setPracticePreference] = useState(activeProfile?.preferredInputMode ?? "both");
-  const [micOn, setMicOn] = useState(learner.micOn);
-  const [cameraOn, setCameraOn] = useState(learner.cameraOn);
+  const [avatar, setAvatar] = useState(() => localStorage.getItem("linguini-avatar") ?? "farfalle");
 
   const saveProfile = () => {
     if (profileSaving || !name.trim()) return;
-    const started = startProfileSettingsSave(language, {
-      displayName: name.trim(), microphoneEnabled: micOn, cameraEnabled: cameraOn,
-    }, { dailyGoalMinutes: dailyMinutes, preferredInputMode: practicePreference });
-    if (started) navigate("/profile");
+    const started = startProfileSettingsSave(learner.languageCode || "es", {
+      displayName: name.trim(), microphoneEnabled: learner.micOn, cameraEnabled: learner.cameraOn,
+    }, activeProfile ? { dailyGoalMinutes: activeProfile.dailyGoalMinutes, preferredInputMode: activeProfile.preferredInputMode } : {});
+    if (started) { localStorage.setItem("linguini-avatar", avatar); navigate("/profile"); }
   };
 
   return (
     <div className="stack profile-page profile-edit-page">
       <div>
-        <h1>Edit profile</h1>
-        <p className="small muted">Make Linguini feel like your learning space.</p>
+        <h1>Profile options</h1>
+        <p className="small muted">Choose your avatar and update your name.</p>
       </div>
 
       <section className="profile-section">
         <h2>About you</h2>
         <Card plain className="profile-edit-card">
+          <fieldset className="profile-avatar-picker"><legend>Profile avatar</legend><div className="profile-avatar-options">{AVATARS.map(option => <button key={option} type="button" className={avatar === option ? "is-selected" : ""} onClick={() => setAvatar(option)}><img src={`/pasta-assets/${option}.png`} alt={`${option} pasta`} /></button>)}</div></fieldset>
           <label className="profile-edit-field">
             <span>Name</span>
             <input maxLength={100} disabled={profileSaving} value={name} onChange={(event) => setName(event.target.value)} />
-          </label>
-        </Card>
-      </section>
-
-      <section className="profile-section">
-        <h2>Learning setup</h2>
-        <Card plain className="profile-settings-card">
-          <label className="profile-setting">
-            <span><strong>Target language</strong><small>The language you are learning</small></span>
-            <select disabled={profileSaving} value={language} onChange={(event) => setLanguageDraft(event.target.value)}>
-              {languages.map((option) => (
-                <option key={option.code} value={option.code}>{option.flag} {option.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="profile-setting">
-            <span><strong>Daily goal</strong><small>Time set aside each day</small></span>
-            <select
-              disabled={profileSaving}
-              value={dailyMinutes}
-              onChange={(event) => setDailyMinutes(Number(event.target.value))}
-            >
-              {[...new Set([5, 10, 15, 20, dailyMinutes])].sort((a, b) => a - b).map((minutes) => (
-                <option key={minutes} value={minutes}>{minutes} min</option>
-              ))}
-            </select>
-          </label>
-          <label className="profile-setting">
-            <span><strong>Practice preference</strong><small>How you prefer to respond</small></span>
-            <select
-              disabled={profileSaving}
-              value={practicePreference}
-              onChange={(event) => setPracticePreference(event.target.value as "speech" | "text" | "both")}
-            >
-              <option value="both">Both</option>
-              <option value="speech">Speaking</option>
-              <option value="text">Typing</option>
-            </select>
-          </label>
-        </Card>
-      </section>
-
-      <section className="profile-section">
-        <h2>Permissions</h2>
-        <Card plain className="profile-settings-card">
-          <label className="profile-setting">
-            <span><strong>Microphone</strong><small>Used for pronunciation practice</small></span>
-            <input type="checkbox" disabled={profileSaving} checked={micOn} onChange={(event) => setMicOn(event.target.checked)} />
-          </label>
-          <label className="profile-setting">
-            <span><strong>Camera</strong><small>Used to capture scenes for learning</small></span>
-            <input type="checkbox" disabled={profileSaving} checked={cameraOn} onChange={(event) => setCameraOn(event.target.checked)} />
           </label>
         </Card>
       </section>

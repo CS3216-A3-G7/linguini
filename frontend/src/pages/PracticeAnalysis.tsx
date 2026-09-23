@@ -48,10 +48,18 @@ export function PracticeAnalysis() {
   if (["created", "analyzingScene", "generatingTasks"].includes(session.session.status)) return <div className="stack analysis-page">
     <h1>Scene analysis</h1>
     {session.session.status === "generatingTasks" && session.translationPreview ? <>
-      <TranslationPreview preview={session.translationPreview} />
+      <TranslationPreview preview={session.translationPreview} scene={scene} />
       <section role="status" className="panel-note">
-        <h2>Generating tasks...</h2>
-        <p className="muted">Explore your translations while we prepare your practice.</p>
+        {session.tasks.some(task => task.kind === "vocabularyIntroduction") ? <>
+          <h2>Your first task is ready</h2>
+          <p className="muted">Start learning your words now. The remaining tasks will finish in the background.</p>
+          <Button block onClick={() => navigate(`${base}/learn/${session.tasks.find(task => task.kind === "vocabularyIntroduction")!.id}`)}>
+            Begin tasks <ArrowRightIcon />
+          </Button>
+        </> : <>
+          <h2>Preparing your first task...</h2>
+          <p className="muted">Your translations are ready. Your first task will appear here shortly.</p>
+        </>}
         {practiceStalled ? <Button onClick={() => retryProcessing(session.session.id)}>Check again</Button> : null}
         {practiceError ? <p role="alert">{practiceError}</p> : null}
       </section>

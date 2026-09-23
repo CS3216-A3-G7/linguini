@@ -57,7 +57,7 @@ test("generation stays on analysis until ready for the mic check", () => {
 test("early vocabulary opens learning and never advances to I-Spy while generating", () => {
   for (const status of ["pending", "completed", "skipped"] as const) {
     const generating = detail("generatingTasks", [task("learn", status, 0)]);
-    assert.equal(sessionDestination(generating).path, "/practice/sessions/s1/learn");
+    assert.equal(sessionDestination(generating).path, "/practice/sessions/s1/analysis");
     assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/learn/learn-0"), true);
     assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/ispy-1"), false);
   }

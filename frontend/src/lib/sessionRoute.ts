@@ -27,7 +27,7 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
     case "awaitingObjectReview":
       return { path: `${base}/analysis`, notice: null };
     case "generatingTasks":
-      return { path: `${base}/${detail.tasks.some(task => task.kind === "vocabularyIntroduction") ? "learn" : "analysis"}`, notice: null };
+      return { path: `${base}/analysis`, notice: null };
     case "ready":
       return { path: `${base}/mic-test`, notice: null };
     case "inProgress": {
@@ -50,6 +50,9 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
 export function isSessionRouteAllowed(detail: PracticeDetail, pathname: string): boolean {
   const canonical = sessionDestination(detail).path;
   if (pathname === canonical) return true;
+  if (detail.session.status === "generatingTasks"
+    && detail.tasks.some(task => task.kind === "vocabularyIntroduction")
+    && pathname.startsWith(`${canonical.slice(0, -"/analysis".length)}/learn`)) return true;
   if (!canonical.endsWith("/learn")) return false;
   return pathname.startsWith(`${canonical}/`) || pathname === `${canonical.slice(0, -"/learn".length)}/mic-test`;
 }
