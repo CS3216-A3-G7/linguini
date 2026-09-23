@@ -130,8 +130,10 @@ def test_moderation_rejection_fails_the_session_with_moderation_code(database):
         background=runner,
     )
     sid = UUID(create_run(client, profile)["session"]["id"])
-    assert repo.analyze(sid, profile.id).session.status == "analyzingScene"
-    runner.jobs.pop()()
+    # Preloaded scenes use their saved analysis on the request path, so a
+    # rejection is persisted before analyze() returns.
+    assert repo.analyze(sid, profile.id).session.status == "failed"
+    assert not runner.jobs
     detail = repo.get(sid, profile.id)
     assert detail.session.status == "failed"
     assert detail.session.failure_code == "imageModerationFailed"
