@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 from app.ai.features.object_grounding.service import ObjectGrounder
 from app.schemas.media import AnchorPoint, BoundingBox
 from app.services.scene_analysis import SceneAnalysisResult
 from app.services.vision_model import VisionImage
+
+logger = logging.getLogger(__name__)
 
 
 def apply_object_grounding(
@@ -13,6 +17,11 @@ def apply_object_grounding(
 ) -> SceneAnalysisResult:
     """Replace only locations that the detector can match with confidence."""
     boxes = grounder.ground(image, [object.label for object in result.objects])
+    logger.info(
+        "Object grounding applied detector boxes to %s of %s scene objects.",
+        sum(object.label in boxes for object in result.objects),
+        len(result.objects),
+    )
     objects = []
     for object in result.objects:
         box = boxes.get(object.label)

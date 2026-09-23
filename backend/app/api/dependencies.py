@@ -155,6 +155,8 @@ def get_object_grounder(settings: AiSettings):
     if _OBJECT_GROUNDER is _OBJECT_GROUNDER_UNINITIALIZED:
         try:
             _OBJECT_GROUNDER = build_object_grounder(settings)
+            if _OBJECT_GROUNDER is not None:
+                logger.info("Grounding DINO object detector loaded.")
         except ObjectGroundingError:
             logger.warning("object grounding is unavailable; using model locations")
             _OBJECT_GROUNDER = None
