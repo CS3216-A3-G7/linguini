@@ -32,8 +32,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.schemas.translation import SceneTranslationResult, TranslatedTerm
-from app.services.scene_translation import (
+from app.ai.features.translation.schemas import SceneTranslationResult, TranslatedTerm
+from app.ai.features.translation.validation import (
     SceneTranslationError,
     validate_translation_terms,
 )

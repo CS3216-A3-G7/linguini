@@ -31,8 +31,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.schemas.scene_analysis import SceneAnalysisModelResult
-from app.services.scene_analysis_validation import (
+from app.ai.features.scene_analysis.schemas import SceneAnalysisModelResult
+from app.ai.features.scene_analysis.validation import (
     SceneAnalysisValidationError,
     parse_scene_analysis,
 )
