@@ -140,7 +140,7 @@ class _LegacySpec:
 _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
     AiFeature.SCENE_ANALYSIS: _LegacySpec(
         provider_var="SCENE_ANALYSIS_PROVIDER",
-        provider_default="gemini",
+        provider_default="openrouter",
         timeout_var="SCENE_ANALYSIS_TIMEOUT_SECONDS",
         timeout_default="120",
         model_vars={
@@ -151,12 +151,12 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
         model_defaults={
             AiProvider.OPENAI: "gpt-4o",
             AiProvider.GEMINI: "",
-            AiProvider.OPENROUTER: "",
+            AiProvider.OPENROUTER: "anthropic/claude-haiku-4.5",
         },
     ),
     AiFeature.SCENE_TRANSLATION: _LegacySpec(
         provider_var="TRANSLATION_PROVIDER",
-        provider_default="gemini",
+        provider_default="openrouter",
         timeout_var="TRANSLATION_TIMEOUT_SECONDS",
         timeout_default="60",
         model_vars={
@@ -167,7 +167,7 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
         model_defaults={
             AiProvider.OPENAI: "gpt-4o-mini",
             AiProvider.GEMINI: "gemini-3.5-flash-lite",
-            AiProvider.OPENROUTER: "",
+            AiProvider.OPENROUTER: "mistralai/mistral-small-2603",
         },
     ),
     AiFeature.LEARNING_TASK: _LegacySpec(
@@ -181,14 +181,14 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
             AiProvider.OPENROUTER: "OPENROUTER_LEARNING_TASK_MODEL",
         },
         model_defaults={
-            AiProvider.OPENAI: "gpt-4o-mini",
+            AiProvider.OPENAI: "gpt-5.4-mini",
             AiProvider.GEMINI: "gemini-3.5-flash-lite",
             AiProvider.OPENROUTER: "",
         },
     ),
     AiFeature.ISPY_CLUE: _LegacySpec(
         provider_var="ISPY_CLUE_PROVIDER",
-        provider_default="openai",
+        provider_default="gemini",
         timeout_var="ISPY_CLUE_TIMEOUT_SECONDS",
         timeout_default="60",
         model_vars={
@@ -198,7 +198,7 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
         },
         model_defaults={
             AiProvider.OPENAI: "gpt-4o-mini",
-            AiProvider.GEMINI: "",
+            AiProvider.GEMINI: "gemini-3.1-flash-lite",
             AiProvider.OPENROUTER: "",
         },
     ),
@@ -212,7 +212,7 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
             AiProvider.OPENROUTER: "OPENROUTER_ISPY_GUESS_MODEL",
         },
         model_defaults={
-            AiProvider.OPENAI: "gpt-4o-mini",
+            AiProvider.OPENAI: "gpt-4.1-mini",
             AiProvider.OPENROUTER: "",
         },
     ),

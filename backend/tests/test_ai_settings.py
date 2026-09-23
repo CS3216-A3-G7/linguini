@@ -170,34 +170,40 @@ def test_demo_mode_with_no_keys_uses_deterministic_fallback():
         assert settings.is_configured(config) is False
 
 
-def test_empty_env_reproduces_legacy_defaults():
+def test_empty_env_reproduces_the_measured_defaults():
+    """Defaults are the models chosen in MODEL_COMPARISON.md."""
     settings = load_ai_settings(env={})
     assert settings.mode is AiMode.DEMO
 
     scene = settings.scene_analysis
-    assert scene.provider is AiProvider.GEMINI
-    assert scene.model_name == ""
+    assert scene.provider is AiProvider.OPENROUTER
+    assert scene.model_name == "anthropic/claude-haiku-4.5"
     assert scene.timeout_seconds == 120
 
     translation = settings.scene_translation
-    assert translation.provider is AiProvider.GEMINI
-    assert translation.model_name == "gemini-3.5-flash-lite"
+    assert translation.provider is AiProvider.OPENROUTER
+    assert translation.model_name == "mistralai/mistral-small-2603"
     assert translation.timeout_seconds == 60
 
     learning = settings.learning_task
     assert learning.provider is AiProvider.OPENAI
-    assert learning.model_name == "gpt-4o-mini"
+    assert learning.model_name == "gpt-5.4-mini"
     assert learning.timeout_seconds == 60
     assert learning.max_retries == 1
 
-    for config in (settings.ispy_clue, settings.ispy_guess):
-        assert config.provider is AiProvider.OPENAI
-        assert config.model_name == "gpt-4o-mini"
+    clue = settings.ispy_clue
+    assert clue.provider is AiProvider.GEMINI
+    assert clue.model_name == "gemini-3.1-flash-lite"
+    assert clue.max_retries == 1
+
+    guess = settings.ispy_guess
+    assert guess.provider is AiProvider.OPENAI
+    assert guess.model_name == "gpt-4.1-mini"
+    assert guess.max_retries == 0
+
+    for config in (clue, guess):
         assert config.timeout_seconds == 60
         assert config.max_output_tokens is None
-        assert config.max_retries == (
-            1 if config.feature is AiFeature.ISPY_CLUE else 0
-        )
 
 
 def test_legacy_aliases_produce_identical_settings():
