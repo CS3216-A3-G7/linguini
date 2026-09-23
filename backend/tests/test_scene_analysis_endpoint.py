@@ -100,7 +100,7 @@ def test_analyze_persists_title_summary_and_draft(database):
     _, _, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
     claimed = client.post(f"/api/v1/sessions/{sid}/analyze").json()
-    assert claimed["session"]["status"] == "analyzingScene"
+    assert claimed["session"]["status"] == "awaitingObjectReview"
     detail = client.get(f"/api/v1/sessions/{sid}").json()
     objects = detail["sceneObjects"]
     relations = detail["sceneObjectRelations"]
@@ -126,7 +126,7 @@ def test_analyzer_failure_marks_session_failed(database, monkeypatch):
     # A provider failure surfaces as a failed session, not a request error.
     response = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert response.status_code == 200, response.text
-    assert response.json()["session"]["status"] == "analyzingScene"
+    assert response.json()["session"]["status"] == "failed"
     session = client.get(f"/api/v1/sessions/{sid}").json()["session"]
     assert session["status"] == "failed"
     assert session["failureCode"] == "sceneAnalysisFailed"

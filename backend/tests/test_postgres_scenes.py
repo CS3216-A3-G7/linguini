@@ -20,7 +20,16 @@ def store_scene(connection, scene):
     connection.execute(insert(media_assets).values(**scene.media_asset.model_dump(by_alias=False)))
     values = scene.model_dump(
         by_alias=False,
-        exclude={"items", "tasks", "rounds", "prompts", "media_asset", "scene_id", "image_url"},
+        exclude={
+            "items",
+            "tasks",
+            "rounds",
+            "prompts",
+            "relations",
+            "media_asset",
+            "scene_id",
+            "image_url",
+        },
     )
     connection.execute(
         insert(preloaded_scenes).values(
@@ -28,7 +37,9 @@ def store_scene(connection, scene):
             slug=scene.scene_id,
             media_asset_id=scene.media_asset.id,
             content=scene.model_dump(
-                mode="json", by_alias=True, include={"items", "tasks", "rounds", "prompts"}
+                mode="json",
+                by_alias=True,
+                include={"items", "tasks", "rounds", "prompts", "relations"},
             ),
         )
     )
