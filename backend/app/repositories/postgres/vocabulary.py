@@ -108,7 +108,7 @@ class VocabularyEncounterConflictError(Exception):
     """An existing event ID was reused with different event data."""
 
 
-STATUS_RANK = {"new": 0, "learning": 1, "familiar": 2, "mastered": 3}
+STATUS_RANK = {"new": 0, "learning": 1, "mastered": 2}
 STATUS_BY_ENCOUNTER_TYPE = {
     "introduced": "new",
     "practised": "learning",

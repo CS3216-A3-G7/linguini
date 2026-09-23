@@ -5,6 +5,17 @@ type VocabularyGroup = {
   words: VocabRecord[];
 };
 
+function vocabularySources(word: VocabRecord, scenes: SceneSummary[]) {
+  const readyScene = scenes.find(scene => scene.id === word.sceneId);
+  return word.scenes?.length ? word.scenes : readyScene ? [{
+    mediaAssetId: readyScene.mediaAssetId, title: readyScene.title, sceneId: readyScene.id,
+  }] : [];
+}
+
+export function vocabularyCategories(word: VocabRecord, scenes: SceneSummary[]): string[] {
+  return [...new Set(vocabularySources(word, scenes).map(source => source.title))];
+}
+
 export function groupVocabularyByPhoto(
   vocabulary: VocabRecord[],
   scenes: SceneSummary[],
@@ -13,10 +24,7 @@ export function groupVocabularyByPhoto(
   const groups = new Map<string, VocabularyGroup>();
   const ungrouped: VocabRecord[] = [];
   for (const word of vocabulary) {
-    const readyScene = scenes.find(scene => scene.id === word.sceneId);
-    const sources = word.scenes?.length ? word.scenes : readyScene ? [{
-      mediaAssetId: readyScene.mediaAssetId, title: readyScene.title, sceneId: readyScene.id,
-    }] : [];
+    const sources = vocabularySources(word, scenes);
     if (!sources.length) ungrouped.push(word);
     for (const source of sources) {
       let group = groups.get(source.mediaAssetId);

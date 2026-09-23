@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupVocabularyByPhoto } from "../src/lib/vocabularyGroups.ts";
+import { groupVocabularyByPhoto, vocabularyCategories } from "../src/lib/vocabularyGroups.ts";
 import type { VocabRecord } from "../src/data/types.ts";
 
 const photo = (id: string) => ({ mediaAssetId: id, title: "Your photo", sceneId: null });
@@ -28,4 +28,16 @@ test("older ready-scene records keep the catalog image", () => {
     blurb: "", language: "Spanish", languageCode: "es" }], id => `/images/${id}`);
   assert.equal(sceneGroups[0].scene.imageUrl, "/street.jpg");
   assert.equal(ungrouped.length, 0);
+});
+
+test("image categories use every photo a word came from", () => {
+  const scenes = [{ id: "street", mediaAssetId: "street-image", title: "Street", imageUrl: "/street.jpg",
+    blurb: "", language: "Spanish", languageCode: "es" }];
+  const lamp = word("lamp", []);
+  lamp.scenes = [
+    { mediaAssetId: "living-room", title: "Living room", sceneId: null },
+    { mediaAssetId: "office", title: "Office", sceneId: null },
+  ];
+  assert.deepEqual(vocabularyCategories(lamp, scenes), ["Living room", "Office"]);
+  assert.deepEqual(vocabularyCategories({ ...word("tree", []), sceneId: "street" }, scenes), ["Street"]);
 });

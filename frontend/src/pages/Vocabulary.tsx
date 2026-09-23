@@ -5,7 +5,7 @@ import { SceneVisual } from "../components/SceneVisual";
 import { LoadingScreen } from "../components/LoadingScreen";
 import type { VocabStatus, WordClass } from "../data/types";
 import { mediaImageUrl } from "../lib/api";
-import { groupVocabularyByPhoto } from "../lib/vocabularyGroups";
+import { groupVocabularyByPhoto, vocabularyCategories } from "../lib/vocabularyGroups";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
 import { useScenesQuery, useVocabularyQuery } from "../state/queries";
@@ -13,7 +13,6 @@ import { useScenesQuery, useVocabularyQuery } from "../state/queries";
 const statusLabels: { id: VocabStatus; label: string }[] = [
   { id: "new", label: "New" },
   { id: "learning", label: "Learning" },
-  { id: "familiar", label: "Familiar" },
   { id: "mastered", label: "Mastered" },
 ];
 
@@ -25,24 +24,27 @@ export function Vocabulary() {
   const [view, setView] = useState<"scenes" | "list">("scenes");
   const [status, setStatus] = useState<VocabStatus>("learning");
   const [wordClass, setWordClass] = useState<WordClass | "all">("all");
-  const [topic, setTopic] = useState<string>("all");
+  const [category, setCategory] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [draftWordClass, setDraftWordClass] = useState<WordClass | "all">("all");
-  const [draftTopic, setDraftTopic] = useState<string>("all");
+  const [draftCategory, setDraftCategory] = useState<string>("all");
   const filterSheetRef = useRef<HTMLDivElement>(null);
 
   const statusTabs = statusLabels.map(({ id, label }) => ({ id, label }));
 
-  const topics = useMemo(
-    () => ["all", ...Array.from(new Set(vocabulary.map((item) => item.topic)))],
-    [vocabulary],
+  const categories = useMemo(
+    () => [
+      "all",
+      ...Array.from(new Set(vocabulary.flatMap(item => vocabularyCategories(item, scenes)))),
+    ],
+    [vocabulary, scenes],
   );
 
   const rows = vocabulary.filter(
     (item) =>
       item.status === status &&
       (wordClass === "all" || item.wordClass === wordClass) &&
-      (topic === "all" || item.topic === topic),
+      (category === "all" || vocabularyCategories(item, scenes).includes(category)),
   );
 
   const sceneGroups = useMemo(
@@ -52,7 +54,7 @@ export function Vocabulary() {
 
   const openFilters = () => {
     setDraftWordClass(wordClass);
-    setDraftTopic(topic);
+    setDraftCategory(category);
     setShowFilters(true);
   };
 
@@ -60,7 +62,7 @@ export function Vocabulary() {
 
   const applyFilters = () => {
     setWordClass(draftWordClass);
-    setTopic(draftTopic);
+    setCategory(draftCategory);
     setShowFilters(false);
   };
 
@@ -170,15 +172,15 @@ export function Vocabulary() {
             </fieldset>
 
             <fieldset className="vocabulary-filter-group">
-              <legend>Topic</legend>
+              <legend>Image</legend>
               <div className="chip-row">
-                {topics.map((option) => (
+                {categories.map((option) => (
                   <button
                     key={option}
                     type="button"
-                    className={`chip${option === draftTopic ? " chip--selected" : ""}`}
-                    aria-pressed={option === draftTopic}
-                    onClick={() => setDraftTopic(option)}
+                    className={`chip${option === draftCategory ? " chip--selected" : ""}`}
+                    aria-pressed={option === draftCategory}
+                    onClick={() => setDraftCategory(option)}
                   >
                     {option}
                   </button>
@@ -209,7 +211,9 @@ export function Vocabulary() {
               <div className="vocabulary-card__footer">
                 <div className="vocabulary-card__tags">
                   <span className="pill pill--new">{item.wordClass}</span>
-                  <span className="pill pill--new">{item.topic}</span>
+                  {vocabularyCategories(item, scenes).map((imageTitle) => (
+                    <span key={imageTitle} className="pill pill--new">{imageTitle}</span>
+                  ))}
                 </div>
                 <IconButton
                   className="vocabulary-card__audio"

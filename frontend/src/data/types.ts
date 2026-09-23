@@ -1,5 +1,5 @@
 export type WordClass = "noun" | "verb" | "adjective" | "adverb" | "pronoun" | "preposition" | "conjunction" | "interjection" | "determiner" | "phrase" | "other";
-export type VocabStatus = "new" | "learning" | "familiar" | "mastered";
+export type VocabStatus = "new" | "learning" | "mastered";
 export type Gender = "la" | "el" | null;
 
 export type LanguageItem = {
