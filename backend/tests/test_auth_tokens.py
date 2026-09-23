@@ -110,6 +110,33 @@ def test_anonymous_accepted_when_allowed(monkeypatch):
     assert identity.is_anonymous is True
 
 
+def test_unlisted_algorithm_rejected_without_jwks(verifier):
+    def _no_lookup(token):
+        raise AssertionError("JWKS lookup must not run for unlisted algorithms")
+
+    verifier._jwks_client.get_signing_key_from_jwt = _no_lookup
+    payload = {
+        "sub": str(uuid4()),
+        "aud": AUDIENCE,
+        "iss": ISSUER,
+        "exp": datetime.now(UTC) + timedelta(minutes=5),
+    }
+    token = jwt.encode(payload, "secret", algorithm="HS384")
+    with pytest.raises(InvalidTokenError):
+        verifier.verify(token)
+
+
+def test_empty_supabase_url_is_configuration_error():
+    with pytest.raises(AuthConfigurationError):
+        SupabaseTokenVerifier(_settings(supabase_url=""))
+
+
+def test_unknown_auth_mode_is_configuration_error(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "nonsense")
+    with pytest.raises(AuthConfigurationError):
+        auth.load_auth_settings()
+
+
 def test_hs256_verified_with_secret():
     verifier = SupabaseTokenVerifier(_settings(jwt_secret=HS_SECRET))
     payload = {

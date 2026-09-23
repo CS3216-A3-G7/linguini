@@ -55,6 +55,7 @@ def _app_without_lifespan():
 
 def test_missing_authorization_header_returns_401(monkeypatch):
     monkeypatch.setenv("AUTH_MODE", "supabase")
+    monkeypatch.setenv("SUPABASE_URL", SUPABASE_URL)
     response = TestClient(_app_without_lifespan()).get("/api/v1/me")
     assert response.status_code == 401
     assert response.json()["detail"]["code"] == "unauthenticated"
@@ -62,6 +63,7 @@ def test_missing_authorization_header_returns_401(monkeypatch):
 
 def test_garbage_bearer_token_returns_401(monkeypatch):
     monkeypatch.setenv("AUTH_MODE", "supabase")
+    monkeypatch.setenv("SUPABASE_URL", SUPABASE_URL)
     client = TestClient(_app_without_lifespan())
     response = client.get("/api/v1/me", headers={"Authorization": "Bearer garbage"})
     assert response.status_code == 401
