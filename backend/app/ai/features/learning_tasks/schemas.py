@@ -2,8 +2,8 @@
 
 Owns the static result models plus the dynamic response-model factory that
 restricts generated references to the supplied scene keys at schema level.
-The added length/count bounds below bind when the response is parsed locally —
-``build_strict_json_schema`` strips those keywords from the provider schema.
+Array bounds are sent to the provider and checked again when parsing locally.
+String length bounds remain enforced by local validation.
 """
 
 from __future__ import annotations

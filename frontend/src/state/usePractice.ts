@@ -38,10 +38,12 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       }
     }
     // Scene analysis can take ~60s, so poll for up to a minute before stalling.
+    if (version === loadVersion.current) setSession(data);
     for (let attempt = 0; attempt < 40 && PROCESSING.includes(data.session.status); attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       if (version !== loadVersion.current) break;
       data = await getPractice(id);
+      if (version === loadVersion.current) setSession(data);
     }
     if (version === loadVersion.current) {
       setSession(data);

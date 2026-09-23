@@ -18,6 +18,23 @@ from app.services.vision_model import build_strict_json_schema
 from tests.test_learning_task_service import INPUT, tasks
 
 
+def test_outgoing_provider_schema_preserves_question_and_reference_counts():
+    # Test our actual wire schema, not the SDK's separate schema converter.
+    schema = build_strict_json_schema(scene_generation_response_model(INPUT))
+    for focus, task in schema["properties"].items():
+        questions = task["properties"]["questions"]
+        assert questions["minItems"] == 2
+        assert questions["maxItems"] == 4
+        fields = questions["items"]["properties"]
+        assert fields["objectKeys"]["minItems"] == 1
+        if focus == "chainedDescription":
+            assert fields["tokenBank"]["minItems"] == 1
+            assert fields["options"]["maxItems"] == 0
+        else:
+            assert fields["options"]["minItems"] == 4
+            assert fields["options"]["maxItems"] == 4
+
+
 @pytest.mark.parametrize("focus", ["sceneDescription", "chainedDescription"])
 def test_provider_schema_requires_nonnullable_english_translation(focus):
     model = scene_generation_response_model(INPUT)
@@ -105,6 +122,11 @@ def test_strict_schema_parsing_preserves_translations_through_provider():
 
     assert len(calls) == 1
     sent_format = calls[0]["text"]["format"]
+    sent_questions = sent_format["schema"]["properties"]["chainedDescription"][
+        "properties"
+    ]["questions"]
+    assert sent_questions["minItems"] == 2
+    assert sent_questions["maxItems"] == 4
     assert sent_format["strict"] is True
     assert sent_format["schema"] == build_strict_json_schema(
         scene_generation_response_model(INPUT)

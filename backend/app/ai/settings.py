@@ -382,13 +382,15 @@ def _load_feature(
             model_name=_parse_model(env, feature, stem, provider),
             timeout_seconds=_parse_timeout(env, feature, stem),
             max_output_tokens=max_output_tokens,
-            # Generated lessons and I-Spy clues are structured responses. One
+            # Translations, lessons and I-Spy clues are structured responses. One
             # repair attempt avoids replacing a usable session when a provider
             # misses a non-schema constraint; an explicit 0 still disables it.
             max_retries=(
                 1
                 if max_retries is None
-                and feature in {AiFeature.LEARNING_TASK, AiFeature.ISPY_CLUE}
+                and feature in {
+                    AiFeature.SCENE_TRANSLATION, AiFeature.LEARNING_TASK, AiFeature.ISPY_CLUE
+                }
                 else 0 if max_retries is None else max_retries
             ),
         )

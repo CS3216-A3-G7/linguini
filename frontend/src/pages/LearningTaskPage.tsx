@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type TouchEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button, Card, Feedback, IconButton, ProgressTrail } from "../components/ui";
-import { CheckIcon, SpeakerIcon } from "../components/icons";
+import { CheckIcon, CloseIcon, SpeakerIcon } from "../components/icons";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { practiceStages, taskDone, taskTitle } from "../lib/practiceTasks";
@@ -22,10 +22,10 @@ export function LearningTaskPage() {
   if (!task || ["abandoned", "failed"].includes(session.session.status)) return <Navigate to={`${base}/learn`} replace />;
   const next = tasks[index + 1];
   return <div className="stack learning-task-page"><LearningTaskContent key={task.id} task={task} index={index} total={tasks.length}
-    onNext={() => navigate(next ? `${base}/learn/${next.id}` : `${base}/ispy-1`)} onClose={() => navigate(`${base}/learn`)} /></div>;
+    onNext={() => navigate(next ? `${base}/learn/${next.id}` : `${base}/ispy-1`)} onClose={() => navigate(`${base}/learn`)} onExit={() => navigate("/home")} /></div>;
 }
 
-function LearningTaskContent({ task, index, total, onNext, onClose }: { task: SessionTask; index: number; total: number; onNext: () => void; onClose: () => void }) {
+function LearningTaskContent({ task, index, total, onNext, onClose, onExit }: { task: SessionTask; index: number; total: number; onNext: () => void; onClose: () => void; onExit: () => void }) {
   const scene = useScene();
   const { actOnTask, practiceSaving, practiceError } = useAppState();
   const [text, setText] = useState("");
@@ -35,7 +35,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
   const busy = useRef(false);
   const content = task.publicContent;
   if (content.kind === "vocabularyIntroduction" && content.words.length) {
-    return <VocabularyLearningFlow task={task} index={index} total={total} onNext={onNext} onClose={onClose} />;
+    return <VocabularyLearningFlow task={task} index={index} total={total} onNext={onNext} onExit={onExit} />;
   }
   if (content.kind === "grammarLesson") {
     return <GrammarLessonFlow task={task} index={index} total={total} onNext={onNext} onClose={onClose} />;
@@ -66,11 +66,9 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
       <div className="spread"><span className="label muted">{card.wordClass}{card.gender ? " · " + card.gender : ""}</span>
         <IconButton label={"Hear " + card.word} onClick={() => speak(card.word, scene.languageCode)}><SpeakerIcon /></IconButton></div>
       <div className="learning-card__word"><h2>{card.word}</h2><p className="muted">{card.translation}</p></div>
-      {card.example ? <Card plain><div className="stack-2"><strong className="small">{card.example}</strong><span className="small muted">{card.exampleTranslation}</span></div></Card> : null}
     </div> : null}
     {!card && content.kind === "vocabularyIntroduction" ? <article className="flashcard learning-card">
       <div className="learning-card__word"><h2>{content.targetText}</h2><p>{content.translation}</p></div>
-      <p>{content.exampleSentence}</p>
       <IconButton label={`Hear ${content.targetText ?? "word"}`} onClick={() => speak(content.targetText ?? "", scene.languageCode)}><SpeakerIcon /></IconButton>
     </article> : null}
     {content.kind === "grammarExplanation" || content.kind === "syntaxExplanation" ? <>
@@ -90,7 +88,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose }: { task: Se
   </div>;
 }
 
-function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task: SessionTask; index: number; total: number; onNext: () => void; onClose: () => void }) {
+function VocabularyLearningFlow({ task, index, total, onNext, onExit }: { task: SessionTask; index: number; total: number; onNext: () => void; onExit: () => void }) {
   const scene = useScene();
   const { actOnTask, practiceSaving, practiceError } = useAppState();
   const [stage, setStage] = useState<"review" | "quiz" | "typing">("review");
@@ -101,13 +99,15 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
   const [typedAnswers, setTypedAnswers] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<string | null>(null);
   const [questionResults, setQuestionResults] = useState<Record<string, boolean>>({});
+  const [correctOptionIds, setCorrectOptionIds] = useState<Record<string, string>>({});
   const [checkingQuestion, setCheckingQuestion] = useState(false);
   const requestKey = useRef(crypto.randomUUID());
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const content = task.publicContent;
   if (content.kind !== "vocabularyIntroduction") return null;
   const terminal = taskDone(task);
-  const pageCount = Math.ceil(content.words.length / 3);
-  const visibleWords = content.words.slice(page * 3, page * 3 + 3);
+  const pageCount = content.words.length;
+  const visibleWords = content.words.slice(page, page + 1);
   const question = content.questions[questionIndex];
   const typingWord = content.words[typingIndex];
   const typingKey = typingWord ? typingWord.learningKey ?? typingWord.vocabularyItemId ?? typingWord.targetText : "";
@@ -119,12 +119,28 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
     }
   };
   const finishReview = () => page < pageCount - 1 ? setPage(value => value + 1) : setStage("quiz");
+  const handleCardTouchStart = (event: TouchEvent) => {
+    const touch = event.changedTouches[0];
+    swipeStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+  const handleCardTouchEnd = (event: TouchEvent) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start) return;
+    const touch = event.changedTouches[0];
+    const horizontal = touch.clientX - start.x;
+    const vertical = touch.clientY - start.y;
+    if (Math.abs(horizontal) < 48 || Math.abs(horizontal) <= Math.abs(vertical)) return;
+    if (horizontal < 0 && page < pageCount - 1) setPage(value => value + 1);
+    if (horizontal > 0 && page > 0) setPage(value => value - 1);
+  };
   const finishQuestion = () => questionIndex < content.questions.length - 1 ? setQuestionIndex(value => value + 1) : setStage("typing");
   const chooseAnswer = async (optionId: string) => {
     if (!question || answers[question.questionId] || checkingQuestion) return;
     if (question.correctOptionId) {
       setAnswers(value => ({ ...value, [question.questionId]: optionId }));
       setQuestionResults(value => ({ ...value, [question.questionId]: question.correctOptionId === optionId }));
+      setCorrectOptionIds(value => ({ ...value, [question.questionId]: question.correctOptionId! }));
       return;
     }
     setCheckingQuestion(true);
@@ -132,18 +148,20 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
       const result = await checkVocabularyAnswer(task.id, question.questionId, optionId);
       setAnswers(value => ({ ...value, [question.questionId]: optionId }));
       setQuestionResults(value => ({ ...value, [question.questionId]: result.isCorrect }));
+      setCorrectOptionIds(value => ({ ...value, [question.questionId]: result.correctOptionId }));
     } finally {
       setCheckingQuestion(false);
     }
   };
   return <div className="stack vocabulary-flow">
     <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
-    <div className="learning-title-row"><h1>{content.title}</h1><Button variant="quiet" className="learning-exit" onClick={onClose}>Back to tasks</Button></div>
+    <div className="learning-title-row"><div><h1>{content.title}</h1>{!terminal && stage === "review" ? <p className="small muted" aria-live="polite">{page + 1} of {pageCount}</p> : null}</div><Button variant="quiet" className="learning-exit" onClick={onExit}><CloseIcon size={18} /> Exit</Button></div>
     {!terminal && stage === "review" ? <>
-      <div className="spread"><p className="muted">Take a moment to learn each word.</p><span className="label muted">{page + 1} / {pageCount}</span></div>
-      <div className="vocabulary-learning-grid">{visibleWords.map(word => <VocabularyLearningCard key={word.learningKey ?? word.vocabularyItemId ?? word.targetText} word={word} languageCode={scene.languageCode} />)}</div>
-      <div className="vocabulary-flow__actions">{page > 0 ? <Button variant="quiet" onClick={() => setPage(value => value - 1)}>Previous words</Button> : <span />}
-        <Button onClick={finishReview}>{page < pageCount - 1 ? "Next words" : "Start quick quiz"}</Button></div>
+      <div className="vocabulary-learning-grid vocabulary-learning-grid--swipe" onTouchStart={handleCardTouchStart} onTouchEnd={handleCardTouchEnd}>{visibleWords.map(word => <VocabularyLearningCard key={word.learningKey ?? word.vocabularyItemId ?? word.targetText} word={word} languageCode={scene.languageCode} />)}</div>
+      <div className="vocabulary-flow__actions">
+        <Button variant="secondary" disabled={page === 0} onClick={() => setPage(value => value - 1)}>Previous word</Button>
+        <Button variant="secondary" onClick={finishReview}>{page < pageCount - 1 ? "Next word" : "Start quick quiz"}</Button></div>
+      <Button variant="primary" block onClick={() => setStage("quiz")}>Skip to word practice</Button>
     </> : null}
     {!terminal && stage === "quiz" && question ? <Card plain><div className="stack">
       <span className="label muted">Question {questionIndex + 1} of {content.questions.length}</span><h2>{question.prompt}</h2>
@@ -153,7 +171,7 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose }: { task:
         const state = result === undefined || !selected ? "" : result ? " choice--correct" : " choice--incorrect";
         return <button key={option.optionId} className={`choice${state}`} aria-pressed={selected} disabled={!!answers[question.questionId] || checkingQuestion || !!feedback} onClick={() => void chooseAnswer(option.optionId)}>{selected ? <CheckIcon size={16} /> : null}{option.label}</button>;
       })}</div>
-      {answers[question.questionId] ? <Feedback tone={questionResults[question.questionId] ? "good" : "warn"}><p role="status">{questionResults[question.questionId] ? "Correct!" : "Not quite — keep going."}</p></Feedback> : null}
+      {answers[question.questionId] ? <Feedback tone={questionResults[question.questionId] ? "good" : "warn"}><p role="status">{questionResults[question.questionId] ? "Correct!" : <>Incorrect. The correct answer is <strong>{question.options.find(option => option.optionId === correctOptionIds[question.questionId])?.label}</strong>.</>}</p></Feedback> : null}
       <Button block disabled={!answers[question.questionId]} onClick={finishQuestion}>{questionIndex < content.questions.length - 1 ? "Next question" : "Continue"}</Button>
     </div></Card> : null}
     {!terminal && stage === "typing" && typingWord ? <Card plain><div className="stack">
@@ -228,6 +246,6 @@ function VocabularyLearningCard({ word, languageCode }: { word: VocabularyLearni
       <IconButton className="learning-card__audio" label={`Hear ${word.targetText}`} onClick={() => speak(word.targetText, languageCode)}><SpeakerIcon /></IconButton></div>
     <div className="learning-card__word"><h2>{word.targetText}</h2><p className="muted">{word.translation}</p></div>
     {word.pluralForm ? <p className="small"><strong>Plural:</strong> {word.pluralForm}</p> : null}
-    {word.exampleSentence ? <div className="learning-example"><strong className="small">{word.exampleSentence}</strong></div> : null}
+    {word.phoneticText ? <p className="small muted" aria-label="Pronunciation">{word.phoneticText}</p> : null}
   </article>;
 }

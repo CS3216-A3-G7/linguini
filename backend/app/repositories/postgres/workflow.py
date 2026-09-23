@@ -315,9 +315,13 @@ class PostgresWorkflowRepository:
             )
             if question is None or option_id not in {item.option_id for item in question.options}:
                 raise PracticeConflictError("Choose one of the offered answers.")
+            correct_option_id = task.answer_key.correct_option_ids.get(question_id)
+            if correct_option_id is None:
+                raise PracticeConflictError("This question has no answer key.")
             return CheckVocabularyAnswerResponse(
                 question_id=question_id,
-                is_correct=task.answer_key.correct_option_ids.get(question_id) == option_id,
+                is_correct=correct_option_id == option_id,
+                correct_option_id=correct_option_id,
             )
 
     def _detail(self, c, session):
@@ -918,6 +922,26 @@ class PostgresWorkflowRepository:
                     ],
                 }
                 translated_scene = self.translator.translate(payload)
+                # Commit translations before the slower lesson/clue calls so
+                # polling clients can show useful content while tasks are built.
+                draft = {
+                    **(session.analysis_draft or {}),
+                    "translationPreview": translated_scene.model_dump(
+                        mode="json", by_alias=True
+                    ),
+                }
+                c.execute(
+                    update(sessions).where(sessions.c.id == session.id)
+                    .values(analysis_draft=draft)
+                )
+
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.status in TERMINAL:
+                return
+            detail = self._detail(c, session)
+            objects = list(detail.scene_objects)
+            if self.translator:
                 if self.learning_task_generator:
                     try:
                         lessons = build_grammar_lessons(
@@ -946,24 +970,13 @@ class PostgresWorkflowRepository:
                         translated.translation,
                         obj.label,
                         gender=translated.gender,
+                        phonetic_text=translated.phonetic_text,
                     )
                     c.execute(
                         update(scene_objects)
                         .where(scene_objects.c.id == obj.id)
                         .values(vocabulary_item_id=word.id)
                     )
-                draft = {
-                    **(session.analysis_draft or {}),
-                    "translationPreview": translated_scene.model_dump(
-                        mode="json", by_alias=True
-                    ),
-                }
-                c.execute(
-                    update(sessions)
-                    .where(sessions.c.id == session.id)
-                    .values(analysis_draft=draft)
-                )
-                session = session.model_copy(update={"analysis_draft": draft})
                 detail = self._detail(c, session)
                 objects = list(detail.scene_objects)
                 words_by_id = {word.id: word for word in detail.vocabulary}

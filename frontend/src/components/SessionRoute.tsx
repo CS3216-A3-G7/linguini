@@ -10,6 +10,7 @@ import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
 import { ScenePhoto } from "./ScenePhoto";
 import { LoadingScreen } from "./LoadingScreen";
+import { TranslationPreview } from "./TranslationPreview";
 
 export function SessionRoute() {
   const { sessionId = "" } = useParams();
@@ -43,6 +44,11 @@ function SessionLoader({ id }: { id: string }) {
   });
   const error = queryError(queryErrorValue);
   const copy = sessionLoadingCopy(location.pathname);
+  if (loading && session?.session.id === id && session.session.status === "generatingTasks" && session.translationPreview) return <div className="stack analysis-page">
+    <h1>Scene analysis</h1>
+    <TranslationPreview preview={session.translationPreview} />
+    <section role="status" className="panel-note"><h2>Generating tasks...</h2><p className="muted">Explore your translations while we prepare your practice.</p></section>
+  </div>;
   if (loading) return copy.scan && preview ? <div className="stack analysis-page">
     <h1>{copy.title}</h1>
     <section className="analysis-loading" aria-live="polite" aria-busy="true">

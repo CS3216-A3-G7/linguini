@@ -209,7 +209,7 @@ export function Vocabulary() {
                 </div>
               </div>
 
-              <p className="vocabulary-card__example">{item.example}</p>
+              {item.phoneticText ? <p className="small muted" aria-label="Pronunciation">{item.phoneticText}</p> : null}
 
               <div className="vocabulary-card__footer">
                 <div className="vocabulary-card__tags">

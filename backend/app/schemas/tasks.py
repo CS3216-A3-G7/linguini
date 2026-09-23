@@ -322,6 +322,7 @@ class CheckVocabularyAnswerRequest(ApiModel):
 class CheckVocabularyAnswerResponse(ApiModel):
     question_id: NonEmptyText
     is_correct: bool
+    correct_option_id: NonEmptyText
 
 
 type SubmitTaskAttemptRequest = Annotated[

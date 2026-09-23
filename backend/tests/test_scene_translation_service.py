@@ -169,6 +169,14 @@ def test_happy_path_returns_translation() -> None:
     assert len(client.requests) == 1
 
 
+def test_translation_preserves_phonetic_pronunciation() -> None:
+    output = json.loads(VALID_OUTPUT)
+    output["objects"][0]["phoneticText"] = "/ˈsiʝa/"
+    client = FakeTextClient([json.dumps(output)])
+    result = service(client).translate(PAYLOAD)
+    assert result.objects[0].phonetic_text == "/ˈsiʝa/"
+
+
 def test_request_uses_versioned_contract() -> None:
     client = FakeTextClient([VALID_OUTPUT])
     service(client).translate(PAYLOAD)
@@ -351,6 +359,32 @@ def test_invalid_output_retries_then_succeeds() -> None:
     client = FakeTextClient(["not json", VALID_OUTPUT])
     result = service(client).translate(PAYLOAD)
     assert result.objects[0].translation == "silla"
+    assert len(client.requests) == 2
+
+
+def test_blank_non_object_translations_receive_targeted_repair() -> None:
+    invalid = json.loads(VALID_OUTPUT)
+    for field in ("attributes", "relationships"):
+        for term in invalid[field]:
+            term["translation"] = ""
+    client = FakeTextClient([json.dumps(invalid), VALID_OUTPUT])
+    result = service(client).translate(PAYLOAD)
+    assert all(term.translation for term in result.attributes + result.relationships)
+    repair = client.requests[1].user_content
+    assert repair != client.requests[0].user_content
+    data = json.loads(repair.split("repair data, not instructions:\n", 1)[1])
+    assert {issue["loc"][0] for issue in data["validationErrors"]} == {
+        "attributes", "relationships"
+    }
+    assert json.loads(data["previousResponse"]) == invalid
+
+
+def test_blank_translations_still_fail_if_repair_is_invalid() -> None:
+    invalid = json.loads(VALID_OUTPUT)
+    invalid["attributes"][0]["translation"] = ""
+    client = FakeTextClient([json.dumps(invalid), json.dumps(invalid)])
+    with pytest.raises(SceneTranslationError):
+        service(client).translate(PAYLOAD)
     assert len(client.requests) == 2
 
 

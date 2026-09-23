@@ -6,6 +6,7 @@ from uuid import UUID
 from test_postgres_sessions import create_run
 from test_postgres_sessions import database as database
 
+from app.ai.features.translation.schemas import SceneTranslationResult
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
 from app.schemas.sessions import ReviewPracticeRequest
 from app.services.session_plan import build_tasks
@@ -19,6 +20,48 @@ class DeferringRunner:
 
     def submit(self, fn, /, *args, **kwargs):
         self.jobs.append(lambda: fn(*args, **kwargs))
+
+
+def test_translations_are_committed_before_lesson_generation(database):
+    engine, owner, profile, client = database
+    runner = DeferringRunner()
+    observed = []
+
+    def translate(payload):
+        return SceneTranslationResult.model_validate({
+            kind: [
+                {**term, "translation": "mesa", "phoneticText": "/ˈmesa/"}
+                for term in payload[kind]
+            ]
+            for kind in ("objects", "attributes", "relationships")
+        })
+
+    def generate(_payload):
+        # A separate reader must see the checkpoint before this slow call ends.
+        observed.append(repo.get(sid, profile.id))
+        raise ValueError("Use deterministic tasks for this test")
+
+    repo = PostgresWorkflowRepository(
+        engine, owner.id, background=runner,
+        translator=SimpleNamespace(translate=translate),
+        learning_task_generator=SimpleNamespace(generate=generate),
+    )
+    sid = UUID(create_run(client, profile)["session"]["id"])
+    repo.analyze(sid, profile.id)
+    runner.jobs.pop()()
+    objects = repo.get(sid, profile.id).scene_objects
+    repo.review(sid, profile.id, ReviewPracticeRequest(accepted_object_ids=[objects[0].id]))
+    runner.jobs.pop()()
+    assert len(observed) == 1
+    assert observed[0].session.status == "generatingTasks"
+    assert observed[0].translation_preview.objects[0].translation == "mesa"
+    assert not observed[0].tasks
+    settled = repo.get(sid, profile.id)
+    assert settled.session.status == "inProgress"
+    assert settled.tasks
+    assert settled.vocabulary[0].phonetic_text == "/ˈmesa/"
+    intro = next(task for task in settled.tasks if task.kind == "vocabularyIntroduction")
+    assert intro.public_content.words[0].phonetic_text == "/ˈmesa/"
 
 
 def test_analyze_claims_then_defers_the_model_call(database):
