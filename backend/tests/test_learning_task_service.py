@@ -665,6 +665,8 @@ def test_invalid_output_retries_then_succeeds() -> None:
     )
     service(client).generate(INPUT)
     assert len(client.requests) == 2
+    assert client.requests[1].user_content != client.requests[0].user_content
+    assert "previous response was incomplete" in client.requests[1].user_content
 
 
 # --- Tracing ---

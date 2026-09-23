@@ -195,7 +195,9 @@ def test_empty_env_reproduces_legacy_defaults():
         assert config.model_name == "gpt-4o-mini"
         assert config.timeout_seconds == 60
         assert config.max_output_tokens is None
-        assert config.max_retries == 0
+        assert config.max_retries == (
+            1 if config.feature is AiFeature.ISPY_CLUE else 0
+        )
 
 
 def test_legacy_aliases_produce_identical_settings():
