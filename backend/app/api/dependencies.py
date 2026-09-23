@@ -19,6 +19,7 @@ from app.ai.instrumentation import TracedISpyGuessGenerator
 from app.ai.registry import (
     build_ispy_clue_generator,
     build_learning_task_generator,
+    build_object_grounder,
     build_scene_translator,
 )
 from app.ai.vision_gemini import GeminiVisionClient
@@ -129,6 +130,7 @@ def get_media_asset_repository(request: Request) -> MediaAssetRepository:
 
 # One shared derivative cache per process so its LRU survives across requests.
 _IMAGE_DERIVATIVES: ImageDerivatives | None = None
+_OBJECT_GROUNDER = None
 
 
 def get_image_derivatives() -> ImageDerivatives:
@@ -141,6 +143,14 @@ def get_image_derivatives() -> ImageDerivatives:
             )
         )
     return _IMAGE_DERIVATIVES
+
+
+def get_object_grounder(settings: AiSettings):
+    """Load the optional local detector once per application process."""
+    global _OBJECT_GROUNDER
+    if _OBJECT_GROUNDER is None:
+        _OBJECT_GROUNDER = build_object_grounder(settings)
+    return _OBJECT_GROUNDER
 
 
 def get_media_asset_service(
@@ -215,6 +225,7 @@ def get_practice_repository(
 
     scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
     tracer = get_ai_tracer(request)
+    object_grounder = get_object_grounder(settings)
     if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
         if not settings.is_configured(scene_config):
             uploaded_analyzer = None
@@ -232,6 +243,7 @@ def get_practice_repository(
                     vision_config,
                     tracer=tracer,
                     provider=scene_config.provider.value,
+                    object_grounder=object_grounder,
                 )
             else:
                 uploaded_analyzer = UploadedSceneAnalyzer(
@@ -240,6 +252,7 @@ def get_practice_repository(
                     vision_config,
                     tracer=tracer,
                     provider=scene_config.provider.value,
+                    object_grounder=object_grounder,
                 )
     elif scene_config.provider is AiProvider.NONE:
         uploaded_analyzer = None

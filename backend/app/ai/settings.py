@@ -23,6 +23,11 @@ class AiProvider(StrEnum):
     NONE = "none"
 
 
+class ObjectGroundingProvider(StrEnum):
+    NONE = "none"
+    GROUNDING_DINO = "groundingDino"
+
+
 class AiFeature(StrEnum):
     SCENE_ANALYSIS = "sceneAnalysis"
     SCENE_TRANSLATION = "sceneTranslation"
@@ -57,6 +62,16 @@ class ObservabilitySettings(BaseModel):
     capture_content: bool = False
 
 
+class ObjectGroundingSettings(BaseModel):
+    """Configuration for the optional local location-refinement pass."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider: ObjectGroundingProvider = ObjectGroundingProvider.NONE
+    model_name: str = ""
+    threshold: float = Field(default=0.35, ge=0, le=1)
+
+
 class AiSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -65,6 +80,7 @@ class AiSettings(BaseModel):
     gemini_api_key: str = ""
     general_api_key: str = ""
     observability: ObservabilitySettings = ObservabilitySettings()
+    object_grounding: ObjectGroundingSettings = ObjectGroundingSettings()
     scene_analysis: FeatureModelConfig
     scene_translation: FeatureModelConfig
     learning_task: FeatureModelConfig
@@ -299,6 +315,42 @@ def _parse_observability(env: Mapping[str, str]) -> ObservabilitySettings:
     )
 
 
+def _parse_object_grounding(env: Mapping[str, str]) -> ObjectGroundingSettings:
+    raw_provider = (_read(env, "AI_OBJECT_GROUNDING_PROVIDER") or "none").casefold()
+    provider_aliases = {"groundingdino": ObjectGroundingProvider.GROUNDING_DINO}
+    provider = provider_aliases.get(raw_provider)
+    if provider is None:
+        try:
+            provider = ObjectGroundingProvider(raw_provider)
+        except ValueError as exc:
+            allowed = ", ".join(item.value for item in ObjectGroundingProvider)
+            raise AiConfigurationError(
+                "Invalid object grounding provider: "
+                f"{raw_provider!r} (allowed: {allowed})"
+            ) from exc
+    raw_threshold = _read(env, "AI_OBJECT_GROUNDING_THRESHOLD") or "0.35"
+    try:
+        threshold = float(raw_threshold)
+    except ValueError as exc:
+        raise AiConfigurationError(
+            "Invalid object grounding threshold: "
+            f"{raw_threshold!r} (AI_OBJECT_GROUNDING_THRESHOLD must be 0..1)"
+        ) from exc
+    model_name = _read(env, "AI_OBJECT_GROUNDING_MODEL") or (
+        "IDEA-Research/grounding-dino-base"
+        if provider is ObjectGroundingProvider.GROUNDING_DINO
+        else ""
+    )
+    try:
+        return ObjectGroundingSettings(
+            provider=provider, model_name=model_name, threshold=threshold
+        )
+    except ValueError as exc:
+        raise AiConfigurationError(
+            f"Invalid object grounding configuration: {exc}"
+        ) from exc
+
+
 def _parse_model(
     env: Mapping[str, str], feature: AiFeature, stem: str, provider: AiProvider
 ) -> str:
@@ -365,6 +417,7 @@ def load_ai_settings(env: Mapping[str, str] | None = None) -> AiSettings:
         or "",
         general_api_key=_read(env, "AI_API_KEY") or "",
         observability=_parse_observability(env),
+        object_grounding=_parse_object_grounding(env),
         **{
             field: _load_feature(env, feature)
             for feature, field in _FEATURE_FIELDS.items()

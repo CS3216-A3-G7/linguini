@@ -9,6 +9,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from app.ai.features.object_grounding import ObjectGroundingError
 from app.ai.features.scene_analysis import (
     SCENE_ANALYSIS_PROMPT_VERSION,
     SCENE_ANALYSIS_SCHEMA_VERSION,
@@ -131,13 +132,16 @@ def config(**overrides) -> VisionModelConfig:
     return VisionModelConfig(**values)
 
 
-def analyzer(client, tracer=None, provider="openai", storage=None, cfg=None):
+def analyzer(
+    client, tracer=None, provider="openai", storage=None, cfg=None, object_grounder=None
+):
     return UploadedSceneAnalyzer(
         storage or FakeStorage(),
         client,
         cfg or config(),
         tracer=tracer or NoOpAITracer(),
         provider=provider,
+        object_grounder=object_grounder,
     )
 
 
@@ -208,6 +212,18 @@ def test_happy_path_maps_to_domain() -> None:
     assert result.objects[0].anchor_point is not None
     assert result.relations[0].relation == "next_to"
     assert len(client.requests) == 1
+
+
+def test_grounding_failure_keeps_the_valid_scene_analysis_result() -> None:
+    class FailingGrounder:
+        def ground(self, image, labels):
+            raise ObjectGroundingError("model unavailable")
+
+    result = analyzer(
+        FakeVisionClient([VALID_OUTPUT]), object_grounder=FailingGrounder()
+    ).analyze(session(), asset(), {}, None)
+
+    assert [object.label for object in result.objects] == ["chair", "table"]
 
 
 def test_request_uses_shared_v2_contract() -> None:
