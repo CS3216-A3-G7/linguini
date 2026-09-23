@@ -654,6 +654,14 @@ class PostgresWorkflowRepository:
                 raise PracticeNotFoundError("Curated scene not found.")
             claimed = self._transition(c, session, "analyzingScene")
             detail = self._detail(c, claimed)
+        if asset.source == "preloaded":
+            # Curated scenes already have their objects, marker positions,
+            # attributes and relations saved. Set up the fresh learner session
+            # on this request instead of showing the uploaded-photo animation.
+            self._run_scene_analysis(
+                session_id, profile_id, claimed, asset, dict(profile), dict(scene)
+            )
+            return self.get(session_id, profile_id)
         self.background.submit(
             self._run_scene_analysis,
             session_id,

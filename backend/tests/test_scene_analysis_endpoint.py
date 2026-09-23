@@ -25,8 +25,8 @@ def test_analyzer_runs_once_and_review_state_never_reanalyzes(database, monkeypa
     sid = create_run(client, profile)["session"]["id"]
     first = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert first.status_code == 200, first.text
-    # Analysis is claimed on the request and finished in the background job.
-    assert first.json()["session"]["status"] == "analyzingScene"
+    # Curated scenes use their saved analysis and are ready for review directly.
+    assert first.json()["session"]["status"] == "awaitingObjectReview"
     repeat = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert repeat.status_code == 200, repeat.text
     assert repeat.json()["session"]["status"] == "awaitingObjectReview"

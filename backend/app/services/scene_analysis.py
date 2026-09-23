@@ -57,8 +57,22 @@ class DeterministicSceneAnalyzer:
         if not summary and objects:
             labels = ", ".join(obj.label for obj in objects)
             summary = f"Words to practise in this photo: {labels}."
+        item_ids = {
+            entry["id"]: obj.id
+            for entry, obj in zip(scene["content"]["items"], objects, strict=True)
+        } if scene else {}
+        curated_relations = [
+            SceneObjectRelation(
+                subject_scene_object_id=item_ids[row["subjectItemId"]],
+                relation=row["relation"],
+                reference_scene_object_id=item_ids[row["referenceItemId"]],
+                source_relation_key="precomputed-v1",
+            )
+            for row in (scene["content"].get("relations", []) if scene else [])
+        ]
         return SceneAnalysisResult(
-            title=title, summary=summary, objects=objects, relations=self._relations(objects)
+            title=title, summary=summary, objects=objects,
+            relations=curated_relations or self._relations(objects),
         )
 
     @staticmethod

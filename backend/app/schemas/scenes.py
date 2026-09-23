@@ -18,8 +18,15 @@ class DemoSceneItem(ApiModel):
     marker: Annotated[int, Field(ge=1)]
     x: Annotated[float, Field(ge=0, le=100)]
     y: Annotated[float, Field(ge=0, le=100)]
+    attributes: dict[str, str] = Field(default_factory=dict)
     example: str
     example_translation: str
+
+
+class DemoSceneRelation(ApiModel):
+    subject_item_id: NonEmptyText
+    relation: NonEmptyText
+    reference_item_id: NonEmptyText
 
 
 class DemoSceneTask(ApiModel):
@@ -65,6 +72,7 @@ class PreloadedSceneDetail(PreloadedScene):
     tasks: Annotated[list[DemoSceneTask], Field(min_length=1)]
     rounds: Annotated[list[DemoSceneRound], Field(min_length=1)]
     prompts: Annotated[list[DemoScenePrompt], Field(min_length=1)]
+    relations: list[DemoSceneRelation] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def valid_references(self) -> "PreloadedSceneDetail":
@@ -84,4 +92,11 @@ class PreloadedSceneDetail(PreloadedScene):
                 raise ValueError("invalid round answer or choices")
         if any(prompt.item_id not in ids for prompt in self.prompts):
             raise ValueError("unknown prompt item")
+        if any(
+            relation.subject_item_id not in ids
+            or relation.reference_item_id not in ids
+            or relation.subject_item_id == relation.reference_item_id
+            for relation in self.relations
+        ):
+            raise ValueError("invalid scene relation")
         return self
