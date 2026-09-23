@@ -48,31 +48,92 @@ def test_detector_prompt_labels_match_the_scene_analysis_labels() -> None:
     assert _canonical_label("the basket") == "basket"
 
 
-def test_queries_labels_separately_and_accepts_partial_returned_phrase() -> None:
+def _detector(results, *, max_labels=12, max_image_side=1024):
     detector = GroundingDinoObjectGrounder.__new__(GroundingDinoObjectGrounder)
     detector._torch = MagicMock()
-    detector._torch.no_grad.side_effect = nullcontext
+    detector._torch.inference_mode.side_effect = nullcontext
     detector._model = MagicMock()
     detector._processor = MagicMock()
+    detector._processor.return_value.to.return_value = (
+        detector._processor.return_value
+    )
+    detector._processor.post_process_grounded_object_detection.return_value = results
     detector._threshold = 0.35
+    detector._device = "cpu"
+    detector._max_labels = max_labels
+    detector._max_image_side = max_image_side
+    return detector
+
+
+def _png(width: int = 100, height: int = 100) -> VisionImage:
+    data = BytesIO()
+    Image.new("RGB", (width, height)).save(data, format="PNG")
+    return VisionImage(data=data.getvalue(), mime_type="image/png")
+
+
+def test_one_batched_pass_accepts_partial_returned_phrase() -> None:
     box = MagicMock()
     box.tolist.return_value = [10, 20, 40, 60]
-    detector._processor.post_process_grounded_object_detection.side_effect = [
-        [{"boxes": [box], "scores": [0.8], "text_labels": ["plant"]}],
-        [{"boxes": [], "scores": [], "text_labels": []}],
-    ]
-    data = BytesIO()
-    Image.new("RGB", (100, 100)).save(data, format="PNG")
+    detector = _detector(
+        [{"boxes": [box], "scores": [0.8], "text_labels": ["plant"]}]
+    )
     boxes = detector.ground(
-        VisionImage(data=data.getvalue(), mime_type="image/png"),
+        _png(),
         ["hanging plant", "lamp", "hanging plant"],
     )
+    assert detector._model.call_count == 1
+    assert detector._processor.call_count == 1
+    assert detector._processor.call_args.kwargs["text"] == "hanging plant. lamp."
     assert list(boxes) == ["hanging plant"]
     assert boxes["hanging plant"].score == 0.8
     assert boxes["hanging plant"].x == 0.1
-    assert [call.kwargs["text"] for call in detector._processor.call_args_list] == [
-        "hanging plant.", "lamp."
-    ]
+
+
+def test_highest_score_per_label_and_returned_box_assignment() -> None:
+    weak, strong = MagicMock(), MagicMock()
+    weak.tolist.return_value = [0, 0, 10, 10]
+    strong.tolist.return_value = [20, 20, 60, 60]
+    detector = _detector(
+        [
+            {
+                "boxes": [weak, strong],
+                "scores": [0.5, 0.9],
+                "text_labels": ["plant", "plant"],
+            }
+        ]
+    )
+    boxes = detector.ground(_png(), ["plant", "the plant", "lamp"])
+    # Both original labels that canonicalize to "plant" get the same best box.
+    assert set(boxes) == {"plant", "the plant"}
+    assert boxes["plant"].score == 0.9
+    assert boxes["the plant"] == boxes["plant"]
+    # Unmatched detections (below threshold, absent from results) stay absent.
+    assert "lamp" not in boxes
+
+
+def test_label_cap_limits_the_joined_prompt() -> None:
+    detector = _detector(
+        [{"boxes": [], "scores": [], "text_labels": []}], max_labels=2
+    )
+    detector.ground(_png(), ["one", "two", "three", "four"])
+    assert detector._processor.call_args.kwargs["text"] == "one. two."
+
+
+def test_oversized_images_are_downscaled_before_the_forward_pass() -> None:
+    box = MagicMock()
+    box.tolist.return_value = [512, 0, 1024, 1024]
+    detector = _detector(
+        [{"boxes": [box], "scores": [0.7], "text_labels": ["chair"]}]
+    )
+    boxes = detector.ground(_png(2048, 1024), ["chair"])
+    image = detector._processor.call_args.kwargs["images"]
+    assert max(image.size) == 1024
+    assert image.size == (1024, 512)
+    # Coordinates normalize against the resized dimensions.
+    assert boxes["chair"].x == 0.5
+    assert boxes["chair"].width == 0.5
+    call = detector._processor.post_process_grounded_object_detection.call_args
+    assert call.kwargs["target_sizes"] == [(512, 1024)]
 
 
 def test_grounding_replaces_the_detector_matched_box_and_anchor() -> None:

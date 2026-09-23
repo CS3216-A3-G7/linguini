@@ -109,6 +109,7 @@ class SessionStatus(StrEnum):
 class SessionFailureCode(StrEnum):
     IMAGE_UPLOAD_FAILED = "imageUploadFailed"
     SCENE_ANALYSIS_FAILED = "sceneAnalysisFailed"
+    IMAGE_MODERATION_FAILED = "imageModerationFailed"
     NO_VALID_OBJECTS = "noValidObjects"
     VOCABULARY_MAPPING_FAILED = "vocabularyMappingFailed"
     TASK_GENERATION_FAILED = "taskGenerationFailed"

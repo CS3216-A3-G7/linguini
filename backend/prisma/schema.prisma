@@ -123,6 +123,7 @@ model VocabularyItem {
 enum SessionFailureCode {
   imageUploadFailed
   sceneAnalysisFailed
+  imageModerationFailed
   noValidObjects
   vocabularyMappingFailed
   taskGenerationFailed

@@ -137,7 +137,7 @@ test("loading copy matches the destination segment", () => {
 });
 
 test("failed sessions carry a notice per failure code", () => {
-  for (const code of ["imageUploadFailed", "sceneAnalysisFailed", "noValidObjects", "vocabularyMappingFailed", "taskGenerationFailed"] as const) {
+  for (const code of ["imageUploadFailed", "sceneAnalysisFailed", "imageModerationFailed", "noValidObjects", "vocabularyMappingFailed", "taskGenerationFailed"] as const) {
     const dest = sessionDestination(detail("failed", [], code));
     assert.equal(dest.path, "/practice");
     assert.ok(dest.notice?.length);

@@ -19,6 +19,7 @@ from app.ai.features.object_grounding import ObjectGroundingError
 from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
 from app.ai.registry import (
+    build_image_moderator,
     build_ispy_clue_generator,
     build_learning_task_generator,
     build_object_grounder,
@@ -134,6 +135,8 @@ def get_media_asset_repository(request: Request) -> MediaAssetRepository:
 _IMAGE_DERIVATIVES: ImageDerivatives | None = None
 _OBJECT_GROUNDER_UNINITIALIZED = object()
 _OBJECT_GROUNDER = _OBJECT_GROUNDER_UNINITIALIZED
+_IMAGE_MODERATOR_UNINITIALIZED = object()
+_IMAGE_MODERATOR = _IMAGE_MODERATOR_UNINITIALIZED
 logger = logging.getLogger(__name__)
 
 
@@ -163,6 +166,22 @@ def get_object_grounder(request: Request, settings: AiSettings):
             logger.warning("object grounding is unavailable; using model locations")
             _OBJECT_GROUNDER = None
     return _OBJECT_GROUNDER
+
+
+def get_image_moderator(request: Request, settings: AiSettings):
+    """Load the optional image moderator once; analysis fails open without it."""
+    if hasattr(request.app.state, "image_moderator"):
+        return request.app.state.image_moderator
+    global _IMAGE_MODERATOR
+    if _IMAGE_MODERATOR is _IMAGE_MODERATOR_UNINITIALIZED:
+        try:
+            _IMAGE_MODERATOR = build_image_moderator(settings)
+            if _IMAGE_MODERATOR is not None:
+                logger.info("Image moderation loaded.")
+        except Exception:
+            logger.warning("image moderation is unavailable; uploads skip the check")
+            _IMAGE_MODERATOR = None
+    return _IMAGE_MODERATOR
 
 
 def get_media_asset_service(
@@ -238,6 +257,7 @@ def get_practice_repository(
     scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
     tracer = get_ai_tracer(request)
     object_grounder = get_object_grounder(request, settings)
+    image_moderator = get_image_moderator(request, settings)
     if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
         if not settings.is_configured(scene_config):
             uploaded_analyzer = None
@@ -256,6 +276,7 @@ def get_practice_repository(
                     tracer=tracer,
                     provider=scene_config.provider.value,
                     object_grounder=object_grounder,
+                    image_moderator=image_moderator,
                 )
             else:
                 uploaded_analyzer = UploadedSceneAnalyzer(
@@ -265,6 +286,7 @@ def get_practice_repository(
                     tracer=tracer,
                     provider=scene_config.provider.value,
                     object_grounder=object_grounder,
+                    image_moderator=image_moderator,
                 )
     elif scene_config.provider is AiProvider.NONE:
         uploaded_analyzer = None
