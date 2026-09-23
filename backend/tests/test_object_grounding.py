@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from app.ai.features.object_grounding import GroundedBox
 from app.ai.features.object_grounding.mapping import apply_object_grounding
+from app.ai.features.object_grounding.service import _canonical_label
 from app.schemas.media import AnchorPoint, BoundingBox, SceneObject
 from app.services.scene_analysis import SceneAnalysisResult
 from app.services.vision_model import VisionImage
@@ -34,6 +35,12 @@ def _result() -> SceneAnalysisResult:
             ),
         ],
     )
+
+
+def test_detector_prompt_labels_match_the_scene_analysis_labels() -> None:
+    assert _canonical_label("a pizza") == "pizza"
+    assert _canonical_label("an apple.") == "apple"
+    assert _canonical_label("the basket") == "basket"
 
 
 def test_grounding_replaces_the_detector_matched_box_and_anchor() -> None:

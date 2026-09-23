@@ -82,12 +82,12 @@ class GroundingDinoObjectGrounder:
         except Exception as error:
             raise ObjectGroundingError("Grounding DINO could not process this image") from error
 
-        requested = {label.casefold(): label for label in labels}
+        requested = {_canonical_label(label): label for label in labels}
         best: dict[str, GroundedBox] = {}
         for box, score, detected_label in zip(
             results["boxes"], results["scores"], results["text_labels"], strict=True
         ):
-            label = requested.get(str(detected_label).casefold())
+            label = requested.get(_canonical_label(str(detected_label)))
             if label is None:
                 continue
             left, top, right, bottom = (float(value) for value in box.tolist())
@@ -98,6 +98,15 @@ class GroundingDinoObjectGrounder:
                 continue
             best[label] = normalized
         return best
+
+
+def _canonical_label(label: str) -> str:
+    """Match Grounding DINO's prompt phrase (for example, ``a pizza``)."""
+    normalized = " ".join(label.casefold().strip().rstrip(".").split())
+    for article in ("a ", "an ", "the "):
+        if normalized.startswith(article):
+            return normalized.removeprefix(article)
+    return normalized
 
 
 def _normalize_box(
