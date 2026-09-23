@@ -10,7 +10,7 @@ from app.services.session_plan import (
     build_ispy_clue_tasks,
     build_ispy_description_tasks,
 )
-from tests.test_openai_learning_tasks import tasks
+from tests.test_learning_task_service import tasks
 
 
 def test_generated_lessons_become_private_grammar_lesson_tasks():

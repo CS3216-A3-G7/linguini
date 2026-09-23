@@ -6,6 +6,22 @@ from uuid import UUID
 
 from fastapi import Depends, Request
 
+from app.ai import (
+    AiFeature,
+    AiProvider,
+    AiSettings,
+    AITracer,
+    NoOpAITracer,
+    load_ai_settings,
+)
+from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
+from app.ai.instrumentation import TracedISpyGuessGenerator
+from app.ai.registry import (
+    build_ispy_clue_generator,
+    build_learning_task_generator,
+    build_scene_translator,
+)
+from app.ai.vision_gemini import GeminiVisionClient
 from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
@@ -26,25 +42,20 @@ from app.repositories.postgres.vocabulary import PostgresVocabularyRepository
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
 from app.repositories.scenes import SceneRepository
 from app.repositories.users import UserRepository
-from app.services.gemini_learning_tasks import GeminiLearningTaskGenerator
-from app.services.gemini_scene_analysis import GeminiSceneAnalyzer, RoutedSceneAnalyzer
-from app.services.gemini_translation import GeminiSceneTranslator
 from app.services.image_derivatives import ImageDerivatives
 from app.services.image_storage import ImageStorage
 from app.services.journals import JournalService
 from app.services.language_profiles import LanguageProfileService
 from app.services.learning import LearningService
 from app.services.media_assets import MediaAssetService
-from app.services.openai_ispy_clues import OpenAIISpyClueGenerator
 from app.services.openai_ispy_guess import OpenAIISpyGuessGenerator
-from app.services.openai_learning_tasks import OpenAILearningTaskGenerator
-from app.services.openai_scene_analysis import OpenAISceneAnalyzer
-from app.services.openai_translation import OpenAISceneTranslator
 from app.services.practice import PracticeService
 from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.scenes import SceneService
 from app.services.tasks import TaskService
 from app.services.users import UserService
+from app.services.vision_model import VisionModelConfig
+from app.services.vision_openai import OpenAIVisionClient
 
 
 def get_user_repository(request: Request) -> UserRepository:
@@ -153,21 +164,38 @@ def get_scene_service(
     return SceneService(repository, get_media_public_base_url(), get_private_media_urls())
 
 
-def get_ispy_guess_generator():
+def get_ai_settings(request: Request) -> AiSettings:
+    """AI settings loaded at app startup; falls back to loading on demand."""
+    settings = getattr(request.app.state, "ai_settings", None)
+    if settings is None:
+        settings = load_ai_settings()
+    return settings
+
+
+def get_ai_tracer(request: Request) -> AITracer:
+    """Tracer built in the app lifespan; falls back to a no-op."""
+    return getattr(request.app.state, "ai_tracer", None) or NoOpAITracer()
+
+
+def get_ispy_guess_generator(settings: AiSettings, tracer: AITracer | None = None):
     """Build the target-blind I-Spy evaluator used by task generation and attempts."""
-    provider = os.getenv("ISPY_GUESS_PROVIDER", "openai").strip().casefold()
-    if provider == "none":
+    config = settings.feature(AiFeature.ISPY_GUESS)
+    if config.provider is AiProvider.NONE:
         return None
-    if provider != "openai":
-        raise ValueError(f"Unsupported ISPY_GUESS_PROVIDER: {provider}")
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    model = os.getenv("OPENAI_ISPY_GUESS_MODEL", "gpt-4o-mini").strip()
-    if not api_key or not model:
+    if config.provider is not AiProvider.OPENAI:
+        raise ValueError(f"Unsupported ISPY_GUESS_PROVIDER: {config.provider}")
+    if not settings.is_configured(config):
         return None
-    return OpenAIISpyGuessGenerator(
-        api_key,
-        model,
-        timeout_seconds=int(os.getenv("ISPY_GUESS_TIMEOUT_SECONDS", "60")),
+    return TracedISpyGuessGenerator(
+        OpenAIISpyGuessGenerator(
+            settings.openai_api_key,
+            config.model_name,
+            timeout_seconds=config.timeout_seconds,
+        ),
+        tracer or NoOpAITracer(),
+        provider=config.provider.value,
+        model=config.model_name,
+        max_retries=config.max_retries,
     )
 
 
@@ -175,117 +203,56 @@ def get_practice_repository(
     request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
 ) -> PostgresWorkflowRepository:
     engine = request.app.state.database_engine
+    settings = get_ai_settings(request)
     deterministic = DeterministicSceneAnalyzer(engine)
-    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-    scene_provider = os.getenv("SCENE_ANALYSIS_PROVIDER", "gemini").strip().casefold()
-    scene_timeout = int(os.getenv("SCENE_ANALYSIS_TIMEOUT_SECONDS", "120").strip())
-    translation_provider = os.getenv("TRANSLATION_PROVIDER", "gemini").strip().casefold()
+    openai_key = settings.openai_api_key
+    gemini_key = settings.gemini_api_key
     analyzer = deterministic
     storage = ImageStorage(
         os.getenv("SUPABASE_URL", "").strip(),
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
     )
-    if scene_provider == "openai":
-        openai_scene_model = os.getenv("OPENAI_SCENE_MODEL", "gpt-4o").strip()
-        uploaded_analyzer = (
-            OpenAISceneAnalyzer(
-                storage,
-                openai_key,
-                openai_scene_model,
-                timeout_seconds=scene_timeout,
+
+    scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
+    tracer = get_ai_tracer(request)
+    if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
+        if not settings.is_configured(scene_config):
+            uploaded_analyzer = None
+        else:
+            vision_config = VisionModelConfig(
+                model_name=scene_config.model_name,
+                timeout_seconds=scene_config.timeout_seconds,
+                max_output_tokens=scene_config.max_output_tokens or 1500,
+                max_retries=min(scene_config.max_retries, 1),
             )
-            if openai_key and openai_scene_model
-            else None
-        )
-    elif scene_provider == "gemini":
-        gemini_model = os.getenv("GEMINI_SCENE_MODEL", "").strip()
-        uploaded_analyzer = (
-            GeminiSceneAnalyzer(
-                storage,
-                gemini_key,
-                gemini_model,
-                timeout_seconds=scene_timeout,
-            )
-            if gemini_key and gemini_model
-            else None
-        )
+            if scene_config.provider is AiProvider.OPENAI:
+                uploaded_analyzer = UploadedSceneAnalyzer(
+                    storage,
+                    OpenAIVisionClient(openai_key, vision_config),
+                    vision_config,
+                    tracer=tracer,
+                    provider=scene_config.provider.value,
+                )
+            else:
+                uploaded_analyzer = UploadedSceneAnalyzer(
+                    storage,
+                    GeminiVisionClient(gemini_key, vision_config),
+                    vision_config,
+                    tracer=tracer,
+                    provider=scene_config.provider.value,
+                )
+    elif scene_config.provider is AiProvider.NONE:
+        uploaded_analyzer = None
     else:
-        raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_provider}")
+        raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_config.provider}")
     if uploaded_analyzer:
         analyzer = RoutedSceneAnalyzer(deterministic, uploaded_analyzer)
 
-    translation_timeout = int(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "60"))
-    if translation_provider == "openai":
-        openai_model = os.getenv("OPENAI_TRANSLATION_MODEL", "gpt-4o-mini").strip()
-        translator = (
-            OpenAISceneTranslator(
-                openai_key,
-                openai_model,
-                timeout_seconds=translation_timeout,
-            )
-            if openai_key and openai_model
-            else None
-        )
-    elif translation_provider == "gemini":
-        translation_model = os.getenv(
-            "GEMINI_TRANSLATION_MODEL", "gemini-3.5-flash-lite"
-        ).strip()
-        translator = (
-            GeminiSceneTranslator(
-                gemini_key,
-                translation_model,
-                timeout_seconds=translation_timeout,
-            )
-            if gemini_key and translation_model
-            else None
-        )
-    else:
-        raise ValueError(f"Unsupported TRANSLATION_PROVIDER: {translation_provider}")
+    translator = build_scene_translator(settings, tracer)
 
-    learning_task_provider = os.getenv("LEARNING_TASK_PROVIDER", "openai").strip().casefold()
-    learning_task_timeout = int(os.getenv("LEARNING_TASK_TIMEOUT_SECONDS", "60"))
-    if learning_task_provider == "openai":
-        openai_learning_model = os.getenv("OPENAI_LEARNING_TASK_MODEL", "gpt-4o-mini").strip()
-        learning_task_generator = (
-            OpenAILearningTaskGenerator(
-                openai_key,
-                openai_learning_model,
-                timeout_seconds=learning_task_timeout,
-            )
-            if openai_key and openai_learning_model
-            else None
-        )
-    elif learning_task_provider == "gemini":
-        gemini_learning_model = os.getenv(
-            "GEMINI_LEARNING_TASK_MODEL", "gemini-3.5-flash-lite"
-        ).strip()
-        learning_task_generator = (
-            GeminiLearningTaskGenerator(
-                gemini_key,
-                gemini_learning_model,
-                timeout_seconds=learning_task_timeout,
-            )
-            if gemini_key and gemini_learning_model
-            else None
-        )
-    else:
-        raise ValueError(f"Unsupported LEARNING_TASK_PROVIDER: {learning_task_provider}")
-    ispy_clue_provider = os.getenv("ISPY_CLUE_PROVIDER", "openai").strip().casefold()
-    ispy_clue_timeout = int(os.getenv("ISPY_CLUE_TIMEOUT_SECONDS", "60"))
-    if ispy_clue_provider == "openai":
-        ispy_clue_model = os.getenv("OPENAI_ISPY_CLUE_MODEL", "gpt-4o-mini").strip()
-        ispy_clue_generator = (
-            OpenAIISpyClueGenerator(
-                openai_key, ispy_clue_model, timeout_seconds=ispy_clue_timeout
-            )
-            if openai_key and ispy_clue_model
-            else None
-        )
-    elif ispy_clue_provider == "none":
-        ispy_clue_generator = None
-    else:
-        raise ValueError(f"Unsupported ISPY_CLUE_PROVIDER: {ispy_clue_provider}")
+    learning_task_generator = build_learning_task_generator(settings, tracer)
+
+    ispy_clue_generator = build_ispy_clue_generator(settings, tracer)
     return PostgresWorkflowRepository(
         engine,
         demo_user_id,
@@ -293,7 +260,9 @@ def get_practice_repository(
         translator=translator,
         learning_task_generator=learning_task_generator,
         ispy_clue_generator=ispy_clue_generator,
-        ispy_guess_generator=get_ispy_guess_generator(),
+        ispy_guess_generator=get_ispy_guess_generator(
+            settings, get_ai_tracer(request)
+        ),
         background=getattr(request.app.state, "background_runner", None),
     )
 
@@ -313,7 +282,9 @@ def get_task_service(
         PostgresTaskRepository(request.app.state.database_engine),
         users,
         request.app.state.database_engine,
-        ispy_guess_generator=get_ispy_guess_generator(),
+        ispy_guess_generator=get_ispy_guess_generator(
+            get_ai_settings(request), get_ai_tracer(request)
+        ),
     )
 
 

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.ai.features.learning_tasks import LearningTaskGenerationError
 from app.repositories.journals import JournalStorageError
 from app.repositories.language_profiles import (
     LanguageProfileConflictError,
@@ -30,7 +31,6 @@ from app.services.journals import (
 )
 from app.services.language_profiles import NoActiveLanguageError
 from app.services.learning import InvalidCursorError, ProgressNotFoundError
-from app.services.learning_tasks import LearningTaskGenerationError
 from app.services.media_assets import MediaAssetNotFoundError
 from app.services.media_urls import MediaUrlError
 from app.services.scene_analysis import SceneAnalysisError
