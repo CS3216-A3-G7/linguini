@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai import build_tracer, load_ai_settings
+from app.ai.features.object_grounding import ObjectGroundingError
+from app.ai.registry import build_object_grounder
 from app.api.learning_errors import register_learning_errors
 from app.api.router import api_router
 from app.config import get_allowed_origins
@@ -22,6 +24,16 @@ async def lifespan(app: FastAPI):
     app.state.database_engine = engine
     app.state.background_runner = ThreadPoolBackgroundRunner()
     app.state.ai_tracer = build_tracer(app.state.ai_settings)
+    try:
+        app.state.object_grounder = build_object_grounder(app.state.ai_settings)
+        if app.state.object_grounder is not None:
+            logger.info("Grounding DINO object detector loaded.")
+    except ObjectGroundingError:
+        app.state.object_grounder = None
+        logger.warning(
+            "Grounding DINO is unavailable; using vision-model marker locations.",
+            exc_info=True,
+        )
     try:
         yield
     finally:

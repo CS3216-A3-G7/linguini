@@ -149,8 +149,10 @@ def get_image_derivatives() -> ImageDerivatives:
     return _IMAGE_DERIVATIVES
 
 
-def get_object_grounder(settings: AiSettings):
+def get_object_grounder(request: Request, settings: AiSettings):
     """Load the optional local detector once; preserve analysis if it is unavailable."""
+    if hasattr(request.app.state, "object_grounder"):
+        return request.app.state.object_grounder
     global _OBJECT_GROUNDER
     if _OBJECT_GROUNDER is _OBJECT_GROUNDER_UNINITIALIZED:
         try:
@@ -235,7 +237,7 @@ def get_practice_repository(
 
     scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
     tracer = get_ai_tracer(request)
-    object_grounder = get_object_grounder(settings)
+    object_grounder = get_object_grounder(request, settings)
     if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
         if not settings.is_configured(scene_config):
             uploaded_analyzer = None
