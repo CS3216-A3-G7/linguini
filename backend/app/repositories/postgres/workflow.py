@@ -1142,7 +1142,7 @@ class PostgresWorkflowRepository:
         record_vocabulary_evidence(
             c,
             user_id=self.user_id,
-            vocabulary_item_id=vocabulary_item_id,
+            vocabulary_item_id=resolved_vocabulary_item_id,
             encounter=event,
         )
 
