@@ -10,7 +10,10 @@ import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
 import { useScenesQuery, useVocabularyQuery } from "../state/queries";
 
-const statusLabels: { id: VocabStatus; label: string }[] = [
+type VocabularyStatusFilter = VocabStatus | "all";
+
+const statusLabels: { id: VocabularyStatusFilter; label: string }[] = [
+  { id: "all", label: "All" },
   { id: "new", label: "New" },
   { id: "learning", label: "Learning" },
   { id: "mastered", label: "Mastered" },
@@ -22,7 +25,7 @@ export function Vocabulary() {
   const { scenes, scenesLoading, scenesError } = useScenesQuery();
   const wordClasses: (WordClass | "all")[] = ["all", ...new Set(vocabulary.map(item => item.wordClass))];
   const [view, setView] = useState<"scenes" | "list">("scenes");
-  const [status, setStatus] = useState<VocabStatus>("learning");
+  const [status, setStatus] = useState<VocabularyStatusFilter>("all");
   const [wordClass, setWordClass] = useState<WordClass | "all">("all");
   const [category, setCategory] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
@@ -42,7 +45,7 @@ export function Vocabulary() {
 
   const rows = vocabulary.filter(
     (item) =>
-      item.status === status &&
+      (status === "all" || item.status === status) &&
       (wordClass === "all" || item.wordClass === wordClass) &&
       (category === "all" || vocabularyCategories(item, scenes).includes(category)),
   );
