@@ -23,6 +23,7 @@ def test_openai_scene_analysis_sends_image_and_uses_shared_contract(tmp_path: Pa
                     "label": "cup",
                     "confidence": 0.95,
                     "boundingBox": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2},
+                    "anchorPoint": {"x": 0.2, "y": 0.2},
                     "attributes": [{"type": "color", "value": "red"}],
                 },
                 {
@@ -30,6 +31,7 @@ def test_openai_scene_analysis_sends_image_and_uses_shared_contract(tmp_path: Pa
                     "label": "table",
                     "confidence": 0.9,
                     "boundingBox": {"x": 0.05, "y": 0.4, "width": 0.8, "height": 0.5},
+                    "anchorPoint": {"x": 0.45, "y": 0.65},
                     "attributes": [],
                 },
             ],

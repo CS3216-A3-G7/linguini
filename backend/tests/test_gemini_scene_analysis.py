@@ -52,9 +52,11 @@ def test_gemini_analyzer_sends_image_and_converts_validated_result(tmp_path):
       "objects":[
         {"key":"object_1","label":"cup","confidence":0.95,
          "boundingBox":{"x":0.1,"y":0.1,"width":0.2,"height":0.2},
+         "anchorPoint":{"x":0.2,"y":0.2},
          "attributes":{"color":"red"}},
         {"key":"object_2","label":"table","confidence":0.9,
          "boundingBox":{"x":0.05,"y":0.4,"width":0.8,"height":0.5},
+         "anchorPoint":{"x":0.45,"y":0.65},
          "attributes":{"material":"wood"}}
       ],
       "relations":[{"key":"relation_1","relationType":"on",
@@ -66,12 +68,15 @@ def test_gemini_analyzer_sends_image_and_converts_validated_result(tmp_path):
     result = provider.analyze(session, asset, {}, None)
 
     assert [item.label for item in result.objects] == ["cup", "table"]
+    assert result.objects[0].anchor_point.model_dump(mode="json") == {"x": "0.2", "y": "0.2"}
     assert result.objects[0].attributes == {"color": "red"}
     assert result.relations[0].relation == "on"
     storage.download.assert_called_once_with(asset.storage_key)
     request = client.models.generate_content.call_args.kwargs
     assert request["model"] == "test-model"
     assert request["config"].response_mime_type == "application/json"
+    object_schema = request["config"].response_json_schema["$defs"]["ModelSceneObject"]
+    assert "anchorPoint" in object_schema["required"]
 
 
 def test_low_confidence_objects_and_their_relations_are_removed(tmp_path):
@@ -79,9 +84,9 @@ def test_low_confidence_objects_and_their_relations_are_removed(tmp_path):
       "title":"Desk", "summary":"A cup may be near a table.",
       "objects":[
         {"key":"cup","label":"cup","confidence":0.69,
-         "boundingBox":{"x":0.1,"y":0.1,"width":0.2,"height":0.2},"attributes":{}},
+         "boundingBox":{"x":0.1,"y":0.1,"width":0.2,"height":0.2},"anchorPoint":{"x":0.2,"y":0.2},"attributes":{}},
         {"key":"table","label":"table","confidence":0.9,
-         "boundingBox":{"x":0.1,"y":0.4,"width":0.8,"height":0.5},"attributes":{}}
+         "boundingBox":{"x":0.1,"y":0.4,"width":0.8,"height":0.5},"anchorPoint":{"x":0.5,"y":0.6},"attributes":{}}
       ],
       "relations":[{"key":"near","relationType":"near","sourceObjectKey":"cup",
         "targetObjectKey":"table","confidence":0.9}]

@@ -18,6 +18,7 @@ You are a vision-to-JSON extractor for a vocabulary-learning app. Users photogra
 - Avoid duplicate labels unless the image clearly contains distinct instances worth distinguishing individually.
 - Give each object a unique temporary key: "object_1", "object_2", etc.
 - Give each object an approximate normalized bounding box, using the image's top-left as (0,0) and bottom-right as (1,1), with all coordinates between 0 and 1. For every box, x + width ≤ 1 and y + height ≤ 1.
+- Give each object an `anchorPoint` with normalized x and y coordinates between 0 and 1. This is where the numbered marker will appear. Choose a point on the visible object, as close as possible to its visual centre. For wide, curved, irregular, or partially hidden objects, choose the most representative visible point inside the object instead.
 - Give each object a `confidence` between 0.0 and 1.0, reflecting how visually certain the detection is — lower it for objects that are blurry, partially occluded, small, or ambiguous rather than omitting them.
 
 ## Attribute Rules

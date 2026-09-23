@@ -33,7 +33,7 @@ class ModelSceneObject(ApiModel):
     )
     label: NonEmptyText
     bounding_box: ModelBoundingBox
-    anchor_point: ModelAnchorPoint | None = None
+    anchor_point: ModelAnchorPoint
     attributes: list[NonEmptyText] | dict[NonEmptyText, NonEmptyText] = []
     confidence_score: Annotated[
         float,

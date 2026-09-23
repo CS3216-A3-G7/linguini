@@ -35,6 +35,7 @@ VALID_OUTPUT = json.dumps(
                 "objectKey": "object_1",
                 "label": "chair",
                 "boundingBox": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2},
+                "anchorPoint": {"x": 0.2, "y": 0.2},
                 "attributes": ["wooden"],
                 "confidenceScore": 0.9,
             },
@@ -42,6 +43,7 @@ VALID_OUTPUT = json.dumps(
                 "objectKey": "object_2",
                 "label": "table",
                 "boundingBox": {"x": 0.4, "y": 0.1, "width": 0.2, "height": 0.2},
+                "anchorPoint": {"x": 0.5, "y": 0.2},
                 "attributes": [],
                 "confidenceScore": 0.8,
             },
@@ -221,6 +223,7 @@ def test_semantically_invalid_output_retries_once_then_fails() -> None:
                         "width": 0.2,
                         "height": 0.2,
                     },
+                    "anchorPoint": {"x": 0.2, "y": 0.2},
                     "attributes": [],
                     "confidenceScore": 0.9,
                 }
