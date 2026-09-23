@@ -1,15 +1,15 @@
 # ruff: noqa: E501 — prompt text is user-approved and must stay verbatim.
 """Versioned prompt for grammar learning-task generation.
 
-``learning-tasks.v1`` asks a text model for structured grammar exercises over
+``learning-tasks.v2`` asks a text model for structured grammar exercises over
 the translated scene vocabulary. The response model is dynamic — built per
 payload by ``scene_generation_response_model`` so generated references can
 only use supplied scene keys — with ``LEARNING_TASK_SCHEMA_VERSION`` as the
 contract version. Both providers use this exact prompt.
 """
 
-LEARNING_TASK_PROMPT_VERSION = "learning-tasks.v1"
-LEARNING_TASK_SCHEMA_VERSION = "learning-tasks-result.v1"
+LEARNING_TASK_PROMPT_VERSION = "learning-tasks.v2"
+LEARNING_TASK_SCHEMA_VERSION = "learning-tasks-result.v2"
 
 _GENERATION_FORMAT_INSTRUCTION = (
     "\nReturn an object with one required field for each requiredTaskFocuses entry, "

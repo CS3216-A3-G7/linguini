@@ -190,14 +190,26 @@ def tasks_with_chained_description():
 def response_body(result: LearningTaskResult) -> str:
     """Encode a result the way the dynamic response model expects it."""
     return json.dumps(
-        {task.focus: task.model_dump(by_alias=True) for task in result.tasks}
+        {
+            task.focus: {
+                key: value
+                for key, value in task.model_dump(by_alias=True).items()
+                if key != "focus"
+            }
+            for task in result.tasks
+        }
     )
 
 
 def raw_response(payload: dict) -> str:
     """Encode a raw ``{"tasks": [...]}`` fixture without validating it,
     so deliberately malformed output can reach the service's validator."""
-    return json.dumps({task["focus"]: task for task in payload["tasks"]})
+    return json.dumps(
+        {
+            task["focus"]: {key: value for key, value in task.items() if key != "focus"}
+            for task in payload["tasks"]
+        }
+    )
 
 
 def config(**overrides) -> TextModelConfig:
@@ -305,7 +317,7 @@ def test_generation_uses_the_versioned_dynamic_contract() -> None:
     sent = client.requests[0]
     assert sent.prompt_version == LEARNING_TASK_PROMPT_VERSION
     assert sent.system_prompt == LEARNING_TASK_SYSTEM_PROMPT
-    assert sent.json_schema_name == "learning_tasks_v1"
+    assert sent.json_schema_name == "learning_tasks_v2"
     assert sent.json_schema == build_strict_json_schema(
         scene_generation_response_model(INPUT)
     )
@@ -537,6 +549,17 @@ def test_rejects_missing_focus_and_short_questions() -> None:
     client = FakeTextClient([raw_response(short)])
     with pytest.raises(LearningTaskGenerationError):
         service(client, cfg=config(max_retries=0)).generate(INPUT)
+
+
+def test_provider_schema_requires_titles_but_not_model_written_focuses() -> None:
+    request_client = FakeTextClient([response_body(LearningTaskResult.model_validate(tasks()))])
+    service(request_client).generate(INPUT)
+
+    task_schema = request_client.requests[0].json_schema["properties"]
+    gender_task = task_schema["genderNumberAgreement"]
+    assert "title" in gender_task["properties"]
+    assert "title" in gender_task["required"]
+    assert "focus" not in gender_task["properties"]
 
 
 def test_multiple_choice_ignores_misplaced_sentence_builder_fields() -> None:

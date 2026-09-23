@@ -107,7 +107,9 @@ _STRIPPED_KEYWORDS = frozenset(
 )
 
 
-def _strictify(node: Any, defs: dict[str, Any]) -> Any:
+def _strictify(
+    node: Any, defs: dict[str, Any], *, property_map: bool = False
+) -> Any:
     """Recursively inline $refs and enforce strict-mode constraints in place."""
     if isinstance(node, list):
         return [_strictify(item, defs) for item in node]
@@ -122,9 +124,9 @@ def _strictify(node: Any, defs: dict[str, Any]) -> Any:
         return _strictify(target, defs)
 
     schema = {
-        key: _strictify(value, defs)
+        key: _strictify(value, defs, property_map=key == "properties")
         for key, value in node.items()
-        if key not in _STRIPPED_KEYWORDS
+        if property_map or key not in _STRIPPED_KEYWORDS
     }
     if schema.get("type") == "object" and "properties" in schema:
         schema["additionalProperties"] = False

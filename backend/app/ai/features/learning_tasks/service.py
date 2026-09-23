@@ -67,7 +67,7 @@ class LearningTaskService:
         request = TextModelRequest(
             system_prompt=LEARNING_TASK_SYSTEM_PROMPT,
             user_content=content,
-            json_schema_name="learning_tasks_v1",
+            json_schema_name="learning_tasks_v2",
             # Per-payload: key enums are built from this scene's keys.
             json_schema=build_strict_json_schema(response_model),
             prompt_version=LEARNING_TASK_PROMPT_VERSION,

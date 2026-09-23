@@ -382,7 +382,15 @@ def _load_feature(
             model_name=_parse_model(env, feature, stem, provider),
             timeout_seconds=_parse_timeout(env, feature, stem),
             max_output_tokens=max_output_tokens,
-            max_retries=0 if max_retries is None else max_retries,
+            # Generated lessons are large structured responses. One repair
+            # attempt avoids presenting a generic lesson when a provider
+            # misses a non-schema length constraint; an explicit 0 still
+            # disables retries for deployments that need that behaviour.
+            max_retries=(
+                1
+                if max_retries is None and feature is AiFeature.LEARNING_TASK
+                else 0 if max_retries is None else max_retries
+            ),
         )
     except ValueError as exc:
         raise AiConfigurationError(

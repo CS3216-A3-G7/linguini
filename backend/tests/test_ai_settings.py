@@ -188,6 +188,7 @@ def test_empty_env_reproduces_legacy_defaults():
     assert learning.provider is AiProvider.OPENAI
     assert learning.model_name == "gpt-4o-mini"
     assert learning.timeout_seconds == 60
+    assert learning.max_retries == 1
 
     for config in (settings.ispy_clue, settings.ispy_guess):
         assert config.provider is AiProvider.OPENAI
