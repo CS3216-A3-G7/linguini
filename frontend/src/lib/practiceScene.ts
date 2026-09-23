@@ -1,4 +1,5 @@
-import type { Scene } from "../data/types";
+import { GENDER_ARTICLES } from "../data/types";
+import type { Gender, Scene } from "../data/types";
 import type { PracticeDetail } from "./api";
 
 /** Join accepted objects to catalog vocabulary by ID; labels are only a fallback. */
@@ -17,7 +18,7 @@ export function practiceScene(detail: PracticeDetail, imageUrl: string, language
         const anchorY = object.anchorPoint ? Number(object.anchorPoint.y) : Number(object.boundingBox?.y ?? 0.5) + height / 2;
         return { id: object.id, word: word?.displayText ?? object.label,
           translation: translation?.translatedText ?? object.label, wordClass: word?.partOfSpeech ?? "noun",
-          gender: word?.gender === "la" || word?.gender === "el" ? word.gender : null,
+          gender: word?.gender != null && GENDER_ARTICLES.has(word.gender) ? word.gender as Gender : null,
           marker: i + 1,
           x: anchorX * 100,
           y: anchorY * 100,

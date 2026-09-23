@@ -14,7 +14,7 @@ class DemoSceneItem(ApiModel):
     word: NonEmptyText
     translation: NonEmptyText
     word_class: PartOfSpeech
-    gender: Literal["la", "el"] | None
+    gender: Literal["la", "el", "le", "l'"] | None
     marker: Annotated[int, Field(ge=1)]
     x: Annotated[float, Field(ge=0, le=100)]
     y: Annotated[float, Field(ge=0, le=100)]

@@ -175,6 +175,43 @@ create metadata only; they do not upload files. This configuration serves public
 preloaded images; use the private mode above for private buckets.
 See [Supabase public URLs](https://supabase.com/docs/reference/javascript/file-buckets-getpublicurl).
 
+#### Precomputing scene vocabulary
+
+`python -m app.scripts.precompute_preloaded_scenes` (run from `backend/`)
+analyses the six bundled scene images once per image with the configured
+scene-analysis provider, translates the detected objects into French and
+Spanish, and stores the assembled suggested words in
+`preloaded_scenes.content.items` so the Scene Analysis review screen opens
+with words already on the photo. Tasks are **not** precomputed — the runtime
+workflow still generates real tasks, rounds and prompts; the script only
+writes minimal placeholders for them.
+
+```sh
+python -m app.scripts.precompute_preloaded_scenes --dry-run --json out.json
+python -m app.scripts.precompute_preloaded_scenes --slug calle-mayor --language fr
+python -m app.scripts.precompute_preloaded_scenes --emit-migration migration.sql
+python -m app.scripts.precompute_preloaded_scenes --from-json out.json --emit-migration migration.sql
+```
+
+`--slug` and `--language` are repeatable and default to all six base scenes
+and both languages (`fr`, `es`). `--dry-run` computes and validates rows
+without writing to the database. `--json` dumps the computed rows and media
+assets for reuse; `--from-json` reloads that file (re-validating every row)
+instead of calling any AI provider, so SQL regeneration or the database write
+never re-bills the model. `--emit-migration` writes an idempotent
+`INSERT ... ON CONFLICT (slug) DO UPDATE` migration; the generated French rows
+reuse the existing `media_assets` rows, so no asset inserts are emitted.
+Environment values are read from `backend/.env.local` (or `--env-file PATH`).
+
+Required environment: `DATABASE_URL`, `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `MEDIA_STORAGE_BUCKET`, plus the AI
+configuration. Canonical key names are `AI_OPENAI_API_KEY` and
+`AI_GEMINI_API_KEY`; plain `OPENAI_API_KEY`/`GEMINI_API_KEY` are accepted as
+fallbacks. Provider and model selection use `AI_SCENE_ANALYSIS_PROVIDER` /
+`AI_SCENE_ANALYSIS_MODEL` and `AI_SCENE_TRANSLATION_PROVIDER` /
+`AI_SCENE_TRANSLATION_MODEL`. Keep keys only in `backend/.env.local`; never
+commit them.
+
 | Data | Runtime storage |
 | --- | --- |
 | Users and language profiles | `users`, `language_profiles` |
