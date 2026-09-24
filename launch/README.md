@@ -4,16 +4,17 @@
 
 | Material | Use |
 | --- | --- |
+| [Narrated launch film and team review page](video/review.html) | Primary 30-second video for team review; includes the MP4, poster, transcript and gallery in one place. Serve the worktree locally as described in the [video guide](video/README.md). |
 | [Product Hunt submission and channel copy](product-hunt.md) | Paste-ready preview listing, first maker comment, full-release draft, social posts, outreach and reply bank. |
 | [Launch dashboard](plan.md) | Timeline, owner board, go/no-go criteria, launch-day response and retention measures. |
-| [Media kit](media/README.md) | Product Hunt gallery, icon, social square, illustrative teaser and editable source. |
+| [Media kit](media/README.md) | Product Hunt gallery, icon, social square, narrated film and editable sources. |
 
 ## Team decision checklist
 
 - [ ] Agree on the launch promise: curated interactive preview now, or a full learner-app release after production verification.
 - [ ] Redeploy the landing-site CTA fix and confirm that signup, login and every plan link opens the intended production route. The deployed page currently points those links to `localhost`.
 - [ ] Reconcile landing claims about automatic photo analysis, speech feedback, pricing and Plus trials with working production behavior. The backend currently describes placeholder analysis and no speech grading.
-- [ ] Confirm photo rights, inspect every media export, and record a genuine product walkthrough for any listing that claims the app flow is live. The supplied MP4 is an **illustrative teaser**, not a screen recording.
+- [ ] Confirm photo rights and inspect every media export. Review the [30-second narrated film](video/review.html) with sound and captions on desktop and phone. It depicts the **curated landing demo** through animation and one captured demo screen; it does not show a personal-photo workflow. Record a genuine product walkthrough before any listing that claims that flow is live.
 - [ ] Have the team review the Product Hunt preview, gallery order, first comment and outreach text. Name a human owner for support, incidents and launch replies.
 - [ ] Run the beta and go/no-go checklist in [plan.md](plan.md), then schedule the listing. Replace `[PH_POST_URL]` after Product Hunt creates the post.
 
