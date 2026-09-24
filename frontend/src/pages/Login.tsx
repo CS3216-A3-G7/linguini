@@ -56,8 +56,12 @@ export function Login() {
         setError(authenticationMessage(response.error.message));
         return;
       }
-      if (mode === "signup" && !response.data.session) {
-        setMessage("Check your email to confirm your account, then sign in here.");
+      if (mode === "signup") {
+        if (response.data.session) {
+          navigate("/onboarding", { replace: true, state: { from: requestedPath } });
+          return;
+        }
+        setMessage("Check your email to confirm your account. When you sign in, we’ll take you straight to setup.");
       }
     } catch {
       setError("We couldn't connect right now. Please check your connection and try again.");
