@@ -2,9 +2,11 @@ import { useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
 import { ChevronRightIcon } from "../components/icons";
 import { useAppState } from "../state/useAppState";
+import { useAuth } from "../state/Auth";
 
 export function Profile() {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const { learner, user, activeProfile, progress, progressLoading, progressError, profileError, profileSaving, setLanguage, saveLanguageProfile, saveUser } = useAppState();
 
   return (
@@ -92,7 +94,7 @@ export function Profile() {
         </p>
       </aside>
 
-      <Button block className="profile-logout" onClick={() => window.location.assign("/")}>
+      <Button block className="profile-logout" onClick={() => void signOut()}>
         Log Out
       </Button>
     </div>
