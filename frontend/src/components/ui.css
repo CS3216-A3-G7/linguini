@@ -3690,7 +3690,7 @@ p[role="alert"]::before { content: "!"; }
   flex: 0 0 112px;
   place-items: center;
   overflow: hidden;
-  background: #fff;
+  background: var(--teal-dark);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
 }
