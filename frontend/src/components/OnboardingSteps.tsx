@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Card, ProgressTrail, TopBar } from "./ui";
-import { CameraIcon, CheckIcon, MicIcon } from "./icons";
+import { CameraIcon, CheckIcon } from "./icons";
 import { languages } from "../config/languages";
 import type { OnboardingDraft } from "../lib/onboardingDraft";
 
@@ -14,7 +14,7 @@ export function OnboardingSteps({ initial, saving = false, error, onComplete }: 
   const [language, setLanguage] = useState(languages.find(option => option.code === initial.languageCode) ?? languages[0]);
   const [goal, setGoal] = useState(initial.goal || goals[0]);
   const [minutes, setMinutes] = useState(initial.minutes || 10);
-  const [microphoneEnabled, setMicrophoneEnabled] = useState(initial.microphoneEnabled);
+  const [microphoneEnabled] = useState(initial.microphoneEnabled);
   const [cameraEnabled, setCameraEnabled] = useState(initial.cameraEnabled);
   const [avatar, setAvatar] = useState(initial.avatar);
   const steps = ["Your profile", "Choose a language", "Set your goal", "Permissions"];
