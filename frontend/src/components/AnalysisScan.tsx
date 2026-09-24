@@ -8,7 +8,6 @@ export function AnalysisScan({ scene }: { scene: Scene }) {
       <ScenePhoto scene={scene} items={[]} />
       <span className="analysis-scan__wash" />
       <span className="analysis-scan__noodle" />
-      <span className="analysis-scan__tag">Looking for words...</span>
     </div>
   );
 }
