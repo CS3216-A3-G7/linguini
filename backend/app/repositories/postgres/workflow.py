@@ -827,19 +827,36 @@ class PostgresWorkflowRepository:
             existing = {obj.id: obj for obj in detail.scene_objects}
             if any(object_id not in existing for object_id in request.accepted_object_ids):
                 raise PracticeConflictError("An object does not belong to this session.")
+            if any(item.id not in existing for item in request.repositioned_objects):
+                raise PracticeConflictError("A marker does not belong to this session.")
+            if request.scene_title is not None:
+                c.execute(
+                    update(sessions)
+                    .where(sessions.c.id == session_id)
+                    .values(session_title=request.scene_title)
+                )
+                session = session.model_copy(update={"session_title": request.scene_title})
             profile = (
                 c.execute(select(language_profiles).where(language_profiles.c.id == profile_id))
                 .mappings()
                 .one()
             )
+            positions = {item.id: item.anchor_point for item in request.repositioned_objects}
             for object_id in request.accepted_object_ids:
                 obj = existing[object_id].model_copy(
-                    update={"attributes": request.object_attributes.get(object_id) or None}
+                    update={
+                        "attributes": request.object_attributes.get(object_id) or None,
+                        "anchor_point": positions.get(object_id, existing[object_id].anchor_point),
+                    }
                 )
+                values = object_values(obj)
                 c.execute(
                     upsert(scene_objects)
-                    .values(**object_values(obj))
-                    .on_conflict_do_nothing(index_elements=["id"])
+                    .values(**values)
+                    .on_conflict_do_update(
+                        index_elements=["id"],
+                        set_={key: value for key, value in values.items() if key != "id"},
+                    )
                 )
             for added in request.added_objects:
                 # Scope client-generated IDs to this session; retries keep the same object.

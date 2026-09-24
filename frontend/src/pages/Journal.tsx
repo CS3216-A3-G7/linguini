@@ -5,6 +5,7 @@ import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons
 import { JournalImage } from "../components/JournalImage";
 import { MediaImage } from "../components/MediaImage";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ErrorState } from "../components/ErrorState";
 import { useJournalsQuery } from "../state/queries";
 import type { JournalEntry } from "../data/types";
 
@@ -42,7 +43,7 @@ function wordCount(text: string) {
 export function Journal() {
   const { journal, journalLoading, journalError } = useJournalsQuery();
   if (journalLoading) return <LoadingScreen label="Loading journal history..." />;
-  if (journalError) return <p role="alert">{journalError} Reload to retry.</p>;
+  if (journalError) return <ErrorState title="We couldn't load your journal" message={journalError} retry={() => window.location.reload()} />;
   return <JournalMonths journal={journal} />;
 }
 

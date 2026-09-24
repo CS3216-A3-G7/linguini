@@ -7,7 +7,7 @@ import { useAppState } from "../state/useAppState";
 import { useVocabularyQuery } from "../state/queries";
 import { createPractice, getPracticeSummary } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
-import { queryError, queryKeys } from "../lib/queryKeys";
+import { friendlyError, queryError, queryKeys } from "../lib/queryKeys";
 
 export function SessionSummary() {
   const navigate = useNavigate();
@@ -36,7 +36,7 @@ export function SessionSummary() {
     try {
       const next = await createPractice(activeProfile.id, scene.mediaAssetId, requestKey.current);
       navigate(sessionDestination(next).path);
-    } catch (error) { setStartError(error instanceof Error ? error.message : "Unable to start practice."); }
+    } catch (error) { setStartError(friendlyError(error)); }
     finally { busy.current = false; setStarting(false); }
   };
   return <div className="stack">

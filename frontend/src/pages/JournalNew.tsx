@@ -1,4 +1,5 @@
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ErrorState } from "../components/ErrorState";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Feedback } from "../components/ui";
@@ -21,7 +22,7 @@ export function JournalNew() {
   });
   const error = queryError(queryErrorValue);
   if (loading) return <LoadingScreen label="Loading journal…" />;
-  if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
+  if (error || !data) return <ErrorState title="We couldn't open your journal" message={error ?? "Your journal isn't available right now."} retry={() => window.location.reload()} backTo="/journal" />;
   return <JournalForm key={data.entry?.id ?? `new-${data.date}`} entry={data.entry} date={data.date} photoOptions={data.photoOptions} />;
 }
 

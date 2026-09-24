@@ -5,6 +5,23 @@ import { isSupabaseConfigured, supabase } from "../lib/supabase.ts";
 import { readOnboardingDraft } from "../lib/onboardingDraft";
 import { useAuth } from "../state/Auth";
 
+function authenticationMessage(message: string) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("invalid login") || normalized.includes("invalid credentials")) {
+    return "That email and password don't match. Try again or create an account.";
+  }
+  if (normalized.includes("email not confirmed")) {
+    return "Confirm your email first, then come back here to sign in.";
+  }
+  if (normalized.includes("already registered")) {
+    return "An account already uses that email. Try signing in instead.";
+  }
+  if (normalized.includes("rate limit") || normalized.includes("too many")) {
+    return "Please wait a moment before trying again.";
+  }
+  return "We couldn't complete that sign-in request. Please try again.";
+}
+
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,14 +56,14 @@ export function Login() {
           options: { emailRedirectTo: `${window.location.origin}/login` },
         });
       if (response.error) {
-        setError(response.error.message);
+        setError(authenticationMessage(response.error.message));
         return;
       }
       if (mode === "signup" && !response.data.session) {
         setMessage("Check your email to confirm your account, then sign in here.");
       }
     } catch {
-      setError("We could not reach sign-in. Check the Supabase URL and publishable key, then try again.");
+      setError("We couldn't connect right now. Please check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -58,7 +75,7 @@ export function Login() {
       <h1>{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
       <p className="muted">{mode === "signin" ? "Sign in to continue learning." : "Start learning words from your world."}</p>
     </div>
-    {!isSupabaseConfigured ? <p role="alert">Authentication is not configured yet. Add the Supabase URL and publishable key to this app’s environment variables.</p> : null}
+    {!isSupabaseConfigured ? <p role="alert">Sign-in is being set up right now. Please try again shortly.</p> : null}
     {isSupabaseConfigured ? <form className="stack" onSubmit={event => void submit(event)}>
       <label className="field">
         <span className="field__label">Email</span>

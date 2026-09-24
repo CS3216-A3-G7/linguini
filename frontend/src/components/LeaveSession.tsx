@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "./ui";
 import { useBackAction } from "./BackAction";
 import { abandonPractice } from "../lib/api";
+import { friendlyError } from "../lib/queryKeys";
 
 export function LeaveSession({ sessionId, warning }: { sessionId: string; warning: string }) {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export function LeaveSession({ sessionId, warning }: { sessionId: string; warnin
       await abandonPractice(sessionId);
       navigate("/practice", { replace: true });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to leave the session.");
+      setError(friendlyError(reason));
       setLeaving(false);
     }
   };

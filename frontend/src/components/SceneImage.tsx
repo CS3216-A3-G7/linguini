@@ -65,7 +65,11 @@ export function SceneImage({ scene, className, lazy }: Props) {
     );
   }
   if (isProtectedMediaUrl && (loading || !resolvedUrl)) {
-    return <span className={`scene-image${className ? ` ${className}` : ""}`} role="status">Loading image…</span>;
+    return (
+      <span className={`scene-image scene-image--loading${className ? ` ${className}` : ""}`} role="status">
+        <span className="scene-image__loading-label">Preparing photo…</span>
+      </span>
+    );
   }
   return (
     <img
