@@ -97,7 +97,7 @@ The primary link goes to the landing page because its no-signup demo on real pho
 <YouTube link>
 ```
 
-This must be a full `https://www.youtube.com/watch?v=…` URL, because Product Hunt says shortened links won't load. Product Hunt reports that about 53% of Product of the Day winners since 2021 had a video. Use the promo cut from `marketing/promo-video/` once it is uploaded.
+This must be a full `https://www.youtube.com/watch?v=…` URL, because Product Hunt says shortened links won't load. Product Hunt reports that about 53% of Product of the Day winners since 2021 had a video. Use the 30-second launch film from `marketing/promo-video/` once it is uploaded; the YouTube title and description are in `marketing/promo-video/VIDEO.md`.
 
 ## Gallery captions (6 images, 1270×760)
 

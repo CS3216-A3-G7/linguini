@@ -1,2 +1,4 @@
 node_modules
-out/*.tmp
+cache
+out/*-master.mp4
+__pycache__

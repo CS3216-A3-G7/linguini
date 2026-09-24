@@ -4,7 +4,7 @@ Launch materials for Product Hunt and social, kept separate from the app, API an
 
 | Path | What it is |
 | --- | --- |
-| [`promo-video/`](promo-video) | The launch film: an HTML animation rendered frame by frame and cut to the music |
+| [`promo-video/`](promo-video) | The 30-second launch film: real footage, a focus frame that finds each object and names it in Spanish and French, and an original piano score cut to the edit |
 | [`product-hunt/submission.md`](product-hunt/submission.md) | Everything to paste into the Product Hunt form: taglines, description, tags, maker comment |
 | [`product-hunt/readiness.md`](product-hunt/readiness.md) | Go/no-go assessment and the must-fix list before launch day |
 | [`product-hunt/launch-plan.md`](product-hunt/launch-plan.md) | Timeline, launch-day roles, reply templates, what we verified about Product Hunt's rules |
@@ -15,11 +15,11 @@ Launch materials for Product Hunt and social, kept separate from the app, API an
 
 ```sh
 cd marketing/promo-video
-npm install                        # Playwright; Chromium must be available to it
-python3 -m http.server 8091 --directory ../..   # serve the repo root in another terminal
-npm run render                     # writes out/linguini-launch.mp4
+pip install -r requirements.txt
+npm install    # Playwright; Chromium must be available to it
+./render.sh    # downloads the footage and piano samples, then writes out/linguini-launch*.mp4
 ```
 
-Gallery images are HTML compositions in `product-hunt/gallery-src/` built from 4× captures of the running landing page. The captures aren't committed; `capture.mjs` regenerates them from `landing/` on port 3200, then `render.mjs` and `thumb.mjs` export the PNGs and GIF.
+[`promo-video/VIDEO.md`](promo-video/VIDEO.md) explains the edit and the pipeline, and [`promo-video/CREDITS.md`](promo-video/CREDITS.md) lists every clip and licence.
 
-`film.html` + `film.js` describe every frame as a function of time; open `film.html?t=30` in a browser to scrub. Scene boundaries and beat positions come from `timing.json`, which is derived from `audio/beats.json`, so cuts land on the music. Sound effects are placed from the cue sheet the page exports (`cues.json`). Music and sound credits are in `audio/CREDITS.md` and must go in the video description wherever the film is posted.
+Gallery images are HTML compositions in `product-hunt/gallery-src/` built from 4× captures of the running landing page. The captures aren't committed; `capture.mjs` regenerates them from `landing/` on port 3200, then `render.mjs` and `thumb.mjs` export the PNGs and GIF.

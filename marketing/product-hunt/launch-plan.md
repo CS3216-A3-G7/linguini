@@ -52,7 +52,7 @@ Not verified (check on the day): whether scheduled launches appear publicly in a
 ### T−10 · Sun 4 Oct: assets
 - [ ] Gallery: six 1270×760 images, following the captions in `submission.md`. Check each one at phone size.
 - [ ] Thumbnail: 240×240 mascot, a PNG, or a gentle GIF under 3 MB.
-- [ ] Video: cut the promo (`marketing/promo-video/`) to 30–60 s, upload it to YouTube as *unlisted* for now, and keep the full URL.
+- [ ] Video: render `marketing/promo-video/` (30 s), upload `out/linguini-launch-master.mp4` to YouTube as *unlisted* for now with the title and description from `VIDEO.md`, and keep the full URL.
 - [ ] Photos: every photo shown in the gallery and video is our own or has a confirmed licence (readiness #4).
 
 ### T−9 · Mon 5 Oct: the Product Hunt teaser, done the current way
