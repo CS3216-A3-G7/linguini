@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { CameraIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
-import { ApiError, createPractice, getActivePractice } from "../lib/api";
+import { createPractice, getActivePractice } from "../lib/api";
 import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { sessionDestination } from "../lib/sessionRoute";
@@ -39,21 +39,15 @@ export function PracticeSelect() {
     queryFn: () => getActivePractice(),
     staleTime: 0,
   }), [queryClient, activeProfileId]);
-  const interactionDisabled = selected || starting || activeCheckLoading || !!activeSession || !!activeCheckError || !activeProfile;
+  const interactionDisabled = selected || starting || !!activeCheckError || !activeProfile;
   const start = async (asset: string) => {
-    if (busy.current || !activeProfile || activeCheckLoading || activeSession || activeCheckError) return;
+    if (busy.current || !activeProfile || activeCheckError) return;
     busy.current = true; setSelected(true); setStarting(true); setError(null);
     if (request.current?.asset !== asset) request.current = { asset, key: crypto.randomUUID() };
     try {
       const detail = await createPractice(activeProfile.id, asset, request.current.key);
       navigate(sessionDestination(detail).path);
     } catch (reason) {
-      if (reason instanceof ApiError && reason.code === "active_session_exists" && reason.activeSessionId) {
-        setSelected(false);
-        const existing = await activeFetch().catch(() => null);
-        navigate(existing ? sessionDestination(existing).path : `/practice/sessions/${reason.activeSessionId}/analysis`);
-        return;
-      }
       setError(reason instanceof Error ? reason.message : "Unable to start practice.");
     }
     finally { busy.current = false; setStarting(false); }
@@ -70,11 +64,11 @@ export function PracticeSelect() {
     {notice ? <p role="alert">{notice}</p> : null}
     <p className="muted">Take a photo of the world around you, or start from a ready scene.</p>
     {activeCheckLoading ? <p role="status">Checking your current practice...</p> : null}
-    {activeCheckError ? <p role="alert">{activeCheckError} Reload to check before starting a new practice.</p> : null}
+    {activeCheckError ? <p role="alert">{activeCheckError} Reload to resume an open practice.</p> : null}
     {activeSession ? <div className="practice-select__active" role="status">
       <div>
-        <strong>You already have an active practice</strong>
-        <p className="small muted">Continue it before starting another session.</p>
+        <strong>Continue an open practice</strong>
+        <p className="small muted">You can also start another photo below.</p>
       </div>
       <Button variant="secondary" onClick={() => void continueActive()}>
         Continue practice

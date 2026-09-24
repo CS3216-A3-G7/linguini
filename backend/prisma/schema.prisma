@@ -145,7 +145,6 @@ enum SessionStatus {
   @@map("session_status")
 }
 
-// SQL owns one_active_session_per_profile, a partial unique index.
 model Session {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId String @map("user_id") @db.Uuid

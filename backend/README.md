@@ -288,8 +288,9 @@ atomically. Prisma records the relations; SQL defines the deferred-check behavio
 
 Practice actions, evaluated attempts, encounters, and vocabulary counters commit in
 one transaction. Stable event identities and a user lock prevent duplicate credit
-under concurrent retries. A new session abandons the prior active session for the
-same profile. Task answers are private and are omitted from every public task response.
+under concurrent retries. Learners can leave several unfinished sessions open and
+resume their latest one from the home screen. Task answers are private and are omitted
+from every public task response.
 
 Journals are unique per user/local date across all target languages. Saves append
 immutable revisions, with identical retries avoiding duplicate revisions. Media

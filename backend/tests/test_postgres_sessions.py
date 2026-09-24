@@ -303,23 +303,21 @@ def age_session(engine, session_id, status, processing_started_at):
         )
 
 
-def test_active_session_replacement_and_owner_scope(database, monkeypatch):
+def test_multiple_active_sessions_and_owner_scope(database, monkeypatch):
     engine, owner, profile, client = database
     first = create_run(client, profile)["session"]["id"]
     # The same image under a different key continues the open run.
     continued = create_run(client, profile, "replacement-key")
     assert continued["session"]["id"] == first
     assert client.get(f"/api/v1/sessions/{first}").json()["session"]["status"] == "created"
-    # A different image conflicts while a session is still active.
+    # A different image creates another unfinished session.
     asset = upload_asset(engine, owner)
-    conflict = create_with_asset(client, profile, asset, "other-asset-key")
-    assert conflict.status_code == 409
-    detail = conflict.json()["detail"]
-    assert detail["code"] == "active_session_exists"
-    assert detail["activeSessionId"] == first
+    second_response = create_with_asset(client, profile, asset, "other-asset-key")
+    assert second_response.status_code == 202, second_response.text
+    second = second_response.json()["session"]["id"]
     with engine.connect() as c:
         ids = c.execute(select(sessions.c.id).where(sessions.c.user_id == owner.id)).scalars().all()
-    assert ids == [UUID(first)]
+    assert set(ids) == {UUID(first), UUID(second)}
 
     # The state machine rejects edges outside ALLOWED_TRANSITIONS.
     repository = PostgresWorkflowRepository(engine, owner.id)
@@ -346,7 +344,13 @@ def test_active_session_replacement_and_owner_scope(database, monkeypatch):
     completed = client.get(f"/api/v1/sessions/{first}").json()["session"]
     assert completed["status"] == "completed" and completed["completedAt"] is not None
 
-    # A terminal session frees the profile; discard is the only route to abandoned.
+    # The second unfinished session remains available after the first completes.
+    assert client.get(f"/api/v1/sessions/{second}").status_code == 200
+    assert client.post(f"/api/v1/sessions/{second}/abandon").status_code == 200
+    assert client.post(f"/api/v1/sessions/{second}/analyze").status_code == 409
+    abandoned = client.get(f"/api/v1/sessions/{second}").json()["session"]
+    assert abandoned["status"] == "abandoned" and abandoned["abandonedAt"] is not None
+
     created = create_with_asset(client, profile, asset, "other-asset-key-2")
     assert created.status_code == 202, created.text
     replacement = created.json()["session"]["id"]

@@ -30,7 +30,6 @@ from app.repositories.postgres.vocabulary import (
 )
 from app.repositories.postgres.xp import award, xp_events
 from app.repositories.practice import (
-    ActiveSessionExistsError,
     PracticeConflictError,
     PracticeNotFoundError,
     PracticeStorageError,
@@ -570,25 +569,25 @@ class PostgresWorkflowRepository:
                         raise PracticeConflictError("This request key was used for another image.")
                     return self._detail(c, parse_session(existing))
             self._reap(c, request.language_profile_id)
+            # Re-selecting an image resumes its unfinished session, but an
+            # unfinished session for another image must never block a learner
+            # from starting a new one.
             existing = (
                 c.execute(
                     select(sessions).where(
                         sessions.c.user_id == self.user_id,
                         sessions.c.language_profile_id == request.language_profile_id,
+                        sessions.c.scene_media_asset_id == request.media_asset_id,
                         sessions.c.status.not_in(TERMINAL),
                     )
+                    .order_by(sessions.c.started_at.desc().nulls_last(), sessions.c.id.desc())
+                    .limit(1)
                 )
                 .mappings()
                 .one_or_none()
             )
             if existing is not None:
-                if existing["scene_media_asset_id"] == request.media_asset_id:
-                    return self._detail(c, parse_session(existing))
-                raise ActiveSessionExistsError(
-                    "You have a practice session in progress. "
-                    "Continue it or discard it before starting a new one.",
-                    active_session_id=existing["id"],
-                )
+                return self._detail(c, parse_session(existing))
             session = Session(
                 user_id=self.user_id,
                 language_profile_id=request.language_profile_id,
