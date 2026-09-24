@@ -76,6 +76,33 @@ def test_review_requires_unique_nonempty_selection_and_in_bounds_positions():
     assert review.added_objects[0].label == "window"
 
 
+def test_review_accepts_a_scene_title_and_repositioned_object_marker():
+    object_id = uuid4()
+
+    review = ReviewPracticeRequest.model_validate(
+        {
+            "sceneTitle": "A sunny cafe",
+            "acceptedObjectIds": [str(object_id)],
+            "repositionedObjects": [
+                {"id": str(object_id), "anchorPoint": {"x": 0.45, "y": 0.6}}
+            ],
+        }
+    )
+
+    assert review.scene_title == "A sunny cafe"
+    assert float(review.repositioned_objects[0].anchor_point.x) == 0.45
+    with pytest.raises(ValidationError):
+        ReviewPracticeRequest.model_validate(
+            {
+                "acceptedObjectIds": [str(object_id)],
+                "repositionedObjects": [
+                    {"id": str(object_id), "anchorPoint": {"x": 0.2, "y": 0.2}},
+                    {"id": str(object_id), "anchorPoint": {"x": 0.4, "y": 0.4}},
+                ],
+            }
+        )
+
+
 @pytest.mark.parametrize("status", ["completed", "abandoned", "failed"])
 def test_review_cannot_change_terminal_sessions(status):
     repo = PostgresWorkflowRepository(None, uuid4())

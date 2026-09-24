@@ -21,6 +21,11 @@ const RELATION_OPTIONS = [
 const RELATION_CHOICES = RELATION_OPTIONS.map(([value, label]) => ({ value, label }));
 type AnalysisPanel = "objects" | "attributes" | "relations";
 
+function relationLabel(relation: string) {
+  return RELATION_OPTIONS.find(([value]) => value === relation)?.[1]
+    ?? relation.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ");
+}
+
 export function PracticeAnalysis() {
   const navigate = useNavigate();
   const scene = useScene();
@@ -28,6 +33,9 @@ export function PracticeAnalysis() {
   const [removed, setRemoved] = useState<string[]>([]);
   const [added, setAdded] = useState<PracticeReview["addedObjects"]>([]);
   const [relations, setRelations] = useState<PracticeReview["relations"]>(() => session?.sceneObjectRelations ?? []);
+  const [sceneTitle, setSceneTitle] = useState(session?.session.sessionTitle ?? scene.title);
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [movingObjectId, setMovingObjectId] = useState<string | null>(null);
   const [panel, setPanel] = useState<AnalysisPanel>("objects");
   const [attributes, setAttributes] = useState<Record<string, Record<string, string>>>(() =>
     Object.fromEntries((session?.sceneObjects ?? []).map(item => [item.id,
@@ -78,6 +86,12 @@ export function PracticeAnalysis() {
   const custom: LanguageItem[] = added.map((item, index) => ({ id: `custom-${item.id}`, word: item.label,
     translation: item.label, wordClass: "noun", gender: null, marker: scene.items.length + index + 1,
     x: item.x * 100, y: item.y * 100, attributes: attributes[item.id] ?? {}, example: "", exampleTranslation: "" }));
+  const positionedKept = kept.map(item => {
+    const position = positions[item.id];
+    return position ? { ...item, x: position.x * 100, y: position.y * 100 } : item;
+  });
+  const movingItem = movingObjectId ? kept.find(item => item.id === movingObjectId) : null;
+  const placementLabel = pending?.label ?? movingItem?.translation ?? null;
   const relationObjects = [...kept.map(item => ({ id: item.id, label: item.translation })), ...added];
   const selectedIds = new Set(relationObjects.map(item => item.id));
   const activeAttributeObjectId = selectedIds.has(attributeObjectId) ? attributeObjectId : relationObjects[0]?.id ?? "";
@@ -93,7 +107,7 @@ export function PracticeAnalysis() {
   };
   const startAdding = () => {
     const word = label.trim();
-    if (!word || pending || practiceSaving) return;
+    if (!word || placementLabel || practiceSaving) return;
     if ([...kept.map(item => item.translation), ...added.map(item => item.label)].some(item => item.toLowerCase() === word.toLowerCase())) {
       setError("That word is already in your list."); return;
     }
@@ -102,8 +116,14 @@ export function PracticeAnalysis() {
     photoRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   };
   const place = ({ x, y }: { x: number; y: number }) => {
-    if (!pending || practiceSaving) return;
+    if (practiceSaving) return;
     const location = { x: Math.min(x / 100, 0.99), y: Math.min(y / 100, 0.99) };
+    if (movingObjectId) {
+      setPositions(current => ({ ...current, [movingObjectId]: location }));
+      setMovingObjectId(null);
+      return;
+    }
+    if (!pending) return;
     setAdded(current => pending.id
       ? current.map(item => item.id === pending.id ? { ...item, ...location } : item)
       : [...current, { id: crypto.randomUUID(), label: pending.label, ...location }]);
@@ -111,6 +131,11 @@ export function PracticeAnalysis() {
   };
   const replaceLocation = (item: PracticeReview["addedObjects"][number]) => {
     setPending({ id: item.id, label: item.label });
+    setError(null);
+    photoRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  };
+  const moveExistingObject = (objectId: string) => {
+    setMovingObjectId(objectId);
     setError(null);
     photoRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   };
@@ -124,7 +149,14 @@ export function PracticeAnalysis() {
     }
     // Stay on the translating screen while background generation runs.
     // SessionRoute forwards to the mic check when the session becomes ready.
-    await saveReview({ acceptedObjectIds: kept.map(item => item.id), addedObjects: added, relations: visibleRelations, objectAttributes: selectedAttributes });
+    await saveReview({
+      sceneTitle: sceneTitle.trim() || undefined,
+      acceptedObjectIds: kept.map(item => item.id),
+      addedObjects: added,
+      relations: visibleRelations,
+      objectAttributes: selectedAttributes,
+      repositionedObjects: Object.entries(positions).map(([id, anchorPoint]) => ({ id, anchorPoint })),
+    });
   };
   return <div className="stack analysis-page">
     <div className="analysis-titlebar">
@@ -134,13 +166,13 @@ export function PracticeAnalysis() {
     <div className="analysis-layout">
       <div className="analysis-stage-column">
         {session.analysisMode === "placeholder" ? <p className="small muted">These are sample suggestions. Keep what matches your photo and add anything missing.</p> : null}
-        <div ref={photoRef} className={`analysis-photo-stage${pending ? " analysis-photo-stage--placing" : ""}`}>
-          {pending ? <div className="analysis-placement-prompt" role="status">
-            <span>Tap where you see <strong>{pending.label}</strong></span>
-            <button type="button" onClick={() => setPending(null)}>Cancel</button>
+        <div ref={photoRef} className={`analysis-photo-stage${placementLabel ? " analysis-photo-stage--placing" : ""}`}>
+          {placementLabel ? <div className="analysis-placement-prompt" role="status">
+            <span>Tap the centre of <strong>{placementLabel}</strong></span>
+            <button type="button" onClick={() => { setPending(null); setMovingObjectId(null); }}>Cancel</button>
           </div> : null}
-          <ScenePhoto scene={scene} items={[...kept, ...custom]} onLocationSelect={pending ? place : undefined}
-            locationLabel={pending ? `Choose the location of ${pending.label}` : undefined} />
+          <ScenePhoto scene={scene} items={[...positionedKept, ...custom]} onLocationSelect={placementLabel ? place : undefined}
+            locationLabel={placementLabel ? `Choose the location of ${placementLabel}` : undefined} />
         </div>
         <div className="analysis-panel-tabs" role="tablist" aria-label="Scene analysis details">
           {(["objects", "attributes", "relations"] as const).map(value => <button key={value} type="button" role="tab"
@@ -155,18 +187,26 @@ export function PracticeAnalysis() {
           <div><h2 id="analysis-found-title">{kept.length + added.length} words selected</h2>
             <p className="muted">{locked ? "Your lesson has started. Start a new practice to change its words." : "Keep what matches your photo. Remove or add anything you need."}</p>
           </div>
+          <label className="analysis-scene-title" htmlFor="analysis-scene-title">
+            <span className="field__label">Scene title</span>
+            <input id="analysis-scene-title" className="input" maxLength={200} value={sceneTitle} disabled={locked || practiceSaving}
+              onChange={event => setSceneTitle(event.target.value)} />
+          </label>
           <Card plain className="analysis-word-card">
             <div className="analysis-word-list" aria-label="Words in this scene">
               {kept.map(item => <div className="analysis-word-row" key={item.id}>
                 <span className="analysis-word-row__marker">{item.marker}</span>
-                <div className="grow"><strong>{item.translation}</strong></div>
+                <div className="grow"><strong>{item.translation}</strong>
+                  {!locked ? <button className="analysis-location-action" type="button" disabled={practiceSaving || !!placementLabel}
+                    onClick={() => moveExistingObject(item.id)}>Move marker</button> : null}
+                </div>
                 {!locked ? <button className="analysis-word-row__remove" type="button" disabled={practiceSaving} aria-label={`Remove ${item.translation}`}
                   onClick={() => setRemoved(current => [...current, item.id])}><CloseIcon size={18} /></button> : null}
               </div>)}
               {added.map((item, index) => <div className="analysis-word-row" key={item.id}>
                 <span className="analysis-word-row__marker analysis-word-row__marker--custom">{scene.items.length + index + 1}</span>
                 <div className="grow"><strong>{item.label}</strong>
-                  <button className="analysis-location-action" type="button" disabled={practiceSaving || !!pending}
+                  <button className="analysis-location-action" type="button" disabled={practiceSaving || !!placementLabel}
                     onClick={() => replaceLocation(item)}>Change location</button>
                 </div>
                 <button className="analysis-word-row__remove" type="button" disabled={practiceSaving} aria-label={`Remove ${item.label}`}
@@ -185,8 +225,8 @@ export function PracticeAnalysis() {
           {!locked ? <form className="analysis-add-word" onSubmit={event => { event.preventDefault(); startAdding(); }}>
             <label className="field__label" htmlFor="analysis-new-word">Add another object you see</label>
             <div className="analysis-add-word__controls">
-              <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={practiceSaving || !!pending} onChange={event => setLabel(event.target.value)} />
-              <Button variant="secondary" type="submit" disabled={!label.trim() || !!pending || practiceSaving || added.length >= 20}>Select location</Button>
+              <input id="analysis-new-word" className="input" maxLength={200} value={label} placeholder="e.g. window" disabled={practiceSaving || !!placementLabel} onChange={event => setLabel(event.target.value)} />
+              <Button variant="secondary" type="submit" disabled={!label.trim() || !!placementLabel || practiceSaving || added.length >= 20}>Select location</Button>
             </div>
           </form> : null}
         </section> : null}
@@ -213,10 +253,10 @@ export function PracticeAnalysis() {
                 <span className="analysis-word-row__marker analysis-relation-row__marker">{index + 1}</span>
                 <div className="analysis-relation-row__flow">
                   <strong>{relationObjects.find(item => item.id === row.subjectSceneObjectId)?.label}</strong>
-                  {locked ? <span className="analysis-relation-row__relation">{RELATION_OPTIONS.find(option => option[0] === row.relation)?.[1] ?? row.relation}</span> :
+                  {locked ? <span className="analysis-relation-row__relation">{relationLabel(row.relation)}</span> :
                     <ComboBox compact ariaLabel="Connection" value={row.relation}
                       options={!RELATION_OPTIONS.some(option => option[0] === row.relation)
-                        ? [{ value: row.relation, label: row.relation }, ...RELATION_CHOICES]
+                        ? [{ value: row.relation, label: relationLabel(row.relation) }, ...RELATION_CHOICES]
                         : RELATION_CHOICES}
                       onChange={value => setRelations(current => current.map(item => item.id === row.id ? { ...item, relation: value } : item))} />}
                   <strong>{relationObjects.find(item => item.id === row.referenceSceneObjectId)?.label}</strong>
@@ -241,7 +281,7 @@ export function PracticeAnalysis() {
           </Card>
         </section> : null}
         {error || practiceError ? <p role="alert">{error ?? practiceError}</p> : null}
-        <Button block className="analysis-continue" disabled={practiceSaving || !!pending || (!kept.length && !added.length)} onClick={() => void proceed()}>
+        <Button block className="analysis-continue" disabled={practiceSaving || !!placementLabel || (!kept.length && !added.length)} onClick={() => void proceed()}>
           {practiceSaving ? "Saving your words..." : "Continue"} <ArrowRightIcon />
         </Button>
       </div>

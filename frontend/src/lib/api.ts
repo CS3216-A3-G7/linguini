@@ -373,10 +373,12 @@ export interface TaskActionResult {
 }
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
 export interface PracticeReview {
+  sceneTitle?: string;
   acceptedObjectIds: string[];
   relations: SceneObjectRelation[];
   addedObjects: { id: string; label: string; x: number; y: number }[];
   objectAttributes: Record<string, Record<string, string>>;
+  repositionedObjects: { id: string; anchorPoint: { x: number; y: number } }[];
 }
 export const reviewPractice = (id: string, review: PracticeReview) => write<PracticeDetail>(`/api/v1/sessions/${id}/review`, "PUT", review);
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);
