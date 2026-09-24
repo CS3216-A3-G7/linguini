@@ -182,7 +182,7 @@ interface DailyVocabularyItem {
     phoneticText?: string | null;
   };
   translation: { translatedText: string } | null;
-  progress: { status: VocabStatus } | null;
+  progress: { status: VocabStatus; firstLearnedAt?: string | null } | null;
   sceneId: string | null;
   topic: string | null;
   scenes?: VocabularyScene[];
@@ -235,6 +235,7 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
     wordClass: item.vocabulary.partOfSpeech,
     gender: item.vocabulary.gender != null && GENDER_ARTICLES.has(item.vocabulary.gender) ? item.vocabulary.gender as Gender : null,
     status: item.progress?.status ?? "new",
+    firstLearnedAt: item.progress?.firstLearnedAt ?? null,
     topic: item.topic ?? "Uncategorised",
     sceneId: item.sceneId ?? "",
     scenes: item.scenes ?? [],

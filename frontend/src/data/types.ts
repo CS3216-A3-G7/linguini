@@ -58,6 +58,7 @@ export type VocabRecord = {
   wordClass: WordClass;
   gender: Gender;
   status: VocabStatus;
+  firstLearnedAt: string | null;
   topic: string;
   sceneId: string;
   example: string;
