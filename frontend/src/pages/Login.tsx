@@ -67,7 +67,7 @@ export function Login() {
       </label>
       {error ? <p role="alert">{error}</p> : null}
       {message ? <p role="status">{message}</p> : null}
-      <Button block disabled={submitting}>{submitting ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}</Button>
+      <Button type="submit" block disabled={submitting}>{submitting ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}</Button>
     </form> : null}
     <p className="small muted center-text">
       {mode === "signin" ? "New to Linguini? " : "Already have an account? "}
