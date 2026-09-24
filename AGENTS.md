@@ -10,6 +10,7 @@ Linguini is a photo-led, speak-first language-learning app. The repository is a 
 
 - Name branches with a plain descriptive slug: `session-lifecycle`, `journal-day-photos`, `vocabulary-evidence-xp`. Do not prefix branches with `devin/` or a timestamp.
 - Commits and pull requests are attributed to the team member who requested the work, not to an agent account. Agents must open pull requests on that person's behalf rather than under their own identity.
+- Never add `Co-Authored-By`, "Generated with" or other AI attribution lines to commit messages or pull request descriptions.
 - One branch per slice of work, opened against `main`.
 
 ## Checks before opening a pull request

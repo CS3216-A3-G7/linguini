@@ -7,7 +7,8 @@
 | [Narrated launch film and team review page](video/review.html) | Primary 30-second video for team review; includes the MP4, poster, transcript and gallery in one place. Serve the worktree locally as described in the [video guide](video/README.md). |
 | [Product Hunt submission and channel copy](product-hunt.md) | Paste-ready preview listing, first maker comment, full-release draft, social posts, outreach and reply bank. |
 | [Launch dashboard](plan.md) | Timeline, owner board, go/no-go criteria, launch-day response and retention measures. |
-| [Media kit](media/README.md) | Product Hunt gallery, icon, social square, narrated film and editable sources. |
+| [Media kit](media/README.md) | Product Hunt gallery, icon, social square, narrated film, animated explainer and editable sources. |
+| [Explainer video script](explainer-script.md) | Script and production notes for the alternate 50-second animated explainer: visual system, second-by-second voiceover, visuals and motion notes, audio, and claims to verify. The rendered video, captions and style frames are in the media kit. |
 
 ## Team decision checklist
 
