@@ -2,7 +2,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell, FocusShell } from "./components/AppShell";
 import { Home } from "./pages/Home";
 import { Welcome } from "./pages/Welcome";
-import { Onboarding } from "./pages/Onboarding";
+import { Onboarding, PreAccountOnboarding } from "./pages/Onboarding";
 import { Login } from "./pages/Login";
 import { PracticeSelect } from "./pages/PracticeSelect";
 import { PracticeAnalysis } from "./pages/PracticeAnalysis";
@@ -37,17 +37,24 @@ function AuthenticatedApp() {
   return <AppStateProvider><Outlet /></AppStateProvider>;
 }
 
+function OnboardingRoute() {
+  const { session, loading } = useAuth();
+  if (loading) return <LoadingScreen label="Preparing onboarding…" />;
+  if (!session) return <PreAccountOnboarding />;
+  return <AppStateProvider><Onboarding /></AppStateProvider>;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route element={<FocusShell />}>
         <Route path="/" element={<Welcome />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<OnboardingRoute />} />
       </Route>
       <Route element={<RequireAuth />}>
         <Route element={<AuthenticatedApp />}>
           <Route element={<FocusShell />}>
-            <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/practice/sessions/:sessionId" element={<SessionRoute />}>
           <Route path="analysis" element={<PracticeAnalysis />} />
           <Route path="mic-test" element={<MicTest />} />
