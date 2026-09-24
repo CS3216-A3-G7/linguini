@@ -6,6 +6,7 @@ import { sessionDestination } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import { LoadingScreen } from "./LoadingScreen";
+import { ErrorState } from "./ErrorState";
 
 export function SceneRoute() {
   const { sceneId = "" } = useParams();
@@ -21,7 +22,7 @@ export function SceneRoute() {
     staleTime: 0, gcTime: 0, retry: false, refetchOnMount: "always",
   });
   const error = queryError(queryErrorValue);
-  if (error) return <p role="alert">{error}</p>;
+  if (error) return <ErrorState title="We couldn't open that scene" message={error} retry={() => window.location.reload()} backTo="/practice" backLabel="Choose another image" />;
   if (!data) return <LoadingScreen label="Loading session..." />;
   return <Navigate replace to={sessionDestination(data).path} />;
 }

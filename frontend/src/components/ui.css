@@ -309,6 +309,66 @@
   color: #5b3a00;
 }
 
+/* Errors always give the learner one clear explanation and a calm recovery path. */
+.error-notice,
+p[role="alert"] {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid #efb8a9;
+  border-radius: var(--radius-md);
+  background: #fff0ea;
+  color: #793221;
+  line-height: 1.45;
+}
+
+.error-notice__icon,
+p[role="alert"]::before {
+  flex: 0 0 auto;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--tomato);
+  color: #fffaf2;
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+p[role="alert"]::before { content: "!"; }
+
+.error-notice__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.error-notice__copy strong { color: var(--ink); }
+.error-notice__copy p { margin: 2px 0 0; }
+.error-notice--compact { padding: var(--space-2) var(--space-3); font-size: var(--text-small); }
+
+.error-state {
+  display: grid;
+  max-width: 560px;
+  gap: var(--space-4);
+  margin: min(16vh, 120px) auto;
+}
+
+.error-state .error-notice {
+  padding: var(--space-5);
+  background: #fff8f4;
+  box-shadow: var(--shadow-paper);
+}
+
+.error-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* Scene */
 .scene {
   position: relative;

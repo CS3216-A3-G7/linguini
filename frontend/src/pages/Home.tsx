@@ -6,7 +6,7 @@ import { BookIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
 import { MediaImage } from "../components/MediaImage";
 import { getActivePractice } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
-import { queryError, queryKeys } from "../lib/queryKeys";
+import { friendlyError, queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import { useVocabularyQuery } from "../state/queries";
 
@@ -37,7 +37,7 @@ export function Home() {
       });
       if (!fresh) { queryClient.setQueryData(queryKeys.activeSession(profileId), null); return; }
       navigate(sessionDestination(fresh).path);
-    } catch (reason) { setContinueError(reason instanceof Error ? reason.message : "Unable to load your practice."); }
+    } catch (reason) { setContinueError(friendlyError(reason)); }
   };
 
   return (
