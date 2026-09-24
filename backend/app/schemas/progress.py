@@ -1,5 +1,6 @@
 """Read models for the demo progress screen."""
 
+from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -33,10 +34,21 @@ class LeaderboardRow(ApiModel):
     is_you: bool = False
 
 
+class StreakDay(ApiModel):
+    date: date
+    active: bool = False
+
+
+class Streak(ApiModel):
+    current: Annotated[int, Field(ge=0)] = 0
+    days: list[StreakDay] = Field(default_factory=list)
+
+
 class ProgressResponse(ApiModel):
     xp: Annotated[int, Field(ge=0)]
     scenarios: list[ScenarioProgress]
     leaderboard: list[LeaderboardRow]
+    streak: Streak = Field(default_factory=Streak)
 
 
 class StoredProgress(ProgressResponse):

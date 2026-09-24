@@ -1,5 +1,8 @@
 """Session table definitions and progress derived from normalized encounters."""
 
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
 from sqlalchemy import (
     Column,
     DateTime,
@@ -61,12 +64,12 @@ class SessionBackedLearningRepository:
         self.user_id = user_id
         self.vocabulary = vocabulary
 
-    def get_progress(self, user_id, language_code=None):
+    def get_progress(self, user_id, language_code=None, timezone="UTC"):
         from app.repositories.postgres.language_profiles import language_profiles
         from app.repositories.postgres.scenes import preloaded_scenes
         from app.repositories.postgres.tasks import session_tasks
         from app.repositories.postgres.xp import xp_events
-        from app.schemas.progress import ScenarioProgress
+        from app.schemas.progress import ScenarioProgress, Streak, StreakDay
 
         if user_id != self.user_id:
             return None
@@ -84,6 +87,36 @@ class SessionBackedLearningRepository:
                     func.lower(language_profiles.c.target_language_code) == language_code.lower()
                 )
             xp = connection.execute(query).scalar_one()
+            learner_timezone = ZoneInfo(timezone)
+            today = datetime.now(learner_timezone).date()
+            streak_dates = [today - timedelta(days=offset) for offset in range(6, -1, -1)]
+            end = datetime.combine(
+                today + timedelta(days=1), time.min, learner_timezone
+            ).astimezone(UTC)
+            activity_query = select(xp_events.c.occurred_at).where(
+                xp_events.c.user_id == user_id,
+                xp_events.c.occurred_at < end,
+            )
+            if language_code:
+                activity_query = activity_query.join(
+                    language_profiles,
+                    language_profiles.c.id == xp_events.c.language_profile_id,
+                ).where(
+                    func.lower(language_profiles.c.target_language_code) == language_code.lower()
+                )
+            active_dates = {
+                occurred_at.astimezone(learner_timezone).date()
+                for occurred_at in connection.execute(activity_query).scalars()
+            }
+            current_streak = 0
+            for day in reversed(streak_dates):
+                if day not in active_dates:
+                    break
+                current_streak += 1
+            streak = Streak(
+                current=current_streak,
+                days=[StreakDay(date=day, active=day in active_dates) for day in streak_dates],
+            )
             query = (
                 select(sessions, preloaded_scenes.c.slug, preloaded_scenes.c.title)
                 .join(language_profiles, language_profiles.c.id == sessions.c.language_profile_id)
@@ -131,6 +164,7 @@ class SessionBackedLearningRepository:
                 xp=xp,
                 scenarios=list(scenarios.values()),
                 leaderboard=[],
+                streak=streak,
             )
 
     def list_vocabulary(self, user_id):

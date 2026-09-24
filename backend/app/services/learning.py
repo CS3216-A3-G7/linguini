@@ -20,9 +20,12 @@ class LearningService:
 
     def get_progress(self, language_code: str | None = None) -> ProgressResponse:
         user = self.users.get_current_user()
-        data = self.repository.get_progress(user.id, language_code)
+        data = self.repository.get_progress(user.id, language_code, user.timezone)
         if data is None:
-            if language_code is not None and self.repository.get_progress(user.id) is not None:
+            if (
+                language_code is not None
+                and self.repository.get_progress(user.id, timezone=user.timezone) is not None
+            ):
                 return ProgressResponse(xp=0, scenarios=[], leaderboard=[])
             raise ProgressNotFoundError("No progress found for this user.")
         board = [
@@ -34,7 +37,12 @@ class LearningService:
         board.sort(key=lambda row: row.xp, reverse=True)
         for rank, row in enumerate(board, 1):
             row.rank = rank
-        return ProgressResponse(xp=data.xp, scenarios=data.scenarios, leaderboard=board)
+        return ProgressResponse(
+            xp=data.xp,
+            scenarios=data.scenarios,
+            leaderboard=board,
+            streak=data.streak,
+        )
 
     def list_vocabulary(
         self, cursor: str | None, limit: int, language_code: str | None = None

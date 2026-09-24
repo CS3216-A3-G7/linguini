@@ -1,5 +1,5 @@
 import { GENDER_ARTICLES } from "../data/types.ts";
-import type { Gender, LeaderboardRow, ScenarioProgress, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
+import type { Gender, LeaderboardRow, ScenarioProgress, Streak, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";
 import { getAccessToken } from "./supabase.ts";
@@ -169,6 +169,7 @@ export interface ProgressResponse {
   xp: number;
   scenarios: ScenarioProgress[];
   leaderboard: LeaderboardRow[];
+  streak: Streak;
 }
 
 interface DailyVocabularyItem {

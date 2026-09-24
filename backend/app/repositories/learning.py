@@ -11,7 +11,7 @@ class LearningStorageError(Exception):
 
 class LearningRepository(Protocol):
     def get_progress(
-        self, user_id: UUID, language_code: str | None = None
+        self, user_id: UUID, language_code: str | None = None, timezone: str = "UTC"
     ) -> StoredProgress | None: ...
 
     def list_vocabulary(self, user_id: UUID) -> list[DailyVocabularyItem]: ...
