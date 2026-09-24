@@ -68,13 +68,7 @@ export function Profile() {
       <section className="profile-section">
         <h2>Permissions</h2>
         <Card plain className="profile-settings-card">
-          <label className="profile-setting">
-            <span>
-              <strong>Microphone</strong>
-              <small>Used for pronunciation practice</small>
-            </span>
-            <input type="checkbox" disabled={profileSaving} checked={learner.micOn} onChange={event => void saveUser({ microphoneEnabled: event.target.checked })} />
-          </label>
+          
           <label className="profile-setting" >
             <span>
               <strong>Camera</strong>

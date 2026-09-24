@@ -67,7 +67,6 @@ export function SessionSummary() {
     <div className="stack-2">
       <Button block onClick={() => navigate("/journal/new")}>Write today&apos;s journal entry</Button>
       <Button variant="secondary" block onClick={() => navigate("/vocabulary")}>Review difficult words</Button>
-      <Button variant="secondary" block disabled={starting || !activeProfile} onClick={() => void practiseAgain()}>Practise again</Button>
       <Button variant="quiet" block onClick={() => navigate("/home")}>Back home</Button>
     </div>
   </div>;

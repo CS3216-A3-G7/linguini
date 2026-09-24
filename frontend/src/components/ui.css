@@ -2496,7 +2496,7 @@ p[role="alert"]::before { content: "!"; }
 }
 
 .scene-pick--selected {
-  border: var(--stroke) solid var(--tomato);
+  border: var(--stroke) solid var(--teal);
   background: #fff4e2;
 }
 
