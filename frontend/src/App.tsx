@@ -25,9 +25,13 @@ import { AppStateProvider } from "./state/AppState";
 import { useAuth } from "./state/Auth";
 import { LoadingScreen } from "./components/LoadingScreen";
 
+const localDevAuthBypass = import.meta.env.DEV
+  && import.meta.env.VITE_LOCAL_DEV_AUTH_BYPASS === "true";
+
 function RequireAuth() {
   const { session, loading } = useAuth();
   const location = useLocation();
+  if (localDevAuthBypass) return <Outlet />;
   if (loading) return <LoadingScreen label="Checking your account…" />;
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <Outlet />;
