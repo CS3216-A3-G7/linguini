@@ -133,7 +133,7 @@ export function Wordmark({ size = 26 }: { size?: number }) {
 }
 
 /** Centered Linguini wordmark in the shared brand strip at the top of every screen. */
-export function BrandBar({ back = false, onBack, backLabel }: { back?: boolean; onBack?: () => void; backLabel?: string }) {
+export function BrandBar({ back = false, onBack, backLabel, homeTo = "/" }: { back?: boolean; onBack?: () => void; backLabel?: string; homeTo?: string }) {
   const navigate = useNavigate();
   return (
     <header className="brandbar" aria-label="Linguini">
@@ -142,7 +142,9 @@ export function BrandBar({ back = false, onBack, backLabel }: { back?: boolean; 
           <ChevronLeftIcon />
         </IconButton>
       ) : null}
-      <img className="brandbar__wordmark" src="/linguini-wordmark.png" alt="Linguini" />
+      <button type="button" className="brandbar__brand" onClick={() => navigate(homeTo)} aria-label="Go to home">
+        <img className="brandbar__wordmark" src="/linguini-wordmark.png" alt="Linguini" />
+      </button>
     </header>
   );
 }
