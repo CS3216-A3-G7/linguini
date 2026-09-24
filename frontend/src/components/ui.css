@@ -1057,6 +1057,10 @@ p[role="alert"]::before { content: "!"; }
     animation: none;
   }
 
+  .home-words__fill {
+    transition: none;
+  }
+
   .analysis-scan__noodle { top: 50%; }
 }
 
@@ -3108,6 +3112,112 @@ p[role="alert"]::before { content: "!"; }
   color: var(--teal-dark);
 }
 
+/* "Words learnt each day" bar chart */
+.home-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+}
+
+.home-words__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.home-words__heading h2 {
+  font-size: var(--text-h2);
+}
+
+.home-words__heading p {
+  margin: 4px 0 0;
+  color: var(--ink-muted);
+}
+
+.home-words__heading > strong {
+  color: var(--teal-dark);
+  font-family: var(--font-display);
+  font-size: var(--text-h2);
+  white-space: nowrap;
+}
+
+.home-words p {
+  color: var(--ink-muted);
+  font-size: var(--text-small);
+}
+
+.home-words__chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+  align-items: end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-words__bar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  justify-items: center;
+  gap: var(--space-1);
+  height: 120px;
+}
+
+.home-words__value {
+  color: var(--teal-dark);
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: 800;
+}
+
+.home-words__bar--empty .home-words__value {
+  visibility: hidden;
+}
+
+.home-words__fill {
+  --home-bar: 0%;
+  align-self: end;
+  width: 100%;
+  max-width: 32px;
+  height: var(--home-bar);
+  min-height: 3px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--teal);
+  transition: height 180ms ease-out;
+}
+
+.home-words__bar--empty .home-words__fill {
+  border-radius: var(--radius-sm);
+  background: var(--line);
+}
+
+.home-words__bar--today .home-words__fill {
+  background: var(--teal-dark);
+}
+
+.home-words__day {
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: 800;
+}
+
+.home-words__bar--today .home-words__day {
+  color: var(--teal-dark);
+}
+
+.home-words__empty {
+  color: var(--ink-muted);
+  font-size: var(--text-small);
+  text-align: center;
+}
+
 @media (min-width: 560px) {
   .home-featured--resume {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3153,6 +3263,18 @@ p[role="alert"]::before { content: "!"; }
   .home-tile {
     min-height: 92px;
     padding: var(--space-2) var(--space-1);
+  }
+
+  .home-words {
+    padding: var(--space-4);
+  }
+
+  .home-words__bar {
+    height: 92px;
+  }
+
+  .home-words__value {
+    font-size: 11px;
   }
 }
 

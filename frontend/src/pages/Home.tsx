@@ -10,6 +10,7 @@ import { sessionDestination } from "../lib/sessionRoute";
 import { friendlyError, queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import { useVocabularyQuery } from "../state/queries";
+import type { VocabRecord } from "../data/types";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -20,6 +21,19 @@ function greeting() {
 
 function dayLabel(date: string) {
   return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${date}T12:00:00`));
+}
+
+function localDateKey(value: string) {
+  const parsed = new Date(value);
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+}
+
+function lastSevenDates() {
+  const today = new Date();
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (6 - index));
+    return localDateKey(day.toString());
+  });
 }
 
 function TaskProgressRing({ completed, total }: { completed: number; total: number }) {
@@ -36,6 +50,39 @@ function TaskProgressRing({ completed, total }: { completed: number; total: numb
       </div>
       <span className="home-task-progress__caption">{completed} of {total} tasks</span>
     </div>
+  );
+}
+
+function WordsLearntChart({ dates, vocabulary, loading, error }: { dates: string[]; vocabulary: VocabRecord[]; loading: boolean; error: string | null }) {
+  const counts = dates.map(date => vocabulary.filter(word => word.firstLearnedAt && localDateKey(word.firstLearnedAt) === date).length);
+  const peak = Math.max(...counts);
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  return (
+    <section className="home-words" aria-labelledby="home-words-title">
+      <div className="home-words__heading">
+        <div><h2 id="home-words-title">Words learnt each day</h2><p>The last seven days of new words.</p></div>
+        <strong>{total} this week</strong>
+      </div>
+      {loading ? <p role="status">Loading your words…</p> : error ? null : (
+        <>
+          <ol className="home-words__chart" aria-label="New words learnt on each of the last seven days">
+            {dates.map((date, index) => (
+              <li
+                key={date}
+                role="img"
+                aria-label={`${counts[index]} ${counts[index] === 1 ? "word" : "words"} on ${dayLabel(date)}`}
+                className={`home-words__bar${counts[index] === 0 ? " home-words__bar--empty" : ""}${index === dates.length - 1 ? " home-words__bar--today" : ""}`}
+              >
+                <span className="home-words__value" aria-hidden="true">{counts[index]}</span>
+                <span className="home-words__fill" style={{ "--home-bar": `${peak === 0 ? 0 : Math.round((counts[index] / peak) * 100)}%` } as CSSProperties} />
+                <span className="home-words__day" aria-hidden="true">{dayLabel(date)}</span>
+              </li>
+            ))}
+          </ol>
+          {total === 0 ? <p className="home-words__empty">Learn a word today to start your chart.</p> : null}
+        </>
+      )}
+    </section>
   );
 }
 
@@ -175,6 +222,13 @@ export function Home() {
           <div><span className="home-journey__marks" aria-hidden="true">{marks(scenes, "▣")}</span><strong>{scenes ?? "--"} scenes explored</strong></div>
         </div>
       </section>
+
+      <WordsLearntChart
+        dates={streak?.days.map(day => day.date) ?? lastSevenDates()}
+        vocabulary={vocabulary}
+        loading={vocabularyLoading}
+        error={vocabularyError}
+      />
     </div>
   );
 }
