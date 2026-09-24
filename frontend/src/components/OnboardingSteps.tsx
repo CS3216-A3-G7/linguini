@@ -6,6 +6,7 @@ import type { OnboardingDraft } from "../lib/onboardingDraft";
 
 const goals = ["Chat with neighbours", "Travel confidently", "Order food and drinks", "Understand my family"];
 const minutesOptions = [5, 10, 20];
+const avatars = ["farfalle", "fusilli", "penne", "macaroni"] as const;
 
 export function OnboardingSteps({ initial, saving = false, error, onComplete }: { initial: OnboardingDraft; saving?: boolean; error?: string | null; onComplete: (draft: OnboardingDraft) => void | Promise<void> }) {
   const [step, setStep] = useState(0);
@@ -15,15 +16,16 @@ export function OnboardingSteps({ initial, saving = false, error, onComplete }: 
   const [minutes, setMinutes] = useState(initial.minutes || 10);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(initial.microphoneEnabled);
   const [cameraEnabled, setCameraEnabled] = useState(initial.cameraEnabled);
+  const [avatar, setAvatar] = useState(initial.avatar);
   const steps = ["Your profile", "Choose a language", "Set your goal", "Permissions"];
   const next = () => {
     if (step < steps.length - 1) { setStep(current => current + 1); return; }
-    void onComplete({ name: name.trim(), languageCode: language.code, goal, minutes, microphoneEnabled, cameraEnabled });
+    void onComplete({ name: name.trim(), languageCode: language.code, goal, minutes, microphoneEnabled, cameraEnabled, avatar });
   };
   return <div className="stack">
     <TopBar title={steps[step]} help="Four short steps and you are ready to practise." />
     <ProgressTrail value={step + 1} total={steps.length} label={`Step ${step + 1} of ${steps.length}`} />
-    {step === 0 ? <div className="stack"><h1>Nice to meet you</h1><p className="muted">We only need a name to cheer you on.</p><div className="field"><label className="field__label" htmlFor="ob-name">Your name</label><input id="ob-name" className="input" value={name} placeholder="Alex" onChange={event => setName(event.target.value)} /></div></div> : null}
+    {step === 0 ? <div className="stack"><h1>Nice to meet you</h1><p className="muted">Choose a pasta pal and a name to cheer you on.</p><fieldset className="profile-avatar-picker"><legend>Your pasta pal</legend><div className="profile-avatar-options">{avatars.map(option => <button key={option} type="button" className={avatar === option ? "is-selected" : ""} aria-pressed={avatar === option} onClick={() => setAvatar(option)}><img src={`/pasta-assets/${option}.png`} alt={`${option} pasta`} /></button>)}</div></fieldset><div className="field"><label className="field__label" htmlFor="ob-name">Your name</label><input id="ob-name" className="input" value={name} placeholder="Alex" onChange={event => setName(event.target.value)} /></div></div> : null}
     {step === 1 ? <div className="stack"><h1>Which language today?</h1><p className="muted">You can change this later in your profile.</p><div className="grid-2">{languages.map(option => <button key={option.code} type="button" className={`scene-pick${option.code === language.code ? " scene-pick--selected" : ""}`} onClick={() => setLanguage(option)} style={{ alignItems: "center", padding: "var(--space-4)" }}><span style={{ fontSize: 28 }}>{option.flag}</span><strong>{option.name}</strong></button>)}</div></div> : null}
     {step === 2 ? <div className="stack"><h1>What are you practising for?</h1><div className="stack-2">{goals.map(option => <button key={option} type="button" className={`task-row${option === goal ? " task-row--done" : ""}`} onClick={() => setGoal(option)}><span className="task-row__index">{option === goal ? <CheckIcon size={16} /> : ""}</span><span className="grow">{option}</span></button>)}</div><h3>Minutes a day</h3><div className="row">{minutesOptions.map(option => <button key={option} type="button" className={`chip${option === minutes ? " chip--selected" : ""}`} onClick={() => setMinutes(option)}>{option} min</button>)}</div></div> : null}
     {step === 3 ? <div className="stack"><h1>Permissions</h1><p className="muted">Linguini uses your camera for scenes and your microphone for speaking practice. You can always type instead.</p><Card><div className="spread"><div className="row"><CameraIcon /><div><strong>Camera</strong><p className="small muted">Capture scenes to learn from</p></div></div><input type="checkbox" aria-label="Allow camera" checked={cameraEnabled} onChange={event => setCameraEnabled(event.target.checked)} /></div></Card><Card><div className="spread"><div className="row"><MicIcon /><div><strong>Microphone</strong><p className="small muted">Speak your clues</p></div></div><input type="checkbox" aria-label="Allow microphone" checked={microphoneEnabled} onChange={event => setMicrophoneEnabled(event.target.checked)} /></div></Card></div> : null}
