@@ -216,16 +216,7 @@ export function Home() {
           </Button>
         </div>
       </section>
-
-      <section className="home-journey" aria-label="Your learning journey">
-        <div className="home-journey__heading"><div><h2>Your learning journey</h2><p>Every small step adds up.</p></div><strong>{progressLoading || progressError ? "--" : progress?.xp ?? 0} XP</strong></div>
-        <div className="home-journey__milestones">
-          <div><span className="home-journey__marks" aria-hidden="true">{marks(collected, "●")}</span><strong>{collected ?? "--"} words collected</strong></div>
-          <div><span className="home-journey__marks" aria-hidden="true">{marks(mastered, "★")}</span><strong>{mastered ?? "--"} words mastered</strong></div>
-          <div><span className="home-journey__marks" aria-hidden="true">{marks(scenes, "▣")}</span><strong>{scenes ?? "--"} scenes explored</strong></div>
-        </div>
-      </section>
-
+      
       <WordsLearntChart
         dates={streak?.days.map(day => day.date) ?? lastSevenDates()}
         vocabulary={vocabulary}
