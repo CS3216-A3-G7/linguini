@@ -1,32 +1,74 @@
-import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState, type FormEvent } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui";
-import { getActivePractice } from "../lib/api";
-import { sessionDestination } from "../lib/sessionRoute";
-import { queryError, queryKeys } from "../lib/queryKeys";
-import { useAppState } from "../state/useAppState";
+import { isSupabaseConfigured, supabase } from "../lib/supabase.ts";
+import { useAuth } from "../state/Auth";
 
 export function Login() {
   const navigate = useNavigate();
-  const { learner, activeProfile } = useAppState();
-  const { data: active, error: activeQueryError, isPending: activeLoading } = useQuery({
-    queryKey: queryKeys.activeSession(activeProfile?.id ?? ""),
-    queryFn: () => getActivePractice(),
-  });
-  const activeError = queryError(activeQueryError);
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { session, loading } = useAuth();
+  const [mode, setMode] = useState<"signin" | "signup">(searchParams.get("mode") === "signup" ? "signup" : "signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const destination = (location.state as { from?: string } | null)?.from ?? "/home";
+
+  useEffect(() => {
+    if (session && !loading) navigate(destination, { replace: true });
+  }, [destination, loading, navigate, session]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+    const response = mode === "signin"
+      ? await supabase.auth.signInWithPassword({ email, password })
+      : await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${window.location.origin}/login` },
+      });
+    setSubmitting(false);
+    if (response.error) {
+      setError(response.error.message);
+      return;
+    }
+    if (mode === "signup" && !response.data.session) {
+      setMessage("Check your email to confirm your account, then sign in here.");
+    }
+  }
+
   return <div className="stack">
     <div className="center-text stack-2" style={{ alignItems: "center" }}>
       <img className="mascot" src="/linguini-logo.png" width={120} height={120} alt="Linguini mascot" />
-      <h1>Welcome back</h1>
-      <p className="muted">Continue learning with {learner.name}.</p>
-      <p className="small muted">This version uses a demo account. Email and password sign-in is not available yet.</p>
+      <h1>{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
+      <p className="muted">{mode === "signin" ? "Sign in to continue learning." : "Start learning words from your world."}</p>
     </div>
-    <Button block onClick={() => navigate("/home")}>Continue to home</Button>
-    {activeLoading ? <p role="status">Loading your practice...</p> : null}
-    {activeError ? <p role="alert">{activeError} Reload to retry.</p> : null}
-    {active ? <Button variant="secondary" block onClick={() => navigate(sessionDestination(active).path)}>Resume {active.title}</Button> : null}
+    {!isSupabaseConfigured ? <p role="alert">Authentication is not configured yet. Add the Supabase URL and publishable key to this app’s environment variables.</p> : null}
+    {isSupabaseConfigured ? <form className="stack" onSubmit={event => void submit(event)}>
+      <label className="field">
+        <span className="field__label">Email</span>
+        <input className="input" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required />
+      </label>
+      <label className="field">
+        <span className="field__label">Password</span>
+        <input className="input" type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={event => setPassword(event.target.value)} minLength={6} required />
+      </label>
+      {error ? <p role="alert">{error}</p> : null}
+      {message ? <p role="status">{message}</p> : null}
+      <Button block disabled={submitting}>{submitting ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}</Button>
+    </form> : null}
     <p className="small muted center-text">
-      <button type="button" className="btn btn--quiet" onClick={() => navigate("/onboarding")}>Set up your learning preferences</button>
+      {mode === "signin" ? "New to Linguini? " : "Already have an account? "}
+      <button type="button" className="btn btn--quiet" onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setMessage(null); }}>
+        {mode === "signin" ? "Create an account" : "Sign in"}
+      </button>
     </p>
   </div>;
 }

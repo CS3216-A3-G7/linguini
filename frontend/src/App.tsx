@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell, FocusShell } from "./components/AppShell";
 import { Home } from "./pages/Home";
 import { Welcome } from "./pages/Welcome";
@@ -21,14 +21,33 @@ import { SceneRoute } from "./components/SceneRoute";
 import { SessionRoute } from "./components/SessionRoute";
 import { ProfileEdit } from "./pages/ProfileEdit";
 import { Progress } from "./pages/Progress";
+import { AppStateProvider } from "./state/AppState";
+import { useAuth } from "./state/Auth";
+import { LoadingScreen } from "./components/LoadingScreen";
+
+function RequireAuth() {
+  const { session, loading } = useAuth();
+  const location = useLocation();
+  if (loading) return <LoadingScreen label="Checking your account…" />;
+  if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  return <Outlet />;
+}
+
+function AuthenticatedApp() {
+  return <AppStateProvider><Outlet /></AppStateProvider>;
+}
 
 export default function App() {
   return (
     <Routes>
       <Route element={<FocusShell />}>
         <Route path="/" element={<Welcome />} />
-        <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
+      </Route>
+      <Route element={<RequireAuth />}>
+        <Route element={<AuthenticatedApp />}>
+          <Route element={<FocusShell />}>
+            <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/practice/sessions/:sessionId" element={<SessionRoute />}>
           <Route path="analysis" element={<PracticeAnalysis />} />
           <Route path="mic-test" element={<MicTest />} />
@@ -39,8 +58,8 @@ export default function App() {
           <Route path="summary" element={<SessionSummary />} />
         </Route>
         <Route path="/practice/:sceneId/*" element={<SceneRoute />} />
-      </Route>
-      <Route element={<AppShell />}>
+          </Route>
+          <Route element={<AppShell />}>
         <Route path="/home" element={<Home />} />
         <Route path="/practice" element={<PracticeSelect />} />
         <Route path="/progress" element={<Progress />} />
@@ -51,6 +70,8 @@ export default function App() {
         <Route path="/journal/:entryId" element={<JournalEntryPage />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />
+          </Route>
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>

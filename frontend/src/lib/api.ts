@@ -2,6 +2,7 @@ import { GENDER_ARTICLES } from "../data/types.ts";
 import type { Gender, LeaderboardRow, ScenarioProgress, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";
+import { getAccessToken } from "./supabase.ts";
 
 // The Node test runner has no import.meta.env; read process.env there.
 const envBaseUrl = import.meta.env?.VITE_API_BASE_URL
@@ -116,7 +117,10 @@ async function request<T>(path: string, signal?: AbortSignal, options?: RequestI
 
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, { ...options, signal });
+    const headers = new Headers(options?.headers);
+    const token = await getAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    response = await fetch(`${apiBaseUrl}${path}`, { ...options, headers, signal });
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new Error("Cannot reach the API. Check that the backend is running and CORS allows this origin.");
