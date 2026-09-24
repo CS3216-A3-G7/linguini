@@ -1,6 +1,6 @@
 """Session table definitions and progress derived from normalized encounters."""
 
-from datetime import UTC, datetime, time, timedelta
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import (
@@ -74,28 +74,8 @@ class SessionBackedLearningRepository:
         if user_id != self.user_id:
             return None
         with self.engine.connect() as connection:
-            query = (
-                select(func.coalesce(func.sum(xp_events.c.amount), 0))
-                .select_from(xp_events)
-                .where(xp_events.c.user_id == user_id)
-            )
-            if language_code:
-                query = query.join(
-                    language_profiles,
-                    language_profiles.c.id == xp_events.c.language_profile_id,
-                ).where(
-                    func.lower(language_profiles.c.target_language_code) == language_code.lower()
-                )
-            xp = connection.execute(query).scalar_one()
-            learner_timezone = ZoneInfo(timezone)
-            today = datetime.now(learner_timezone).date()
-            streak_dates = [today - timedelta(days=offset) for offset in range(6, -1, -1)]
-            end = datetime.combine(
-                today + timedelta(days=1), time.min, learner_timezone
-            ).astimezone(UTC)
-            activity_query = select(xp_events.c.occurred_at).where(
-                xp_events.c.user_id == user_id,
-                xp_events.c.occurred_at < end,
+            activity_query = select(xp_events.c.amount, xp_events.c.occurred_at).where(
+                xp_events.c.user_id == user_id
             )
             if language_code:
                 activity_query = activity_query.join(
@@ -104,9 +84,15 @@ class SessionBackedLearningRepository:
                 ).where(
                     func.lower(language_profiles.c.target_language_code) == language_code.lower()
                 )
+            activity_rows = connection.execute(activity_query).all()
+            xp = sum(row.amount for row in activity_rows)
+            learner_timezone = ZoneInfo(timezone)
+            today = datetime.now(learner_timezone).date()
+            streak_dates = [today - timedelta(days=offset) for offset in range(6, -1, -1)]
             active_dates = {
-                occurred_at.astimezone(learner_timezone).date()
-                for occurred_at in connection.execute(activity_query).scalars()
+                local_date
+                for _, occurred_at in activity_rows
+                if (local_date := occurred_at.astimezone(learner_timezone).date()) <= today
             }
             current_streak = 0
             for day in reversed(streak_dates):
