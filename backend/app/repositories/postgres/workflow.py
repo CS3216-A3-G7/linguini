@@ -36,7 +36,11 @@ from app.repositories.practice import (
     PracticeStorageError,
 )
 from app.schemas.base import utc_now
-from app.schemas.enums import SessionStatus
+from app.schemas.enums import (
+    SessionStatus,
+    VocabularyEncounterOutcome,
+    VocabularyEncounterType,
+)
 from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
 from app.schemas.tasks import (
@@ -986,6 +990,25 @@ class PostgresWorkflowRepository:
                 introduction.order_index = 0
                 c.execute(insert(session_tasks).values(**entity_values(introduction)))
                 introduction_id = introduction.id
+                # Translation is the moment a learner has collected these
+                # words. Persist a "new" vocabulary record now, rather than
+                # waiting for task completion, so leaving the lesson does not
+                # discard their image vocabulary.
+                for word in words:
+                    record_vocabulary_evidence(
+                        c,
+                        user_id=self.user_id,
+                        vocabulary_item_id=word.id,
+                        encounter=VocabularyEncounter(
+                            id=uuid5(session_id, f"translated:{word.id}"),
+                            user_id=self.user_id,
+                            vocabulary_item_id=word.id,
+                            session_id=session_id,
+                            session_task_id=introduction.id,
+                            encounter_type=VocabularyEncounterType.INTRODUCED,
+                            outcome=VocabularyEncounterOutcome.COMPLETED,
+                        ),
+                    )
 
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
