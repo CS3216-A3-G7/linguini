@@ -16,7 +16,7 @@ Copy `.env.example` to `.env.local` to point the site at real URLs:
 | Variable | Used for |
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Canonical URL, sitemap and absolute OG image links. On Vercel it falls back to the production domain. |
-| `NEXT_PUBLIC_APP_URL` | Where “Start learning” and “Log in” go. On Vercel it defaults to the live app, https://linguini-navy.vercel.app. |
+| `NEXT_PUBLIC_APP_URL` | Where “Start learning” and “Log in” go. Production builds (including Vercel) default to the live app, https://linguini-navy.vercel.app; development uses `http://localhost:5173`. |
 
 Live at https://linguini-landing.vercel.app (Vercel project `linguini-landing`, **Root Directory** `landing`).
 
