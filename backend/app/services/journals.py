@@ -161,9 +161,22 @@ class JournalService:
         if entry is not None and entry.journal.user_id != user.id:
             entry = None
         eligible_photos: list[JournalPhotoOption] = []
+        suggested_words: list[str] = []
         if self.media is not None:
             start = datetime.combine(day, time.min, tzinfo=tz)
             end = start + timedelta(days=1)
+            language_profile_id = (
+                entry.journal.language_profile_id
+                if entry is not None
+                else next(
+                    (profile.id for profile in self.profiles.list_profiles() if profile.is_active),
+                    None,
+                )
+            )
+            if language_profile_id is not None:
+                suggested_words = self.media.list_session_translation_suggestions(
+                    user.id, language_profile_id, start, end
+                )
             unique: dict[UUID, SessionImage] = {}
             for image in self.media.list_completed_session_images(user.id, start, end):
                 unique.setdefault(image.asset.id, image)
@@ -187,6 +200,7 @@ class JournalService:
             local_date=day,
             journal=entry.journal if entry else None,
             eligible_photos=eligible_photos,
+            suggested_words=suggested_words,
             can_create=entry is None,
         )
 
