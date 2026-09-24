@@ -32,7 +32,7 @@ def test_translations_are_committed_before_lesson_generation(database):
     def translate(payload):
         return SceneTranslationResult.model_validate({
             kind: [
-                {**term, "translation": "mesa", "phoneticText": "/ˈmesa/"}
+                {**term, "translation": "mesa", "phoneticText": "MEH-sah"}
                 for term in payload[kind]
             ]
             for kind in ("objects", "attributes", "relationships")
@@ -72,11 +72,11 @@ def test_translations_are_committed_before_lesson_generation(database):
     settled = repo.get(sid, profile.id)
     assert settled.session.status == "inProgress"
     assert settled.tasks
-    assert settled.vocabulary[0].phonetic_text == "/ˈmesa/"
+    assert settled.vocabulary[0].phonetic_text == "MEH-sah"
     intro = next(task for task in settled.tasks if task.kind == "vocabularyIntroduction")
     assert intro.id == observed[0].tasks[0].id
     assert intro.status == "completed"
-    assert intro.public_content.words[0].phonetic_text == "/ˈmesa/"
+    assert intro.public_content.words[0].phonetic_text == "MEH-sah"
 
 
 def test_preloaded_analysis_is_ready_without_a_background_job(database):

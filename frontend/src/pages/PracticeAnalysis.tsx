@@ -9,6 +9,7 @@ import { LeaveSession } from "../components/LeaveSession";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { sessionDestination } from "../lib/sessionRoute";
+import { humanizeTerm } from "../lib/termLabel";
 import type { PracticeReview } from "../lib/api";
 import type { LanguageItem } from "../data/types";
 
@@ -23,7 +24,7 @@ type AnalysisPanel = "objects" | "attributes" | "relations";
 
 function relationLabel(relation: string) {
   return RELATION_OPTIONS.find(([value]) => value === relation)?.[1]
-    ?? relation.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ");
+    ?? humanizeTerm(relation);
 }
 
 export function PracticeAnalysis() {

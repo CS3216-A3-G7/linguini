@@ -1,4 +1,5 @@
 import type { PracticeDetail } from "../lib/api";
+import { humanizeTerm } from "../lib/termLabel";
 import type { Scene } from "../data/types";
 import { Card } from "./ui";
 import { ScenePhoto } from "./ScenePhoto";
@@ -14,7 +15,7 @@ export function TranslationPreview({ preview, scene }: { preview: NonNullable<Pr
     ] as const).map(([label, terms]) => terms.length ? <section key={label} className="translation-preview__group">
       <h3>{label}</h3>
       <div className="translation-preview__terms">{terms.map(term => <span className="translation-preview__term" key={term.key}>
-        <span>{term.source}</span><strong>{term.translation}</strong>
+        <span>{humanizeTerm(term.source)}</span><strong>{term.translation}</strong>
       </span>)}</div>
     </section> : null)}
   </Card>;
