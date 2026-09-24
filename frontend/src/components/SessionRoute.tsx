@@ -8,9 +8,9 @@ import { isPreTaskStep, isSessionRouteAllowed, sessionDestination, sessionLoadin
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
-import { ScenePhoto } from "./ScenePhoto";
 import { LoadingScreen } from "./LoadingScreen";
 import { ErrorState } from "./ErrorState";
+import { AnalysisScan } from "./AnalysisScan";
 import { TranslationPreview } from "./TranslationPreview";
 
 export function SessionRoute() {
@@ -55,7 +55,7 @@ function SessionLoader({ id }: { id: string }) {
   if (loading && !earlyReady) return copy.scan && preview ? <div className="stack analysis-page">
     <h1>{copy.title}</h1>
     <section className="analysis-loading" aria-live="polite" aria-busy="true">
-      <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={preview} items={[]} /><span className="analysis-scan__line" /></div>
+      <AnalysisScan scene={preview} />
       <div className="analysis-loading__copy"><h2>{copy.heading}</h2><p className="muted">This will only take a moment.</p></div>
     </section>
   </div> : <LoadingScreen label={copy.heading} />;

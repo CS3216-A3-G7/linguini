@@ -40,7 +40,16 @@ export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
   return createPortal(
     <div className="loading-screen">
       <div className="loading-screen__status" role="status" aria-live="polite" aria-atomic="true" tabIndex={-1} ref={status}>
-        <span className="loading-screen__spinner" aria-hidden="true" />
+        <div className="loading-screen__bowl" aria-hidden="true">
+          <span className="loading-screen__steam loading-screen__steam--one" />
+          <span className="loading-screen__steam loading-screen__steam--two" />
+          <span className="loading-screen__steam loading-screen__steam--three" />
+          <img className="loading-screen__pasta loading-screen__pasta--farfalle" src="/pasta-assets/farfalle.png" alt="" />
+          <img className="loading-screen__pasta loading-screen__pasta--fusilli" src="/pasta-assets/fusilli.png" alt="" />
+          <img className="loading-screen__pasta loading-screen__pasta--penne" src="/pasta-assets/penne.png" alt="" />
+          <span className="loading-screen__bowl-rim" />
+        </div>
+        <span className="loading-screen__eyebrow">Linguini is cooking</span>
         <span className="loading-screen__label">{label}</span>
       </div>
     </div>,
