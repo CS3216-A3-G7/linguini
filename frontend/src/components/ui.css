@@ -643,42 +643,54 @@ p[role="alert"]::before { content: "!"; }
   z-index: 1;
   pointer-events: none;
   background:
-    linear-gradient(115deg, rgba(46, 156, 153, 0.18), transparent 38%, rgba(255, 190, 58, 0.2)),
-    repeating-linear-gradient(90deg, transparent 0 42px, rgba(255, 250, 242, 0.22) 43px 45px);
+    linear-gradient(115deg, rgba(31, 122, 120, 0.24), transparent 42%, rgba(255, 190, 58, 0.26)),
+    rgba(38, 50, 56, 0.13);
+  backdrop-filter: blur(2px) saturate(0.8);
+  -webkit-backdrop-filter: blur(2px) saturate(0.8);
 }
 
-.analysis-scan__line {
+.analysis-scan__magnifier {
   position: absolute;
   z-index: 2;
-  top: 12%;
-  left: var(--space-3);
-  right: var(--space-3);
-  height: 5px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--tomato), var(--pasta), var(--teal), var(--pasta), var(--tomato));
-  box-shadow: 0 0 0 3px rgba(255, 250, 242, 0.62), 0 6px 18px rgba(86, 67, 34, 0.28);
-  animation: analyse-scene 1300ms ease-in-out infinite alternate;
+  top: 14%;
+  left: 9%;
+  width: clamp(80px, 15vw, 128px);
+  height: clamp(80px, 15vw, 128px);
+  animation: analysis-magnifier-glide 5000ms cubic-bezier(.44, .05, .38, .98) infinite;
 }
 
-.analysis-scan__pasta {
+.analysis-scan__glass {
   position: absolute;
-  z-index: 3;
-  width: clamp(34px, 7vw, 60px);
-  height: auto;
-  pointer-events: none;
-  filter: drop-shadow(0 4px 7px rgba(86, 67, 34, 0.25));
+  inset: 0;
+  border: 8px solid var(--pasta);
+  border-radius: 50%;
+  background: rgba(255, 250, 242, 0.12);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.34), 0 8px 16px rgba(38, 50, 56, 0.3);
 }
 
-.analysis-scan__pasta--one {
-  top: 18%;
-  right: 9%;
-  animation: scan-pasta-bob 1800ms ease-in-out infinite alternate;
+.analysis-scan__handle {
+  position: absolute;
+  right: -28%;
+  bottom: -18%;
+  width: 17%;
+  height: 50%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--teal-dark), var(--teal));
+  box-shadow: 2px 3px 6px rgba(38, 50, 56, 0.24);
+  transform: rotate(-43deg);
 }
 
-.analysis-scan__pasta--two {
-  bottom: 13%;
-  left: 8%;
-  animation: scan-pasta-bob 1500ms 250ms ease-in-out infinite alternate-reverse;
+.analysis-scan__glint {
+  position: absolute;
+  z-index: 2;
+  top: 33%;
+  left: 32%;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff8d0;
+  box-shadow: 0 0 0 4px rgba(255, 190, 58, 0.34), 0 0 18px 6px rgba(255, 250, 242, 0.82);
+  animation: analysis-glint 5000ms ease-in-out infinite;
 }
 
 .analysis-scan__tag {
@@ -695,6 +707,19 @@ p[role="alert"]::before { content: "!"; }
   font-size: 0.78rem;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.analysis-scan__caption { display: block; }
+
+.analysis-scan__caption--veo {
+  position: absolute;
+  inset: 6px 12px;
+  opacity: 0;
+  animation: analysis-caption-cycle 5000ms ease-in-out infinite;
+}
+
+.analysis-scan__caption--words {
+  animation: analysis-caption-cycle 5000ms ease-in-out infinite reverse;
 }
 
 .analysis-loading__copy {
@@ -1063,21 +1088,35 @@ p[role="alert"]::before { content: "!"; }
   to { background-position: 0 0, 0 0, 0 0; }
 }
 
-@keyframes scan-pasta-bob {
-  from { transform: translateY(-5px) rotate(-10deg); }
-  to { transform: translateY(7px) rotate(10deg); }
+@keyframes analysis-magnifier-glide {
+  0%, 100% { transform: translate(0, 0) rotate(-10deg); }
+  24% { transform: translate(180%, 42%) rotate(9deg); }
+  39% { transform: translate(180%, 42%) rotate(9deg); }
+  67% { transform: translate(70%, 125%) rotate(-5deg); }
+  80% { transform: translate(70%, 125%) rotate(-5deg); }
+}
+
+@keyframes analysis-glint {
+  0%, 19%, 43%, 100% { opacity: 0; transform: scale(0.4); }
+  25%, 35% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes analysis-caption-cycle {
+  0%, 43% { opacity: 1; transform: translateY(0); }
+  50%, 93% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .analysis-scan__line {
-    top: 50%;
+  .scene-image.scene-image--loading,
+  .analysis-scan__magnifier,
+  .analysis-scan__glint,
+  .analysis-scan__caption {
     animation: none;
   }
 
-  .scene-image.scene-image--loading,
-  .analysis-scan__pasta {
-    animation: none;
-  }
+  .analysis-scan__magnifier { top: 36%; left: 42%; }
+  .analysis-scan__caption--veo { display: none; }
 }
 
 /* Top bar */
