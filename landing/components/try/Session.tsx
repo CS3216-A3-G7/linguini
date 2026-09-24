@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { scenes } from "@/data/scenes";
 import { languageNames, type Lang, type Scene } from "@/data/types";
 import { appLinks } from "@/lib/site";
 import { speak } from "@/lib/speech";
@@ -45,6 +46,7 @@ export function Session({ scene, lang, onLangChange, onExit }: SessionProps) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const visualRef = useRef<HTMLDivElement>(null);
 
   const words = useMemo(() => scene.words.filter(word => selected.includes(word.id)), [scene.words, selected]);
   const scanLines = useMemo(
@@ -78,8 +80,13 @@ export function Session({ scene, lang, onLangChange, onExit }: SessionProps) {
     requestAnimationFrame(() => {
       headingRef.current?.focus({ preventScroll: true });
       const panel = panelRef.current;
-      if (panel && panel.getBoundingClientRect().top < 64) {
-        panel.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+      if (!panel) return;
+      // On small screens the photo sticks under the header, so keep the panel start just below it.
+      const stacked = window.matchMedia("(max-width: 960px)").matches;
+      const offset = stacked ? 64 + (visualRef.current?.offsetHeight ?? 0) + 8 : 96;
+      const top = panel.getBoundingClientRect().top;
+      if (top < offset) {
+        window.scrollTo({ top: top + window.scrollY - offset, behavior: prefersReducedMotion() ? "auto" : "smooth" });
       }
     });
   }
@@ -100,7 +107,12 @@ export function Session({ scene, lang, onLangChange, onExit }: SessionProps) {
       </div>
 
       <div className={styles.layout}>
-        <div className={styles.visual}>
+        <div
+          ref={visualRef}
+          className={styles.visual}
+          data-compact={taskIndex >= 0}
+          style={{ "--ar": scene.width / scene.height } as React.CSSProperties}
+        >
           <PhotoMarkers
             scene={scene}
             lang={lang}
@@ -276,7 +288,12 @@ function WordsStage({
         <WordCard key={word.id} word={word} lang={lang} className={styles.dealt} />
       </div>
       <div className={styles.pair}>
-        <button type="button" className="btn btn--teal" disabled={safeIndex === 0} onClick={() => setIndex(safeIndex - 1)}>
+        <button
+          type="button"
+          className="btn btn--teal"
+          style={safeIndex === 0 ? { visibility: "hidden" } : undefined}
+          onClick={() => setIndex(safeIndex - 1)}
+        >
           <ArrowLeft size={18} /> Previous
         </button>
         {last ? (
@@ -613,7 +630,7 @@ function DoneStage({
         ))}
       </div>
       <JournalCard
-        photos={[{ src: scene.photo, alt: scene.alt }]}
+        photos={[scene, ...scenes.filter(other => other.id !== scene.id).slice(0, 3)].map(item => ({ src: item.photo, alt: item.alt }))}
         title={entry.title}
         body={entry.body}
         date={date}

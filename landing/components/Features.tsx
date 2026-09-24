@@ -151,11 +151,9 @@ export function Features() {
                   </span>
                 ))}
               </div>
-              <dl className={styles.stats}>
-                <div><dt>XP this week</dt><dd>420</dd></div>
-                <div><dt>Words collected</dt><dd>86</dd></div>
-                <div><dt>Journal pages</dt><dd>19</dd></div>
-              </dl>
+              <p className={styles.stats}>
+                <b>420 XP</b> this week · <b>86</b> words collected · <b>19</b> journal pages
+              </p>
             </div>
           </Reveal>
         </div>

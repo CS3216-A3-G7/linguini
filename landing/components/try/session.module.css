@@ -878,6 +878,29 @@
 
   .visual {
     position: static;
+    top: 64px;
+    z-index: 3;
+    margin-inline: calc(var(--gutter) * -1);
+    padding: 6px var(--gutter) 12px;
+    background: var(--butter);
+  }
+
+  .visual[data-compact="true"] {
+    position: sticky;
+  }
+
+  .visual[data-compact="true"] .photo {
+    width: min(100%, calc(24svh * var(--ar)));
+    margin-inline: auto;
+  }
+
+  .visual[data-compact="true"] .caption {
+    display: none;
+  }
+
+  .panel {
+    position: relative;
+    z-index: 1;
   }
 }
 

@@ -169,6 +169,10 @@
   grid-template-columns: 1fr;
 }
 
+.journalPhotosPair .journalSide {
+  grid-row: 1 / -1;
+}
+
 .journalMain {
   position: relative;
   grid-row: 1 / -1;

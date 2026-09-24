@@ -34,7 +34,9 @@ export function JournalCard({ photos, title, body, date, lang, highlight = [], c
   const extra = photos.length - 3;
   return (
     <article className={`${styles.journalCard} ${className}`}>
-      <div className={`${styles.journalPhotos} ${side.length ? "" : styles.journalPhotosSingle}`}>
+      <div
+        className={`${styles.journalPhotos} ${side.length === 0 ? styles.journalPhotosSingle : side.length === 1 ? styles.journalPhotosPair : ""}`}
+      >
         <div className={styles.journalMain}>
           <Image src={main.src} alt={main.alt} fill sizes="(max-width: 700px) 70vw, 280px" className={styles.photoImg} />
         </div>
