@@ -79,7 +79,7 @@ function JournalEntryDetail({ entryId }: { entryId: string }) {
         <div className="journal-entry__gallery">
           <div className="journal-carousel">
             <div className="scene">
-              <MediaImage key={photo.mediaAssetId} assetId={photo.mediaAssetId} title={entry.title} imageUrl={photo.imageUrl} />
+              <MediaImage key={photo.mediaAssetId} assetId={photo.mediaAssetId} title={entry.title} />
             </div>
             {entry.photos.length > 1 ? <>
               <IconButton className="journal-carousel__control journal-carousel__control--previous" label="Previous photo" onClick={() => changePhoto(-1)}><ChevronLeftIcon /></IconButton>
@@ -98,7 +98,7 @@ function JournalEntryDetail({ entryId }: { entryId: string }) {
                   aria-current={i === photoIndex}
                   onClick={() => setActivePhotoIndex(i)}
                 >
-                  <MediaImage assetId={p.mediaAssetId} imageUrl={p.imageUrl} title={`Photo ${i + 1}`} />
+                  <MediaImage assetId={p.mediaAssetId} title={`Photo ${i + 1}`} width={320} lazy />
                 </button>
               ))}
             </div>
@@ -142,5 +142,5 @@ function JournalEntryEditor({ entry, onSaved }: { entry: JournalEntry; onSaved: 
   const error = queryError(queryErrorValue);
   if (loading) return <LoadingScreen label="Loading journal…" />;
   if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
-  return <JournalForm entry={entry} date={entry.date} photoOptions={data.photoOptions} onSaved={onSaved} />;
+  return <JournalForm entry={entry} date={entry.date} photoOptions={data.photoOptions} wordSuggestions={data.wordSuggestions} onSaved={onSaved} />;
 }

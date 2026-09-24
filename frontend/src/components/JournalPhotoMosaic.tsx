@@ -11,7 +11,7 @@ export function JournalPhotoMosaic({ photos, title }: { photos: MosaicPhoto[]; t
     <span className={`journal-mosaic journal-mosaic--${tiles.length}`} aria-hidden={false}>
       {tiles.map((photo, index) => (
         <span key={photo.mediaAssetId} className="journal-mosaic__tile">
-          <MediaImage assetId={photo.mediaAssetId} imageUrl={photo.imageUrl} title={`${title}, photo ${index + 1}`} />
+          <MediaImage assetId={photo.mediaAssetId} title={`${title}, photo ${index + 1}`} width={320} lazy />
           {remaining > 0 && index === tiles.length - 1 ? (
             <span className="journal-mosaic__more">+{remaining}</span>
           ) : null}

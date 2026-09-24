@@ -27,3 +27,6 @@ class MediaAssetRepository(Protocol):
     def list_completed_session_images(
         self, user_id: UUID, start: datetime, end: datetime
     ) -> list[SessionImage]: ...
+    def list_session_translation_suggestions(
+        self, user_id: UUID, language_profile_id: UUID, start: datetime, end: datetime
+    ) -> list[str]: ...

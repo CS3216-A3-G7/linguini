@@ -2,11 +2,10 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Feedback } from "../components/ui";
-import { ChevronRightIcon, UploadIcon } from "../components/icons";
+import { ChevronRightIcon } from "../components/icons";
 import { ImageUpload } from "../components/ImageUpload";
 import { MediaImage } from "../components/MediaImage";
 import { useAppState } from "../state/useAppState";
-import { useVocabularyQuery } from "../state/queries";
 import { getJournalContext } from "../lib/api";
 import type { JournalPhotoOption } from "../lib/api";
 import { queryError, queryKeys } from "../lib/queryKeys";
@@ -22,15 +21,12 @@ export function JournalNew() {
   const error = queryError(queryErrorValue);
   if (loading) return <LoadingScreen label="Loading journal…" />;
   if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
-  return <JournalForm key={data.entry?.id ?? `new-${data.date}`} entry={data.entry} date={data.date} photoOptions={data.photoOptions} />;
+  return <JournalForm key={data.entry?.id ?? `new-${data.date}`} entry={data.entry} date={data.date} photoOptions={data.photoOptions} wordSuggestions={data.wordSuggestions} />;
 }
 
-export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: JournalEntry | null; date: string; photoOptions: JournalPhotoOption[]; onSaved?: (entry: JournalEntry) => void }) {
+export function JournalForm({ entry, date, photoOptions, wordSuggestions, onSaved }: { entry: JournalEntry | null; date: string; photoOptions: JournalPhotoOption[]; wordSuggestions: string[]; onSaved?: (entry: JournalEntry) => void }) {
   const navigate = useNavigate();
   const { saveJournalEntry, journalSaving, journalSaveError, learner, activeProfile } = useAppState();
-  const { vocabulary, vocabularyError, vocabularyLoading } = useVocabularyQuery();
-  const sameLanguage = !entry || entry.languageProfileId === activeProfile?.id;
-  const journalWordSuggestions = sameLanguage ? [...new Set(vocabulary.map((item) => item.word))] : [];
   const shownDate = new Date(`${date}T12:00:00`);
   const isToday = date === new Date().toLocaleDateString("en-CA");
   const [title, setTitle] = useState(entry?.title ?? "");
@@ -110,7 +106,7 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
             {photos.length ? (
               <div className="photo-strip" aria-label={`${photos.length} photos added`}>
                 {photos.map((photo, index) => <div key={photo.mediaAssetId} className="photo-thumb">
-                  <MediaImage assetId={photo.mediaAssetId} imageUrl={photo.imageUrl} title={`Journal photo ${index + 1}`} />
+                  <MediaImage assetId={photo.mediaAssetId} title={`Journal photo ${index + 1}`} width={320} lazy />
                   <button type="button" className="photo-thumb__remove" aria-label={`Remove photo ${index + 1}`}
                     disabled={journalSaving || uploading}
                     onClick={() => setPhotos(current => current.filter(item => item.mediaAssetId !== photo.mediaAssetId))}>
@@ -118,12 +114,10 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
                   </button>
                 </div>)}
               </div>
-            ) : <div className="dashed-capture">
-              <span style={{ color: "var(--teal-dark)" }}><UploadIcon size={40} /></span>
-              <p className="small muted">Add a few photos from your day</p>
-            </div>}
+            ) : null}
             <div className="journal-editor__upload">
               <ImageUpload cameraEnabled={learner.cameraOn} disabled={journalSaving} onBusyChange={setUploading}
+                dropzoneLabel={photos.length ? "Add another photo" : "Add a few photos from your day"}
                 onUploaded={(image) => setPhotos(current => current.some(photo => photo.mediaAssetId === image.id) ? current
                   : [...current, { mediaAssetId: image.id, imageUrl: image.signedUrl, displayOrder: current.length }])} />
             </div>
@@ -146,7 +140,7 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
                         onClick={() => setPhotos(current => selected
                           ? current.filter(photo => photo.mediaAssetId !== option.mediaAssetId)
                           : [...current, { mediaAssetId: option.mediaAssetId, imageUrl: option.imageUrl, displayOrder: current.length }])}>
-                        <MediaImage assetId={option.mediaAssetId} imageUrl={option.imageUrl} title="Photo from your practice session" />
+                        <MediaImage assetId={option.mediaAssetId} title="Photo from your practice session" width={320} lazy />
                       </button>;
                     })}
                   </div>
@@ -156,13 +150,10 @@ export function JournalForm({ entry, date, photoOptions, onSaved }: { entry: Jou
           </section>
 
           <section className="journal-editor__panel">
-            <h2 className="journal-editor__panel-title">Words to use</h2>
-            {!sameLanguage ? <p className="small muted">Select this entry's language in Profile to see matching word suggestions.</p> : null}
+            <h2 className="journal-editor__panel-title">Words from today</h2>
             <div className="chip-row">
-              {vocabularyLoading ? <p role="status">Loading words…</p> : null}
-              {vocabularyError ? <p role="alert">{vocabularyError}</p> : null}
-              {!vocabularyLoading && !vocabularyError && !journalWordSuggestions.length ? <p className="small muted">No saved words for {learner.language} yet.</p> : null}
-              {journalWordSuggestions.map((word) => (
+              {!wordSuggestions.length ? <p className="small muted">No translated words were added from your photos on this day yet.</p> : null}
+              {wordSuggestions.map((word) => (
                 <button
                   key={word}
                   type="button"

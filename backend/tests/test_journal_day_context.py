@@ -111,6 +111,26 @@ def test_day_context_deduplicates_repeated_asset_across_sessions():
     assert [option.media_asset_id for option in context.eligible_photos] == [asset.id]
 
 
+def test_day_context_includes_every_translated_term_from_that_day():
+    today = datetime.now(ZoneInfo(TIMEZONE)).date()
+    media = MagicMock()
+    media.list_completed_session_images.return_value = []
+    media.list_session_translation_suggestions.return_value = [
+        "mesa",
+        "roja",
+        "al lado de",
+    ]
+    service, user, profile = _service([], media=media)
+
+    context = service.day_context(today)
+
+    assert context.suggested_words == ["mesa", "roja", "al lado de"]
+    _, language_profile_id, start, end = media.list_session_translation_suggestions.call_args.args
+    assert language_profile_id == profile.id
+    assert start == datetime.combine(today, time.min, tzinfo=ZoneInfo(TIMEZONE))
+    assert end == start + timedelta(days=1)
+
+
 def test_day_context_rejects_future_dates():
     service, _, _ = _service([], media=MagicMock())
     tomorrow = datetime.now(ZoneInfo(TIMEZONE)).date() + timedelta(days=1)
