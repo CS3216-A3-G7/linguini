@@ -167,8 +167,25 @@
   color: var(--pasta);
 }
 
+.founding {
+  max-width: 920px;
+  margin: 24px auto 0;
+  padding: 16px 22px;
+  border-radius: var(--radius-md);
+  background: var(--pasta-soft);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.founding a {
+  margin-left: 6px;
+  color: var(--tomato-ink);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .note {
-  margin-top: 28px;
+  margin-top: 20px;
   text-align: center;
   font-size: 15px;
   color: var(--ink-muted);

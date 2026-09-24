@@ -132,6 +132,56 @@ The preview variants point to the live landing demo. On actual Product Hunt day,
 
 > Linguini is on Product Hunt today. We’re exploring how photos from daily life can become short Spanish and French practice and a language journal. Try the demo, then tell us what worked and what didn’t in the comments: [PH_POST_URL]
 
+## Launch-day posts (final drafts, 17 October)
+
+These match the mockups in the launch blog post (`landing/components/blog/launch/content.ts`). Images are in `media/export/banners/`. None of them ask for upvotes.
+
+**X thread** (image on post 1: `launch-card-1200x630.png`)
+
+> 1/ Linguini is live on Product Hunt today 🍝
+>
+> Pick a photo of a street, a café or a desk. Linguini pins the Spanish or French words onto it, you play a round of I-Spy with them, and the lesson ends as a page in your journal.
+>
+> It’s early. Tell us where you got stuck 👇
+>
+> 2/ Why photos? A word sticks when it belongs to a place you remember. A flashcard has no place. Your camera roll is full of them.
+>
+> 3/ Built by a small student team at NUS. Spanish and French for now, free to try in your browser, nothing to install.
+>
+> The listing, with the 50-second explainer: [PH_POST_URL]
+
+**Instagram carousel** (`ig-post-1080x1350.png`, `social-square.png`, `countdown-1080x1080.png`)
+
+> Today’s lesson is on your camera roll 📷
+>
+> Linguini is live on Product Hunt. Pick a photo, learn the words inside it in Spanish or French, play a round of I-Spy and keep the day as a journal page.
+>
+> Link in bio. What’s the first thing you’d photograph?
+>
+> #learnspanish #learnfrench #languagelearning #studygram #producthunt
+
+**Instagram stories:** `ig-story-countdown-1080x1920.png` at T−3; `ig-story-1080x1920.png` on the day with a link sticker to [PH_POST_URL] in the clear area.
+
+**LinkedIn** (personal profile, with `linkedin-1584x396.png`)
+
+> We put Linguini on Product Hunt today.
+>
+> It started as a CS3216 project with a simple bet: vocabulary lists are easy to forget, but the places you walk through every day are not. So Linguini starts with a photo, pins Spanish or French words onto it, and ends each lesson as a journal page.
+>
+> The browser demo is open to everyone. The full app is with a small group of beta testers while we finish real photo analysis.
+>
+> If you teach, learn or build things, I’d value one honest comment on the listing: which step would make you come back tomorrow? [PH_POST_URL]
+
+**r/Spanish weekly self-promotion thread** (after messaging the mods)
+
+> **We made a photo-based Spanish mini lesson. Does the photo actually help you remember?**
+>
+> Small student team here. The idea: learn words from a place you recognise (a street, a café), then use them in I-Spy and a short sentence before saving it as a journal page. There’s a free demo with sample scenes, no sign-up. We’re trying to work out if the photo helps recall or just looks nice. If you try one scene, what would you change?
+
+**Telegram / WhatsApp to friends' groups** (send `launch-card-1200x630.png` as a photo with this caption, so the card shows whatever preview the link gets)
+
+> hey all! our CS3216 app Linguini just went up on Product Hunt 🍝 you pick a photo and learn the Spanish or French words in it. takes a few minutes in the browser. if you try it, drop a comment on what confused you 🙏 [PH_POST_URL]
+
 ## Maker reply bank
 
 - **“Can I use my own photo?”** Preview: “The public site currently offers a complete mini session using selected real photographs. We’re testing the user-photo flow in the learner app; we’ll update this answer when the production flow is verified.” Full release: “Yes. You can upload a photo or use your device camera in the browser. If an object suggestion is wrong, you can remove it before practising.”

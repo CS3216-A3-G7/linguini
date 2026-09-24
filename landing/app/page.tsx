@@ -1,3 +1,4 @@
+import { BlogSection } from "@/components/blog/BlogSection";
 import { Faq } from "@/components/Faq";
 import { Features } from "@/components/Features";
 import { FinalCta } from "@/components/FinalCta";
@@ -25,6 +26,7 @@ export default function HomePage() {
         <Pricing />
         <Faq />
         <FinalCta />
+        <BlogSection />
       </main>
       <SiteFooter />
       <JsonLd faq={faq} />
