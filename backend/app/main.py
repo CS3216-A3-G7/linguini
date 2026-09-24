@@ -13,6 +13,7 @@ from app.api.learning_errors import register_learning_errors
 from app.api.router import api_router
 from app.config import get_allowed_origins
 from app.database import create_database_engine
+from app.services.auth import SupabaseTokenVerifier, load_auth_settings
 from app.services.background import ThreadPoolBackgroundRunner
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,15 @@ async def lifespan(app: FastAPI):
     app.state.database_engine = engine
     app.state.background_runner = ThreadPoolBackgroundRunner()
     app.state.ai_tracer = build_tracer(app.state.ai_settings)
+    auth_settings = app.state.auth_settings
+    if auth_settings.mode == "demo":
+        server_logger.warning(
+            "Auth mode: demo — requests without a bearer token use DEMO_USER_ID. "
+            "Do not use this mode in deployed environments."
+        )
+    else:
+        app.state.token_verifier = SupabaseTokenVerifier(auth_settings)
+        server_logger.info("Auth mode: %s", auth_settings.mode)
     grounding_config = app.state.ai_settings.object_grounding
     server_logger.info(
         "Object grounding configuration: provider=%s model=%s threshold=%s",
@@ -85,11 +95,12 @@ def create_app() -> FastAPI:
         ),
     )
     app.state.ai_settings = load_ai_settings()
+    app.state.auth_settings = load_auth_settings()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_allowed_origins(),
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Authorization"],
     )
     register_learning_errors(app)
     app.include_router(api_router)

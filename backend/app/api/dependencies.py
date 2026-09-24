@@ -26,7 +26,8 @@ from app.ai.registry import (
     build_scene_translator,
     build_uploaded_scene_analyzer,
 )
-from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
+from app.api.auth import get_current_user_id
+from app.config import get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
 from app.repositories.learning import LearningRepository
@@ -65,9 +66,9 @@ def get_user_repository(request: Request) -> UserRepository:
 
 
 def get_journal_repository(
-    request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
+    request: Request, user_id: Annotated[UUID, Depends(get_current_user_id)]
 ) -> JournalRepository:
-    return PostgresJournalRepository(request.app.state.database_engine, demo_user_id)
+    return PostgresJournalRepository(request.app.state.database_engine, user_id)
 
 
 def get_language_profile_repository(request: Request) -> LanguageProfileRepository:
@@ -76,9 +77,9 @@ def get_language_profile_repository(request: Request) -> LanguageProfileReposito
 
 def get_user_service(
     repository: Annotated[UserRepository, Depends(get_user_repository)],
-    demo_user_id: Annotated[UUID, Depends(get_demo_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
 ) -> UserService:
-    return UserService(repository, demo_user_id)
+    return UserService(repository, user_id)
 
 
 def get_language_profile_service(
@@ -112,11 +113,11 @@ def get_journal_service(
 
 
 def get_learning_repository(
-    request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
+    request: Request, user_id: Annotated[UUID, Depends(get_current_user_id)]
 ) -> LearningRepository:
     return SessionBackedLearningRepository(
         request.app.state.database_engine,
-        demo_user_id,
+        user_id,
         PostgresVocabularyRepository(request.app.state.database_engine),
     )
 
@@ -239,7 +240,7 @@ def get_ispy_guess_generator(settings: AiSettings, tracer: AITracer | None = Non
 
 
 def get_practice_repository(
-    request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
+    request: Request, user_id: Annotated[UUID, Depends(get_current_user_id)]
 ) -> PostgresWorkflowRepository:
     engine = request.app.state.database_engine
     settings = get_ai_settings(request)
@@ -270,7 +271,7 @@ def get_practice_repository(
     ispy_clue_generator = build_ispy_clue_generator(settings, tracer)
     return PostgresWorkflowRepository(
         engine,
-        demo_user_id,
+        user_id,
         analyzer=analyzer,
         translator=translator,
         learning_task_generator=learning_task_generator,
