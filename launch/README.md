@@ -1,6 +1,6 @@
 # Linguini launch kit
 
-**Status: prepared for team review; no Product Hunt post has been published.** The public [landing page](https://linguini-landing.vercel.app/) offers a curated-photo mini session. The recommended next step is a supervised learner beta, followed by a Product Hunt launch once the checks in the [launch dashboard](plan.md) pass. The planning slot is 13 October 2026 at 00:01 PDT / 15:01 SGT; move it if readiness slips.
+**Status: prepared for team review; no Product Hunt post has been published.** The public [landing page](https://linguini-landing.vercel.app/) offers a curated-photo mini session. The recommended next step is a supervised learner beta, followed by a Product Hunt launch once the checks in the [launch dashboard](plan.md) pass. The planning slot is **Saturday 17 October 2026 at 00:01 PDT / 15:01 SGT** (moved from Tuesday 13 October: Saturdays have about a third as many launches, and Product Hunt reports 15% more visit clicks on weekends). Move it if readiness slips.
 
 | Material | Use |
 | --- | --- |
@@ -8,6 +8,8 @@
 | [Product Hunt submission and channel copy](product-hunt.md) | Paste-ready preview listing, first maker comment, full-release draft, social posts, outreach and reply bank. |
 | [Launch dashboard](plan.md) | Timeline, owner board, go/no-go criteria, launch-day response and retention measures. |
 | [Media kit](media/README.md) | Product Hunt gallery, icon, social square, narrated film, animated explainer and editable sources. |
+| [Launch checklist](checklist.md) | Yangshun-style dashboard: links, hour-by-hour run, tasks by week, Product Hunt fields, and community, creator and newsletter lists with their rules. |
+| [Launch campaign blog post](../landing/components/blog/posts/LaunchCampaign.tsx) | Public write-up at `/blog/launch-week`: the reasoning, animated mockups of every post, banners, runbook, retention plan and a tickable checklist. |
 | [Explainer video script](explainer-script.md) | Script and production notes for the alternate 50-second animated explainer: visual system, second-by-second voiceover, visuals and motion notes, audio, and claims to verify. The rendered video, captions and style frames are in the media kit. |
 
 ## Team decision checklist

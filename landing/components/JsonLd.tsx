@@ -62,12 +62,12 @@ export function JsonLd({ faq }: JsonLdProps) {
         {
           "@type": "Offer",
           name: "Plus",
-          price: "6.99",
+          price: "7.99",
           priceCurrency: "USD",
           category: "subscription",
           priceSpecification: {
             "@type": "UnitPriceSpecification",
-            price: "6.99",
+            price: "7.99",
             priceCurrency: "USD",
             unitCode: "MON",
             billingDuration: "P1M",
@@ -81,12 +81,12 @@ export function JsonLd({ faq }: JsonLdProps) {
         {
           "@type": "Offer",
           name: "Plus (yearly)",
-          price: "59.88",
+          price: "49.99",
           priceCurrency: "USD",
           category: "subscription",
           priceSpecification: {
             "@type": "UnitPriceSpecification",
-            price: "59.88",
+            price: "49.99",
             priceCurrency: "USD",
             unitCode: "ANN",
             billingDuration: "P1Y",

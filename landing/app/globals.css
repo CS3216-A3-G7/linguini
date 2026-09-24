@@ -243,6 +243,65 @@ button {
   transform: none;
 }
 
+/* Paper button: the quiet partner to a filled action */
+.btn--paper {
+  --btn-bg: var(--paper);
+  --btn-edge: #e2d6bd;
+  --btn-fg: var(--ink);
+  box-shadow: 0 4px 0 var(--btn-edge), inset 0 0 0 1px var(--line);
+}
+
+.btn--paper:hover {
+  box-shadow: 0 5px 0 var(--btn-edge), inset 0 0 0 1px var(--line);
+}
+
+/* Glossy main action: a light sweep and a slowly turning pasta-gold rim */
+@property --gloss-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.btn-gloss {
+  isolation: isolate;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 55%) padding-box,
+    linear-gradient(var(--btn-bg), var(--btn-bg)) padding-box,
+    conic-gradient(from var(--gloss-angle), var(--pasta), #fff3d6, var(--tomato-pressed), var(--pasta-soft), var(--pasta)) border-box;
+  animation: gloss-spin 5s linear infinite;
+}
+
+.btn-gloss::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.5) 48%, transparent 66%);
+  transform: translateX(-130%);
+  animation: gloss-sheen 4.2s var(--ease-out) infinite;
+  pointer-events: none;
+}
+
+@keyframes gloss-spin {
+  to {
+    --gloss-angle: 360deg;
+  }
+}
+
+@keyframes gloss-sheen {
+  0%,
+  35% {
+    transform: translateX(-130%);
+  }
+
+  75%,
+  100% {
+    transform: translateX(130%);
+  }
+}
+
 .btn-quiet {
   display: inline-flex;
   align-items: center;
@@ -312,4 +371,35 @@ button {
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 0.4s;
+}
+
+/* Print: blog posts export to PDF without site chrome */
+.no-print {
+  display: contents;
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+  }
+
+  body {
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print,
+  .skip-link {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
 }
