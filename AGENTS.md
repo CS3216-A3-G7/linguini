@@ -4,6 +4,7 @@ Linguini is a photo-led, speak-first language-learning app. The repository is a 
 
 - `frontend/` — React 19 + TypeScript + Vite SPA. See `frontend/AGENTS.md` for UI conventions (note: its "Current checkout" section describes an older root-level prototype and is out of date).
 - `backend/` — FastAPI + Pydantic + SQLAlchemy on PostgreSQL/Supabase, with Prisma owning migrations. API prefix `/api/v1`.
+- `landing/` — Next.js 16 marketing site (SEO, Open Graph images, interactive demo session). Independent of the app and API; see `landing/README.md`.
 
 ## Branch and pull request conventions
 
@@ -16,6 +17,7 @@ Linguini is a photo-led, speak-first language-learning app. The repository is a 
 ```sh
 cd frontend && npm ci && npm run lint && npm run build
 cd backend  && ruff check . && pytest
+cd landing  && npm ci && npm run lint && npm run build
 ```
 
 Backend tests need `TEST_DATABASE_URL` pointing at a disposable PostgreSQL database; without it the PostgreSQL integration tests skip silently. Prisma migrations are validated with `npm run db:validate` and applied with `npm run db:deploy` from `backend/`.
