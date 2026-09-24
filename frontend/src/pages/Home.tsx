@@ -23,8 +23,8 @@ function dayLabel(date: string) {
   return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${date}T12:00:00`));
 }
 
-function localDateKey(value: string) {
-  const parsed = new Date(value);
+function localDateKey(value: Date | string) {
+  const parsed = typeof value === "string" ? new Date(value) : value;
   return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
 }
 
@@ -32,7 +32,7 @@ function lastSevenDates() {
   const today = new Date();
   return Array.from({ length: 7 }, (_, index) => {
     const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (6 - index));
-    return localDateKey(day.toString());
+    return localDateKey(day);
   });
 }
 
@@ -73,8 +73,11 @@ function WordsLearntChart({ dates, vocabulary, loading, error }: { dates: string
                 aria-label={`${counts[index]} ${counts[index] === 1 ? "word" : "words"} on ${dayLabel(date)}`}
                 className={`home-words__bar${counts[index] === 0 ? " home-words__bar--empty" : ""}${index === dates.length - 1 ? " home-words__bar--today" : ""}`}
               >
-                <span className="home-words__value" aria-hidden="true">{counts[index]}</span>
-                <span className="home-words__fill" style={{ "--home-bar": `${peak === 0 ? 0 : Math.round((counts[index] / peak) * 100)}%` } as CSSProperties} />
+                <span className="home-words__track">
+                  <span className="home-words__fill" style={{ "--home-bar": `${peak === 0 ? 0 : Math.round((counts[index] / peak) * 100)}%` } as CSSProperties}>
+                    <span className="home-words__value" aria-hidden="true">{counts[index]}</span>
+                  </span>
+                </span>
                 <span className="home-words__day" aria-hidden="true">{dayLabel(date)}</span>
               </li>
             ))}
