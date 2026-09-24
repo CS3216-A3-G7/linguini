@@ -274,8 +274,13 @@ export interface JournalPhotoOption {
   completedAt: string;
 }
 export async function getJournalContext(date?: string, signal?: AbortSignal) {
-  const context = await request<{ localDate: string; journal: JournalRecord | null; eligiblePhotos: JournalPhotoOption[] }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
-  return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null, photoOptions: context.eligiblePhotos };
+  const context = await request<{ localDate: string; journal: JournalRecord | null; eligiblePhotos: JournalPhotoOption[]; suggestedWords: string[] }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
+  return {
+    date: context.localDate,
+    entry: context.journal ? await getJournal(context.journal.id, signal) : null,
+    photoOptions: context.eligiblePhotos,
+    wordSuggestions: context.suggestedWords ?? [],
+  };
 }
 export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed"> & { photoAssetIds?: string[] };
 export async function saveJournal(draft: JournalDraft, profileId: string, id?: string, date?: string) {
@@ -373,10 +378,12 @@ export interface TaskActionResult {
 }
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
 export interface PracticeReview {
+  sceneTitle?: string;
   acceptedObjectIds: string[];
   relations: SceneObjectRelation[];
   addedObjects: { id: string; label: string; x: number; y: number }[];
   objectAttributes: Record<string, Record<string, string>>;
+  repositionedObjects: { id: string; anchorPoint: { x: number; y: number } }[];
 }
 export const reviewPractice = (id: string, review: PracticeReview) => write<PracticeDetail>(`/api/v1/sessions/${id}/review`, "PUT", review);
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);

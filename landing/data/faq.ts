@@ -25,6 +25,6 @@ export const faq = [
   },
   {
     q: "Is the free plan really free?",
-    a: "Yes. One new photo session a day, the full journal and every game, with no card required. Plus adds unlimited sessions, pronunciation feedback and review mode.",
+    a: "Yes. One new photo lesson and one journal page every day, unlimited replays of our curated scenes and every game, with no card required. Plus adds up to 10 photo lessons a day, pronunciation feedback and review mode.",
   },
 ];

@@ -16,7 +16,7 @@ Copy `.env.example` to `.env.local` to point the site at real URLs:
 | Variable | Used for |
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Canonical URL, sitemap and absolute OG image links. On Vercel it falls back to the production domain. |
-| `NEXT_PUBLIC_APP_URL` | Where “Start learning” and “Log in” go. On Vercel it defaults to the live app, https://linguini-navy.vercel.app. |
+| `NEXT_PUBLIC_APP_URL` | Where “Start learning” and “Log in” go. Production builds (including Vercel) default to the live app, https://linguini-navy.vercel.app; development uses `http://localhost:5173`. |
 
 Live at https://linguini-landing.vercel.app (Vercel project `linguini-landing`, **Root Directory** `landing`).
 
@@ -25,6 +25,7 @@ Live at https://linguini-landing.vercel.app (Vercel project `linguini-landing`, 
 - **Interactive demo** (`components/try/`): pick a real photo, watch it get “analysed”, then play through word cards, I-Spy, a fill-in-the-blank and a sentence builder before the day is saved as a journal entry. Lesson content for each photo, in Spanish and French, is in `data/scenes.ts`.
 - **SEO**: semantic sections with one `h1`, per-page metadata, `robots.txt`, `sitemap.xml`, a web manifest and JSON-LD (Organization, WebSite, SoftwareApplication with Free/Plus offers, FAQPage).
 - **Social previews**: Open Graph and X cards made with `next/og` (`app/opengraph-image.tsx`). `app/og/route.tsx` renders a dynamic journal-page card, and `/share?photo=…&lang=…&words=…` uses it so a finished demo session can be shared with its own preview.
+- **Blog** (`app/blog/`, `components/blog/`): the three newest posts sit below the final call to action. Post metadata is in `data/posts.ts` and each body is a component in `components/blog/posts/`. Interactive charts and the animated lesson walkthrough live in `components/blog/interactive/`; their numbers come from `business-model/model/cost_model.py`. The main post's looping cover video is rendered with `python3 scripts/render-post-video.py` (Pillow and ffmpeg). A post with a `pdf` path offers a download; regenerate it after editing with `NEXT_PUBLIC_SITE_URL=https://linguini-landing.vercel.app npm run build && npm start`, then `node scripts/export-post-pdf.mjs` in another terminal (needs Google Chrome).
 - **Share widgets**: `components/ShareBar.tsx` builds share links for X, WhatsApp, Telegram, LinkedIn and Facebook, plus the native share sheet and copy link. It loads no third-party scripts.
 
 ## Assets

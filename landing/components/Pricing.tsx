@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { appLinks } from "@/lib/site";
 import { Check } from "./icons";
@@ -9,15 +10,16 @@ import styles from "./Pricing.module.css";
 type Billing = "monthly" | "yearly";
 
 const free = [
-  "One new photo session every day",
+  "One new photo lesson every day",
+  "One journal page a day",
+  "Unlimited replays of our curated scenes",
   "Spanish and French, from English",
   "Word cards, I-Spy and sentence games",
-  "A journal entry for every day you practise",
   "Streaks, XP and your pasta avatar",
 ];
 
 const plus = [
-  "Unlimited photo sessions",
+  "Up to 10 photo lessons a day",
   "Pronunciation feedback when you speak",
   "Review mode for words that haven’t stuck yet",
   "Up to 10 photos in each journal entry",
@@ -35,7 +37,7 @@ export function Pricing() {
         <div className="section-head section-head--center">
           <h2 id="pricing-title" className="section-title">Free to start. Plus when you’re hooked.</h2>
           <p className="section-lede">
-            Every photo you take can become a lesson on the free plan. Upgrade when one session a day stops being enough.
+            One photo lesson and one journal page a day are free. Upgrade when one a day stops being enough.
           </p>
         </div>
 
@@ -52,7 +54,7 @@ export function Pricing() {
                 className="visually-hidden"
               />
               {option === "monthly" ? "Monthly" : "Yearly"}
-              {option === "yearly" ? <span className={styles.save}>Save 28%</span> : null}
+              {option === "yearly" ? <span className={styles.save}>Save 48%</span> : null}
             </label>
           ))}
         </fieldset>
@@ -82,10 +84,10 @@ export function Pricing() {
               <p className={styles.planPitch}>For learners who photograph everything.</p>
             </header>
             <p className={styles.price} aria-live="polite">
-              <span className={styles.amount}>{yearly ? "$4.99" : "$6.99"}</span>
+              <span className={styles.amount}>{yearly ? "$4.17" : "$7.99"}</span>
               <span className={styles.per}>
                 per month
-                <span className={styles.billed}>{yearly ? "billed $59.88 yearly" : "billed monthly"}</span>
+                <span className={styles.billed}>{yearly ? "billed $49.99 yearly" : "billed monthly"}</span>
               </span>
             </p>
             <a href={`${appLinks.signUp}&plan=plus-${billing}`} className="btn btn--block">Try Plus free for 7 days</a>
@@ -97,6 +99,10 @@ export function Pricing() {
           </article>
         </div>
 
+        <p className={styles.founding}>
+          <strong>Founding Plus:</strong> our first 300 members lock in $34.99 a year and get early access to competitive
+          I-Spy. <Link href="/blog/linguini-business-model">How we priced Linguini</Link>
+        </p>
         <p className={styles.note}>Prices in US dollars. Cancel any time; your journal stays yours on the free plan.</p>
       </div>
     </section>

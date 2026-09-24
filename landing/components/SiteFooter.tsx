@@ -26,6 +26,7 @@ export function SiteFooter() {
         <nav aria-label="About" className={styles.col}>
           <h2 className={styles.heading}>About</h2>
           <Link href="/#faq">FAQ</Link>
+          <Link href="/blog">Blog</Link>
           <Link href="/credits">Photo credits</Link>
           <a href="https://github.com/CS3216-A3-G7/linguini">GitHub</a>
         </nav>

@@ -1,0 +1,198 @@
+{
+  "sessions": {
+    "current@promo, expected": 0.01195,
+    "current@promo, worst case": 0.04383,
+    "current@list, expected": 0.0189,
+    "current@list, worst case": 0.06096,
+    "optimized, expected": 0.00477,
+    "optimized, worst case": 0.01998
+  },
+  "breakdown": {
+    "current@promo": {
+      "Scene analysis (vision)": 0.00695,
+      "Translation": 0.00171,
+      "Learning tasks": 0.00182,
+      "I-Spy clues": 0.00064,
+      "I-Spy guess feedback": 0.00084
+    },
+    "current@list": {
+      "Scene analysis (vision)": 0.01389,
+      "Translation": 0.00171,
+      "Learning tasks": 0.00182,
+      "I-Spy clues": 0.00064,
+      "I-Spy guess feedback": 0.00084
+    },
+    "optimized": {
+      "Scene analysis (vision)": 0.00241,
+      "Translation": 0.00016,
+      "Learning tasks": 0.00121,
+      "I-Spy clues": 0.00043,
+      "I-Spy guess feedback": 0.00056
+    }
+  },
+  "profiles": {
+    "Free \u00b7 light": {
+      "current@promo": 0.027,
+      "current@list": 0.041,
+      "optimized": 0.012,
+      "worst": 0.148
+    },
+    "Free \u00b7 casual": {
+      "current@promo": 0.106,
+      "current@list": 0.161,
+      "optimized": 0.047,
+      "worst": 0.55
+    },
+    "Free \u00b7 at daily cap": {
+      "current@promo": 0.391,
+      "current@list": 0.6,
+      "optimized": 0.173,
+      "worst": 2.01
+    },
+    "Plus \u00b7 typical": {
+      "current@promo": 0.49,
+      "current@list": 0.699,
+      "optimized": 0.272,
+      "worst": 2.82
+    },
+    "Plus \u00b7 heavy (3/day)": {
+      "current@promo": 1.427,
+      "current@list": 2.052,
+      "optimized": 0.775,
+      "worst": 8.217
+    },
+    "Plus \u00b7 fair-use ceiling (10/day)": {
+      "current@promo": 4.68,
+      "current@list": 6.764,
+      "optimized": 2.519,
+      "worst": 26.837
+    },
+    "_mix": {
+      "current@promo": {
+        "free": 0.109,
+        "plus": 0.678
+      },
+      "current@list": {
+        "free": 0.167,
+        "plus": 0.969
+      },
+      "optimized": {
+        "free": 0.049,
+        "plus": 0.373
+      }
+    }
+  },
+  "options": {
+    "A \u00b7 Current landing ($6.99 / $59.88)": {
+      "monthly": 6.99,
+      "annual": 59.88,
+      "net_web": 5.31,
+      "net_store": 4.94
+    },
+    "B \u00b7 Recommended ($7.99 / $49.99)": {
+      "monthly": 7.99,
+      "annual": 49.99,
+      "net_web": 5.24,
+      "net_store": 4.87
+    },
+    "Founding Plus ($34.99/yr, capped cohort)": {
+      "monthly": null,
+      "annual": 34.99,
+      "net_web": 2.74,
+      "net_store": 2.48
+    }
+  },
+  "scenarios": {
+    "current@list": {
+      "Beta": {
+        "mau": 300,
+        "conversion": 0.023,
+        "payers": 7,
+        "net_revenue": 36.16,
+        "free_ai_cost": 48.96,
+        "plus_ai_cost": 6.69,
+        "fixed": 52,
+        "total_cost": 107.65,
+        "contribution": -71.49
+      },
+      "Launch year": {
+        "mau": 5000,
+        "conversion": 0.023,
+        "payers": 115,
+        "net_revenue": 602.65,
+        "free_ai_cost": 816.06,
+        "plus_ai_cost": 111.49,
+        "fixed": 52,
+        "total_cost": 979.55,
+        "contribution": -376.91
+      },
+      "Traction": {
+        "mau": 50000,
+        "conversion": 0.04,
+        "payers": 2000,
+        "net_revenue": 10480.81,
+        "free_ai_cost": 8018.63,
+        "plus_ai_cost": 1938.96,
+        "fixed": 70,
+        "total_cost": 10027.59,
+        "contribution": 453.22
+      }
+    },
+    "optimized": {
+      "Beta": {
+        "mau": 300,
+        "conversion": 0.023,
+        "payers": 7,
+        "net_revenue": 36.16,
+        "free_ai_cost": 14.28,
+        "plus_ai_cost": 2.57,
+        "fixed": 52,
+        "total_cost": 68.86,
+        "contribution": -32.7
+      },
+      "Launch year": {
+        "mau": 5000,
+        "conversion": 0.023,
+        "payers": 115,
+        "net_revenue": 602.65,
+        "free_ai_cost": 238.05,
+        "plus_ai_cost": 42.88,
+        "fixed": 52,
+        "total_cost": 332.94,
+        "contribution": 269.71
+      },
+      "Traction": {
+        "mau": 50000,
+        "conversion": 0.04,
+        "payers": 2000,
+        "net_revenue": 10480.81,
+        "free_ai_cost": 2339.12,
+        "plus_ai_cost": 745.81,
+        "fixed": 70,
+        "total_cost": 3154.93,
+        "contribution": 7325.88
+      }
+    }
+  },
+  "breakeven_conversion": {
+    "current@promo": {
+      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0231,
+      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0234
+    },
+    "current@list": {
+      "A \u00b7 Current landing ($6.99 / $59.88)": 0.037,
+      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0376
+    },
+    "optimized": {
+      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0098,
+      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0099
+    }
+  },
+  "curated_session": 0.00084,
+  "journal_feedback": 0.00058,
+  "pronunciation_per_session": {
+    "Browser speech recognition": 0.0,
+    "gpt-4o-mini-transcribe + text compare": 0.0033,
+    "Azure pronunciation assessment": 0.027
+  }
+}

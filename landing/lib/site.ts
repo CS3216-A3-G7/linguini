@@ -3,7 +3,8 @@ const productionAppUrl = "https://linguini-navy.vercel.app";
 
 function resolveAppUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  return process.env.VERCEL ? productionAppUrl : "http://localhost:5173";
+  // `VERCEL` is not inlined into browser bundles; `NODE_ENV` is, so client components get the same URL.
+  return process.env.NODE_ENV === "production" ? productionAppUrl : "http://localhost:5173";
 }
 
 function resolveSiteUrl(): string {

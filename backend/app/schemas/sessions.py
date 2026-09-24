@@ -9,7 +9,7 @@ from pydantic import AwareDatetime, Field, model_validator
 
 from app.schemas.base import ApiModel, JsonObject
 from app.schemas.enums import SessionFailureCode, SessionStatus
-from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
+from app.schemas.media import AnchorPoint, MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.tasks import SessionProgress, SessionTaskPublic
 from app.schemas.translation import SceneTranslationResult
 from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
@@ -62,7 +62,13 @@ class AddedPracticeObject(ApiModel):
     y: Annotated[float, Field(ge=0, le=0.99)]
 
 
+class RepositionedPracticeObject(ApiModel):
+    id: UUID
+    anchor_point: AnchorPoint
+
+
 class ReviewPracticeRequest(ApiModel):
+    scene_title: Annotated[str, Field(min_length=1, max_length=200)] | None = None
     relations: Annotated[list[SceneObjectRelation], Field(max_length=100)] = Field(
         default_factory=list
     )
@@ -71,6 +77,9 @@ class ReviewPracticeRequest(ApiModel):
         default_factory=list
     )
     object_attributes: dict[UUID, dict[str, str]] = Field(default_factory=dict)
+    repositioned_objects: Annotated[list[RepositionedPracticeObject], Field(max_length=50)] = Field(
+        default_factory=list
+    )
 
     @model_validator(mode="after")
     def unique_selection(self):
@@ -80,6 +89,11 @@ class ReviewPracticeRequest(ApiModel):
         selected = set(ids)
         if not set(self.object_attributes) <= selected:
             raise ValueError("Attributes must reference selected objects.")
+        moved_ids = [item.id for item in self.repositioned_objects]
+        if len(moved_ids) != len(set(moved_ids)):
+            raise ValueError("Each object can have only one marker position.")
+        if not set(moved_ids) <= selected:
+            raise ValueError("Marker positions must reference selected objects.")
         triples = set()
         relation_ids = set()
         for relation in self.relations:
