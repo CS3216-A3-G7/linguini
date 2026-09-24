@@ -176,7 +176,7 @@ def test_wrong_session_object_and_owned_audio_constraints(context):
         **(task.model_dump(by_alias=False) | {"id": uuid4(), "session_id": uuid4()})
     )
     with pytest.raises(IntegrityError) as failure, engine.begin() as connection:
-        # A terminal row avoids violating the one-active-session constraint first.
+        # A terminal row keeps this fixture focused on the composite foreign key.
         copied = dict(
             connection.execute(select(sessions).where(sessions.c.id == task.session_id))
             .mappings()

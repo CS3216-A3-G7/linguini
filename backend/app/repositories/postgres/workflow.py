@@ -30,13 +30,17 @@ from app.repositories.postgres.vocabulary import (
 )
 from app.repositories.postgres.xp import award, xp_events
 from app.repositories.practice import (
-    ActiveSessionExistsError,
+    ActiveSessionLimitReachedError,
     PracticeConflictError,
     PracticeNotFoundError,
     PracticeStorageError,
 )
 from app.schemas.base import utc_now
-from app.schemas.enums import SessionStatus
+from app.schemas.enums import (
+    SessionStatus,
+    VocabularyEncounterOutcome,
+    VocabularyEncounterType,
+)
 from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
 from app.schemas.tasks import (
@@ -66,6 +70,7 @@ from app.services.session_plan import (
 logger = logging.getLogger(__name__)
 
 TERMINAL = {"completed", "abandoned", "failed"}
+MAX_ACTIVE_SESSIONS = 3
 ALLOWED_TRANSITIONS = {
     "created": {"analyzingScene", "abandoned", "failed"},
     "analyzingScene": {"awaitingObjectReview", "abandoned", "failed"},
@@ -566,24 +571,36 @@ class PostgresWorkflowRepository:
                         raise PracticeConflictError("This request key was used for another image.")
                     return self._detail(c, parse_session(existing))
             self._reap(c, request.language_profile_id)
+            # Re-selecting an image resumes its unfinished session, but an
+            # unfinished session for another image must never block a learner
+            # from starting a new one.
             existing = (
                 c.execute(
                     select(sessions).where(
                         sessions.c.user_id == self.user_id,
                         sessions.c.language_profile_id == request.language_profile_id,
+                        sessions.c.scene_media_asset_id == request.media_asset_id,
                         sessions.c.status.not_in(TERMINAL),
                     )
+                    .order_by(sessions.c.started_at.desc().nulls_last(), sessions.c.id.desc())
+                    .limit(1)
                 )
                 .mappings()
                 .one_or_none()
             )
             if existing is not None:
-                if existing["scene_media_asset_id"] == request.media_asset_id:
-                    return self._detail(c, parse_session(existing))
-                raise ActiveSessionExistsError(
-                    "You have a practice session in progress. "
-                    "Continue it or discard it before starting a new one.",
-                    active_session_id=existing["id"],
+                return self._detail(c, parse_session(existing))
+            active_count = c.execute(
+                select(func.count()).select_from(sessions).where(
+                    sessions.c.user_id == self.user_id,
+                    sessions.c.language_profile_id == request.language_profile_id,
+                    sessions.c.status.not_in(TERMINAL),
+                )
+            ).scalar_one()
+            if active_count >= MAX_ACTIVE_SESSIONS:
+                raise ActiveSessionLimitReachedError(
+                    "You can keep up to three unfinished practices open at once. "
+                    "Finish or leave one before starting another."
                 )
             session = Session(
                 user_id=self.user_id,
@@ -986,6 +1003,25 @@ class PostgresWorkflowRepository:
                 introduction.order_index = 0
                 c.execute(insert(session_tasks).values(**entity_values(introduction)))
                 introduction_id = introduction.id
+                # Translation is the moment a learner has collected these
+                # words. Persist a "new" vocabulary record now, rather than
+                # waiting for task completion, so leaving the lesson does not
+                # discard their image vocabulary.
+                for word in words:
+                    record_vocabulary_evidence(
+                        c,
+                        user_id=self.user_id,
+                        vocabulary_item_id=word.id,
+                        encounter=VocabularyEncounter(
+                            id=uuid5(session_id, f"translated:{word.id}"),
+                            user_id=self.user_id,
+                            vocabulary_item_id=word.id,
+                            session_id=session_id,
+                            session_task_id=introduction.id,
+                            encounter_type=VocabularyEncounterType.INTRODUCED,
+                            outcome=VocabularyEncounterOutcome.COMPLETED,
+                        ),
+                    )
 
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
