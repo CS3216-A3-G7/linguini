@@ -1,5 +1,5 @@
 /**
- * Numbers behind the interactive charts. They come from business-model/model/cost_model.py
+ * Numbers behind the interactive charts. They come from marketing/business-model/model/cost_model.py
  * (prices checked 23–24 September 2026); rerun that model and update these together.
  */
 

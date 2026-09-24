@@ -223,7 +223,7 @@ export function LaunchCampaign() {
       <h2 id="checklist">Our checklist</h2>
       <p>
         We copied the shape of Yangshun Tay’s launch dashboard for Docusaurus 2.0, which won Product of the Day: links,
-        a timed run, checkboxes, then channel lists. Ours is in the repo as <code>launch/checklist.md</code>. This copy
+        a timed run, checkboxes, then channel lists. Ours is in the repo as <code>marketing/product-hunt/plan.md</code>. This copy
         ticks, and remembers your progress in this browser.
       </p>
       <Checklist />

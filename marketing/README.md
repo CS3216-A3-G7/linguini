@@ -1,25 +1,47 @@
 # Linguini marketing
 
-Launch materials for Product Hunt and social, kept separate from the app, API and landing site.
+Everything for launching and selling Linguini outside the app: the Product Hunt kit, launch videos, the media kit and the business model. The public marketing site itself lives in [`landing/`](../landing), because it deploys on its own.
 
 | Path | What it is |
 | --- | --- |
-| [`promo-video/`](promo-video) | The 30-second launch film: real footage, a focus frame that finds each object and names it in Spanish and French, and an original piano score cut to the edit |
-| [`product-hunt/submission.md`](product-hunt/submission.md) | Everything to paste into the Product Hunt form: taglines, description, tags, maker comment |
-| [`product-hunt/readiness.md`](product-hunt/readiness.md) | Go/no-go assessment and the must-fix list before launch day |
-| [`product-hunt/launch-plan.md`](product-hunt/launch-plan.md) | Timeline, launch-day roles, reply templates, what we verified about Product Hunt's rules |
-| [`product-hunt/social-posts.md`](product-hunt/social-posts.md) | X thread, LinkedIn, Telegram/WhatsApp, Instagram/TikTok, email |
-| [`product-hunt/gallery/`](product-hunt/gallery) | Gallery images (1270×760), thumbnail and social card |
+| [`product-hunt/`](product-hunt/README.md) | Product Hunt launch kit: status and team decisions ([README](product-hunt/README.md)), launch dashboard and checklists ([plan.md](product-hunt/plan.md)), listing copy ([listing.md](product-hunt/listing.md)), channel posts and reply bank ([social-posts.md](product-hunt/social-posts.md)), and the six gallery images with their HTML sources |
+| [`videos/launch-film/`](videos/launch-film/README.md) | 30-second narrated launch film built with Hyperframes, synthesized score and a team [review page](videos/launch-film/review.html). Render: `renders/linguini-launch-v2.mp4` |
+| [`videos/promo-film/`](videos/promo-film/VIDEO.md) | 30-second launch film from real footage with a focus frame naming objects in Spanish and French, and an original piano score. Render: `out/linguini-launch.mp4` (+ 720p) |
+| [`videos/campaign/`](videos/campaign/scripts.md) | Human-voice campaign scripts (30, 20, 15 and 6 seconds), a [recording guide](videos/campaign/recording-guide.md) and music/SFX beds. Not filmed yet |
+| [`media/`](media/README.md) | Media kit: illustrated gallery, Product Hunt icon, social square, banners, the 50-second animated explainer (`export/explainer.mp4`, script in [explainer-script.md](media/explainer-script.md)) and the 18-second illustrated teaser |
+| [`business-model/`](business-model/README.md) | Pricing proposal (Free, Plus, Founding Plus), reproducible AI cost model and charts |
 
-## Rendering the film
+## Finished videos
+
+| Video | File | Length |
+| --- | --- | --- |
+| Narrated launch film | `videos/launch-film/renders/linguini-launch-v2.mp4` | 30 s |
+| Promo film (real footage) | `videos/promo-film/out/linguini-launch.mp4` | 30.6 s |
+| Animated explainer | `media/export/explainer.mp4` | 49.5 s |
+| Illustrated teaser | `media/export/teaser-illustrated.mp4` | 18 s |
+
+Which one becomes the Product Hunt listing video is an open decision in the [launch kit](product-hunt/README.md#team-decision-checklist).
+
+## Rebuilding
+
+Each folder documents its own pipeline. In short:
 
 ```sh
-cd marketing/promo-video
-pip install -r requirements.txt
-npm install    # Playwright; Chromium must be available to it
-./render.sh    # downloads the footage and piano samples, then writes out/linguini-launch*.mp4
+# Narrated launch film (full steps in videos/launch-film/README.md)
+cd marketing/videos/launch-film && npm ci && bash mix-audio.sh && node build.mjs \
+  && npx hyperframes render . --quality high --fps 30 --output renders/linguini-launch-v2.mp4
+
+# Promo film
+cd marketing/videos/promo-film && pip install -r requirements.txt && npm install && ./render.sh
+
+# Media kit: gallery images and teaser, banners (Pillow)
+bash marketing/media/build_video.sh && python3 marketing/media/banners.py
+
+# Animated explainer (needs the one-time venv and voice model in media/explainer.py)
+marketing/media/.venv/bin/python marketing/media/explainer.py
+
+# Business model numbers and charts
+python3 marketing/business-model/model/cost_model.py && python3 marketing/business-model/media/render.py
 ```
 
-[`promo-video/VIDEO.md`](promo-video/VIDEO.md) explains the edit and the pipeline, and [`promo-video/CREDITS.md`](promo-video/CREDITS.md) lists every clip and licence.
-
-Gallery images are HTML compositions in `product-hunt/gallery-src/` built from 4× captures of the running landing page. The captures aren't committed; `capture.mjs` regenerates them from `landing/` on port 3200, then `render.mjs` and `thumb.mjs` export the PNGs and GIF.
+Several scripts read photos, fonts and brand art from `landing/public` and `landing/assets`, and some write web-sized copies back into `landing/public/blog`. Keep the two in step when you change an asset.

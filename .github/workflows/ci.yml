@@ -11,6 +11,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  attribution:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_BODY: ${{ github.event.pull_request.body }}
+      AGENT_PATTERN: 'co-authored-by:.*(devin|claude|anthropic|openai|codex|cursor|copilot|chatgpt|gemini|\[bot\])|(generated|created|written) (with|by) \[?(devin|claude|codex|cursor|copilot|chatgpt|gemini)|devin-ai-integration|noreply@anthropic\.com|cursoragent@|copilot-swe-agent'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Commits and PR description carry no agent attribution
+        run: |
+          status=0
+          for sha in $(git rev-list "$BASE_SHA..$HEAD_SHA"); do
+            if git log -1 --format='%an <%ae>%n%cn <%ce>%n%B' "$sha" | grep -Eiq "$AGENT_PATTERN"; then
+              echo "::error::Commit $(git log -1 --format='%h %s' "$sha") has an agent author or AI attribution line. Recommit it as the requesting team member without Co-Authored-By/Generated-with lines."
+              status=1
+            fi
+          done
+          if printf '%s' "$PR_BODY" | grep -Eiq "$AGENT_PATTERN"; then
+            echo "::error::The pull request description contains an AI attribution line. Remove it."
+            status=1
+          fi
+          exit $status
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
