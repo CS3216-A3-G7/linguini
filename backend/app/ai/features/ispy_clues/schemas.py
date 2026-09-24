@@ -23,6 +23,10 @@ class GeneratedISpyClue(ApiModel):
         max_length=200,
         description="Only the phrase completing 'I spy with my little eye, something that …'."
     )
+    clue_translation: Annotated[str, Field(max_length=200)] = Field(
+        default="",
+        description="English translation of `clue`, without the I-Spy opening.",
+    )
     answer_object_key: NonEmptyText = Field(max_length=200)
     object_keys: Annotated[
         list[Annotated[NonEmptyText, Field(max_length=200)]],

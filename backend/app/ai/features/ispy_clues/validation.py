@@ -66,9 +66,14 @@ def _check_answer_leakage(payload: dict[str, Any], clue) -> None:
     if answer is None:
         return  # the unknown-answer check below reports this
     clue_tokens = _tokens(clue.clue)
+    translation_tokens = _tokens(clue.clue_translation)
     for term in (answer.get("source", ""), answer.get("translation", "")):
         needle = _answer_term_tokens(term)
-        if needle and _contains_subsequence(clue_tokens, needle):
+        if not needle:
+            continue
+        if _contains_subsequence(clue_tokens, needle) or _contains_subsequence(
+            translation_tokens, needle
+        ):
             raise ISpyClueGenerationError("I-Spy clue names its own answer.")
 
 
@@ -88,4 +93,8 @@ def validate_ispy_clues(payload: dict[str, Any], result: ISpyClueResult) -> None
         answers.add(clue.answer_object_key)
         if clue.clue.casefold().lstrip().startswith(_CLUE_OPENINGS):
             raise ISpyClueGenerationError("I-Spy clue must contain only the phrase ending.")
+        if clue.clue_translation.casefold().lstrip().startswith(_CLUE_OPENINGS):
+            raise ISpyClueGenerationError(
+                "I-Spy clue translation must contain only the phrase ending."
+            )
         _check_answer_leakage(payload, clue)

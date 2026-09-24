@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
+import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getPracticeSummary, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, SessionStatus, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
@@ -106,7 +106,13 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
         ? { ...current, session: { ...current.session, status: completed.status as SessionStatus } }
         : current);
       flushLearningChanges();
+      // Refetch the final XP, and warm the cache when the summary screen has
+      // not mounted yet so it renders without a visible fetch.
       void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(sessionId) });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.sessionSummary(sessionId),
+        queryFn: () => getPracticeSummary(sessionId),
+      });
     },
     onSettled: () => { completing.current = false; },
   });

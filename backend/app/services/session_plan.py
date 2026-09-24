@@ -243,6 +243,9 @@ def build_ispy_clue_tasks(session_id, result: ISpyClueResult, objects, words):
             public_content=dict(
                 kind="ispyRound",
                 clue=clue.clue,
+                # Falls back to the clue itself so the reveal control always
+                # has something to show.
+                clue_translation=clue.clue_translation.strip() or clue.clue,
                 interaction_mode="selectObject",
                 options=options,
                 encouragement="Keep looking closely!",
@@ -408,6 +411,7 @@ def build_tasks(session_id, objects, words, translations, uploaded, translated_s
         dict(
             kind="ispyRound",
             clue=f"Find: {translation.translated_text}",
+            clue_translation=f"Find: {word.display_text}",
             interaction_mode="selectObject",
             options=[
                 dict(option_id=str(o.id), label=w.display_text, scene_object_id=o.id)

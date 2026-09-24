@@ -41,6 +41,11 @@ function Reflection({ task, index, total, onNext }: { task: SessionTask; index: 
   const target = scene.items.find(item => item.id === task.sceneObjectId);
   const content = task.publicContent;
   if (content.kind !== "reflection") return null;
+  const opening = scene.languageCode === "es"
+    ? "Veo, veo, algo que"
+    : scene.languageCode === "fr"
+      ? "Je vois, je vois, quelque chose qui"
+      : "I spy with my little eye, something that";
   const suggestions = [
     ...scene.items.map(item => item.word),
     ...(session?.translationPreview?.attributes.map(item => item.translation) ?? []),
@@ -70,7 +75,7 @@ function Reflection({ task, index, total, onNext }: { task: SessionTask; index: 
     <ScenePhoto scene={scene} items={target ? [target] : []} activeItemId={target?.id ?? null} />
     <Card><div className="stack-2"><span className="label muted">Describe this object</span><h2>{target?.word}</h2><span className="small muted">{target?.translation}</span><p>{content.prompt}</p></div></Card>
     <div className="stack-2"><span className="label muted">Words from this scene</span><div className="chip-row">{suggestions.map(word => <button key={word} type="button" className="chip" disabled={answered || practiceSaving} onClick={() => setText(value => `${value} ${word}`.trim())}>{word}</button>)}</div></div>
-    <div className="field"><label className="field__label" htmlFor="reflection">Your clue</label><input id="reflection" className="input" value={text} maxLength={2000} disabled={answered || practiceSaving} onChange={event => setText(event.target.value)} /></div>
+    <div className="field"><label className="field__label" htmlFor="reflection">Your clue</label><p className="ispy-opening">{opening}</p><input id="reflection" className="input" value={text} maxLength={2000} disabled={answered || practiceSaving} onChange={event => setText(event.target.value)} /></div>
     {answered || feedback ? <Feedback><div className="stack-2" role="status">{guess ? <strong>Linguini guessed: {guess}</strong> : null}<span>{task.status === "skipped" ? "Skipped — no XP earned." : feedback ?? "Reflection saved."}</span></div></Feedback> : null}
     {practiceError ? <p role="alert">{practiceError}</p> : null}
     {answered ? <Button block disabled={practiceSaving} onClick={onNext}>{index === total - 1 ? "Finish session" : "Next item"} <ArrowRightIcon /></Button> : <>
