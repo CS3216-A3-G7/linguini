@@ -1,4 +1,5 @@
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ErrorState } from "../components/ErrorState";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -35,7 +36,7 @@ function JournalEntryDetail({ entryId }: { entryId: string }) {
   const [editing, setEditing] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   if (loading) return <LoadingScreen label="Loading journal entry…" />;
-  if (error) return <p role="alert">{error} Reload to retry.</p>;
+  if (error) return <ErrorState title="We couldn't open this entry" message={error} retry={() => window.location.reload()} backTo="/journal" />;
 
   if (!entry) {
     return (
@@ -141,6 +142,6 @@ function JournalEntryEditor({ entry, onSaved }: { entry: JournalEntry; onSaved: 
   });
   const error = queryError(queryErrorValue);
   if (loading) return <LoadingScreen label="Loading journal…" />;
-  if (error || !data) return <p role="alert">{error ?? "Unable to load journal."} Reload to retry.</p>;
-  return <JournalForm entry={entry} date={entry.date} photoOptions={data.photoOptions} wordSuggestions={data.wordSuggestions} onSaved={onSaved} />;
+  if (error || !data) return <ErrorState title="We couldn't open your journal" message={error ?? "Your journal isn't available right now."} retry={() => window.location.reload()} backTo="/journal" />;
+  return <JournalForm entry={entry} date={entry.date} photoOptions={data.photoOptions} onSaved={onSaved} />;
 }

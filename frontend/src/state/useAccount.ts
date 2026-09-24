@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { languages } from "../config/languages";
 import { createLanguageProfile, getCurrentUser, getLanguageProfiles, updateLanguageProfile, updateUser } from "../lib/api";
 import type { LanguageProfilePatch, UserPatch } from "../lib/api";
-import { queryError, queryKeys } from "../lib/queryKeys";
+import { friendlyError, queryError, queryKeys } from "../lib/queryKeys";
 
 async function loadAccount(signal?: AbortSignal) {
   const [user, profiles] = await Promise.all([getCurrentUser(signal), getLanguageProfiles(signal)]);
@@ -31,7 +31,7 @@ export function useAccount() {
   const save = useMutation({
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.account }),
-    onError: (reason) => setError(`${reason instanceof Error ? reason.message : "Unable to save profile."} Please retry or reload.`),
+    onError: (reason) => setError(friendlyError(reason)),
     onSettled: () => { inFlight.current = false; },
   });
   const profileSaving = save.isPending;
