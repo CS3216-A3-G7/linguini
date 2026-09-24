@@ -4,7 +4,7 @@ import { analyzePractice, ApiError, completePractice, createPractice, getPractic
 import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, SessionStatus, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
-import { queryKeys } from "../lib/queryKeys";
+import { friendlyError, queryKeys } from "../lib/queryKeys";
 
 const PROCESSING = ["analyzingScene", "generatingTasks"];
 
@@ -65,7 +65,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     setError(null);
     try { await loadSession(id); }
     catch (error) {
-      setError(error instanceof Error ? error.message : "Unable to check your scene. Please retry.");
+      setError(friendlyError(error));
       setStalled(true);
     }
   }, [loadSession]);
@@ -84,7 +84,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       setSession(value => applyTaskResult(value, session.session.id, result));
       learningDirty.current = true;
       return result;
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to save task. Retry your action."); return null; }
+    } catch (e) { setError(friendlyError(e)); return null; }
     finally { busy.current = false; setSaving(false); }
   }, [session]);
   const flushLearningChanges = useCallback(() => {
@@ -99,7 +99,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       setSession(current => current?.session.id === sessionId
         ? { ...current, session: { ...current.session, status: previousStatus } }
         : current);
-      setCompletionError(error instanceof Error ? error.message : "Unable to complete session.");
+      setCompletionError(friendlyError(error));
     },
     onSuccess: (completed, { sessionId }) => {
       setSession(current => current?.session.id === completed.id
@@ -141,7 +141,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       return true;
     } catch (error) {
       setSession(current => current?.session.id === previous.session.id ? previous : current);
-      setError(error instanceof Error ? error.message : "Unable to save your words.");
+      setError(friendlyError(error));
       return false;
     } finally { busy.current = false; setSaving(false); }
   }, [session, loadSession]);

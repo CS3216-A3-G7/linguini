@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, IconButton } from "../components/ui";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "../components/icons";
-import { JournalImage } from "../components/JournalImage";
-import { MediaImage } from "../components/MediaImage";
+import { JournalPhotoMosaic } from "../components/JournalPhotoMosaic";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ErrorState } from "../components/ErrorState";
 import { useJournalsQuery } from "../state/queries";
 import type { JournalEntry } from "../data/types";
 
@@ -42,7 +42,7 @@ function wordCount(text: string) {
 export function Journal() {
   const { journal, journalLoading, journalError } = useJournalsQuery();
   if (journalLoading) return <LoadingScreen label="Loading journal history..." />;
-  if (journalError) return <p role="alert">{journalError} Reload to retry.</p>;
+  if (journalError) return <ErrorState title="We couldn't load your journal" message={journalError} retry={() => window.location.reload()} />;
   return <JournalMonths journal={journal} />;
 }
 
@@ -58,20 +58,21 @@ function JournalMonths({ journal }: { journal: JournalEntry[] }) {
   };
 
   return (
-    <div className="stack journal-page">
-      <div className="month-switcher">
-        <IconButton label="Previous month" onClick={() => changeMonth(-1)}>
-          <ChevronLeftIcon />
-        </IconButton>
-        <h1>{monthLabel(visibleMonth)}</h1>
-        <IconButton label="Next month" onClick={() => changeMonth(1)}>
-          <ChevronRightIcon />
-        </IconButton>
-      </div>
-
-      <Button block className="journal-page__add" onClick={() => navigate("/journal/new")}>
-        <PlusIcon size={18} /> Add today&apos;s entry
-      </Button>
+    <div className="journal-page">
+      <header className="journal-page__header">
+        <div className="month-switcher">
+          <IconButton label="Previous month" onClick={() => changeMonth(-1)}>
+            <ChevronLeftIcon />
+          </IconButton>
+          <h1>{monthLabel(visibleMonth)}</h1>
+          <IconButton label="Next month" onClick={() => changeMonth(1)}>
+            <ChevronRightIcon />
+          </IconButton>
+        </div>
+        <Button className="journal-page__add" onClick={() => navigate("/journal/new")}>
+          <PlusIcon size={18} /> New entry
+        </Button>
+      </header>
 
       <div className="field">
         <label className="field__label" htmlFor="journal-missed-day">
@@ -90,39 +91,42 @@ function JournalMonths({ journal }: { journal: JournalEntry[] }) {
 
       {visibleEntries.length === 0 ? (
         <Card>
-          <div className="stack-2 center-text" style={{ alignItems: "center" }}>
-
-            <strong>No entries this month</strong>
+          <div className="journal-empty">
+            <strong>Nothing written in {monthLabel(visibleMonth)}</strong>
             <p className="small muted">A few sentences a day goes a long way.</p>
           </div>
         </Card>
-      ) : null}
-
-      {visibleEntries.length ? (
-        <div className="list">
+      ) : (
+        <div className="journal-feed">
           {visibleEntries.map((entry) => (
             <button
               key={entry.id}
               type="button"
-              className="list__row journal-list-entry"
+              className="journal-card"
               onClick={() => navigate(`/journal/${entry.id}`)}
             >
-              <span className="thumb thumb--lg">
-                {entry.mediaAssetId
-                  ? <MediaImage assetId={entry.mediaAssetId} title={entry.title} width={320} lazy />
-                  : <JournalImage title={entry.title} imageUrl={entry.imageUrl} lazy />}
-              </span>
-              <span className="grow journal-list-entry__details">
-                <strong className="journal-list-entry__title">{entry.title}</strong>
-                <span className="journal-list-entry__meta">
-                  <span className="journal-list-entry__date">{formatDate(entry.date)}</span>
+              <JournalPhotoMosaic photos={entry.photos} title={entry.title} />
+              <span className="journal-card__body">
+                <span className="journal-card__title">{entry.title}</span>
+                {entry.body.trim() ? <span className="journal-card__excerpt">{entry.body}</span> : null}
+                <span className="journal-card__footer">
+                  <span className="journal-card__date">{formatDate(entry.date)}</span>
+                  <span className="journal-card__words">{wordCount(entry.body)}</span>
                 </span>
-                 <span className="journal-list-entry__word-count">{wordCount(entry.body)}</span>
               </span>
             </button>
           ))}
         </div>
-      ) : null}
+      )}
+
+      <button
+        type="button"
+        className="journal-fab"
+        aria-label="New journal entry"
+        onClick={() => navigate("/journal/new")}
+      >
+        <PlusIcon size={24} />
+      </button>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { createPractice, getActivePractice } from "../lib/api";
 import { SceneVisual } from "../components/SceneVisual";
 import { SceneCatalogStatus } from "../components/SceneCatalogStatus";
 import { sessionDestination } from "../lib/sessionRoute";
-import { queryError, queryKeys } from "../lib/queryKeys";
+import { friendlyError, queryError, queryKeys } from "../lib/queryKeys";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppState } from "../state/useAppState";
 import { useScenesQuery } from "../state/queries";
@@ -60,7 +60,7 @@ export function PracticeSelect() {
       const detail = await createPractice(activeProfile.id, asset, request.current.key);
       navigate(sessionDestination(detail).path);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to start practice.");
+      setError(friendlyError(reason));
     }
     finally { busy.current = false; setStarting(false); }
   };
@@ -69,7 +69,7 @@ export function PracticeSelect() {
       const fresh = await activeFetch();
       if (!fresh) return;
       navigate(sessionDestination(fresh).path);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load your practice."); }
+    } catch (reason) { setError(friendlyError(reason)); }
   };
   const chooseAsset = (asset: string) => {
     if (activeSession) {

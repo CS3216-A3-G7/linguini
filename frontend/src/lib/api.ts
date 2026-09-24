@@ -112,7 +112,7 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   if (!apiBaseUrl) {
-    throw new Error("Set VITE_API_BASE_URL in frontend/.env.local and restart Vite.");
+    throw new Error("The app is still being set up. Please try again in a moment.");
   }
 
   let response: Response;
@@ -123,14 +123,14 @@ async function request<T>(path: string, signal?: AbortSignal, options?: RequestI
     response = await fetch(`${apiBaseUrl}${path}`, { ...options, headers, signal });
   } catch (error) {
     if (signal?.aborted) throw error;
-    throw new Error("Cannot reach the API. Check that the backend is running and CORS allows this origin.");
+    throw new Error("We couldn't connect right now. Please check your connection and try again.");
   }
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     const message = typeof body?.detail?.message === "string" ? body.detail.message : "Request failed.";
     const code = typeof body?.detail?.code === "string" ? body.detail.code : null;
     const activeSessionId = typeof body?.detail?.activeSessionId === "string" ? body.detail.activeSessionId : null;
-    throw new ApiError(`${message} (HTTP ${response.status})`, response.status, code, activeSessionId);
+    throw new ApiError(message, response.status, code, activeSessionId);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -274,8 +274,13 @@ export interface JournalPhotoOption {
   completedAt: string;
 }
 export async function getJournalContext(date?: string, signal?: AbortSignal) {
-  const context = await request<{ localDate: string; journal: JournalRecord | null; eligiblePhotos: JournalPhotoOption[] }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
-  return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null, photoOptions: context.eligiblePhotos };
+  const context = await request<{ localDate: string; journal: JournalRecord | null; eligiblePhotos: JournalPhotoOption[]; suggestedWords: string[] }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
+  return {
+    date: context.localDate,
+    entry: context.journal ? await getJournal(context.journal.id, signal) : null,
+    photoOptions: context.eligiblePhotos,
+    wordSuggestions: context.suggestedWords ?? [],
+  };
 }
 export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed"> & { photoAssetIds?: string[] };
 export async function saveJournal(draft: JournalDraft, profileId: string, id?: string, date?: string) {
@@ -373,10 +378,12 @@ export interface TaskActionResult {
 }
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
 export interface PracticeReview {
+  sceneTitle?: string;
   acceptedObjectIds: string[];
   relations: SceneObjectRelation[];
   addedObjects: { id: string; label: string; x: number; y: number }[];
   objectAttributes: Record<string, Record<string, string>>;
+  repositionedObjects: { id: string; anchorPoint: { x: number; y: number } }[];
 }
 export const reviewPractice = (id: string, review: PracticeReview) => write<PracticeDetail>(`/api/v1/sessions/${id}/review`, "PUT", review);
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);

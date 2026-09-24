@@ -111,6 +111,38 @@ class PostgresMediaAssetRepository:
         except (SQLAlchemyError, ValidationError) as exc:
             raise MediaAssetStorageError("Unable to read session images.") from exc
 
+    def list_session_translation_suggestions(
+        self, user_id: UUID, language_profile_id: UUID, start: datetime, end: datetime
+    ) -> list[str]:
+        """Return every translated object, attribute, and relation from a day's photos."""
+        from app.repositories.postgres.practice import sessions
+
+        try:
+            with read_connection(self.engine) as connection:
+                drafts = connection.execute(
+                    select(sessions.c.analysis_draft).where(
+                        sessions.c.user_id == user_id,
+                        sessions.c.language_profile_id == language_profile_id,
+                        sessions.c.started_at >= start,
+                        sessions.c.started_at < end,
+                    ).order_by(sessions.c.started_at.asc(), sessions.c.id.asc())
+                ).scalars()
+                suggestions: list[str] = []
+                seen: set[str] = set()
+                for draft in drafts:
+                    preview = draft.get("translationPreview", {}) if isinstance(draft, dict) else {}
+                    for category in ("objects", "attributes", "relationships"):
+                        for term in preview.get(category, []):
+                            word = term.get("translation") if isinstance(term, dict) else None
+                            normalized = word.strip() if isinstance(word, str) else ""
+                            key = normalized.casefold()
+                            if normalized and key not in seen:
+                                suggestions.append(normalized)
+                                seen.add(key)
+                return suggestions
+        except SQLAlchemyError as exc:
+            raise MediaAssetStorageError("Unable to read session suggestions.") from exc
+
     def create(self, asset: MediaAsset) -> MediaAsset:
         try:
             with self.engine.begin() as connection:

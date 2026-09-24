@@ -146,6 +146,7 @@ class JournalTodayContextResponse(ApiModel):
     journal: Journal | None = None
     eligible_photos: list[JournalPhotoOption] = Field(default_factory=list)
     learned_words: list[DailyVocabularyItem] = Field(default_factory=list)
+    suggested_words: list[NonEmptyText] = Field(default_factory=list)
     can_create: bool
 
 
