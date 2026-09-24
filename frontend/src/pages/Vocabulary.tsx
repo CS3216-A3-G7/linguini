@@ -3,6 +3,7 @@ import { Button, Card, IconButton, Tabs } from "../components/ui";
 import { BookIcon, CloseIcon, FilterIcon, SpeakerIcon } from "../components/icons";
 import { SceneVisual } from "../components/SceneVisual";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ErrorState } from "../components/ErrorState";
 import type { VocabStatus, WordClass } from "../data/types";
 import { mediaImageUrl } from "../lib/api";
 import { groupVocabularyByPhoto, vocabularyCategories } from "../lib/vocabularyGroups";
@@ -97,7 +98,7 @@ export function Vocabulary() {
   }, [showFilters]);
 
   if (vocabularyLoading) return <LoadingScreen label="Loading vocabulary..." />;
-  if (vocabularyError) return <p role="alert">{vocabularyError} Reload to retry.</p>;
+  if (vocabularyError) return <ErrorState title="We couldn't load your vocabulary" message={vocabularyError} retry={() => window.location.reload()} />;
 
   return (
     <div className="stack vocabulary-page">

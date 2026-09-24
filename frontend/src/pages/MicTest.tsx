@@ -4,6 +4,7 @@ import { Button } from "../components/ui";
 import { ArrowRightIcon, MicIcon } from "../components/icons";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
+import { friendlyError } from "../lib/queryKeys";
 
 type MicState = "idle" | "listening" | "working" | "unavailable";
 
@@ -40,7 +41,7 @@ export function MicTest() {
     } catch (reason) {
       if (version !== generation.current) return;
       setState("unavailable");
-      setError(reason instanceof Error ? reason.message : "Unable to access your microphone.");
+      setError(friendlyError(reason));
     } finally { pending.current = false; }
   };
 

@@ -3,6 +3,7 @@ import { uploadImage } from "../lib/api";
 import type { UploadedImage } from "../lib/api";
 import { Button } from "./ui";
 import { CameraIcon, UploadIcon } from "./icons";
+import { friendlyError } from "../lib/queryKeys";
 
 export function ImageUpload({ onUploaded, cameraEnabled = true, disabled = false, onBusyChange, compact = false }: {
   compact?: boolean;
@@ -24,7 +25,7 @@ export function ImageUpload({ onUploaded, cameraEnabled = true, disabled = false
     onBusyChange?.(true);
     setError(null);
     try { onUploaded(await uploadImage(file, source, setPhase)); }
-    catch (e) { setError(e instanceof Error ? e.message : "Unable to upload image."); }
+    catch (e) { setError(friendlyError(e)); }
     finally { busyRef.current = false; setBusy(false); setPhase(""); onBusyChange?.(false); }
   };
   return <div className="stack-2">

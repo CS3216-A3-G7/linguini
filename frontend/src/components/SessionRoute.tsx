@@ -1,6 +1,6 @@
 import { practiceScene } from "../lib/practiceScene";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getPractice, mediaImageUrl } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
@@ -10,6 +10,7 @@ import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
 import { ScenePhoto } from "./ScenePhoto";
 import { LoadingScreen } from "./LoadingScreen";
+import { ErrorState } from "./ErrorState";
 import { TranslationPreview } from "./TranslationPreview";
 
 export function SessionRoute() {
@@ -58,7 +59,7 @@ function SessionLoader({ id }: { id: string }) {
       <div className="analysis-loading__copy"><h2>{copy.heading}</h2><p className="muted">This will only take a moment.</p></div>
     </section>
   </div> : <LoadingScreen label={copy.heading} />;
-  if ((!data && !earlyReady) || error) return <div className="stack"><p role="alert">{error ?? "Session unavailable."}</p><button onClick={() => window.location.reload()}>Retry</button><Link to="/practice">Choose an image</Link></div>;
+  if ((!data && !earlyReady) || error) return <ErrorState title="We couldn't open this practice" message={error ?? "This practice isn't available right now."} retry={() => window.location.reload()} backTo="/practice" backLabel="Choose another image" />;
   const current = session?.session.id === id
     ? practiceScene(session, mediaImageUrl(session.mediaAsset.id, 1280), learner.language)
     : data;
