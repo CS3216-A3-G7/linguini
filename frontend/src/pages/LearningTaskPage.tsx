@@ -1,7 +1,7 @@
 import { useRef, useState, type TouchEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button, Card, Feedback, IconButton, ProgressTrail } from "../components/ui";
-import { CheckIcon, CloseIcon, SpeakerIcon } from "../components/icons";
+import { CloseIcon, SpeakerIcon } from "../components/icons";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { choiceOrder, practiceStages, taskDone, taskTitle } from "../lib/practiceTasks";
@@ -81,7 +81,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose, onExit }: { 
       <Card plain><div className="stack-2">{content.kind === "syntaxExplanation" ? <strong>{content.sentencePattern}</strong> : null}{content.examples.map((example, i) => <p key={i}>{example}</p>)}</div></Card>
     </> : null}
     {"prompt" in content ? <p className="muted">{content.prompt}</p> : null}
-    {content.kind === "grammarPractice" ? <div className="choice-grid">{choiceOrder(content.options, task.id, option => option).map(option => <button key={option} className={`choice${choice === option ? " choice--selected" : ""}`} aria-pressed={choice === option} disabled={terminal || practiceSaving || checking} onClick={() => setChoice(option)}>{choice === option ? <CheckIcon size={16} /> : null}{option}</button>)}</div> : null}
+    {content.kind === "grammarPractice" ? <div className="choice-grid">{choiceOrder(content.options, task.id, option => option).map(option => <button key={option} className={`choice${choice === option ? " choice--selected" : ""}`} aria-pressed={choice === option} disabled={terminal || practiceSaving || checking} onClick={() => setChoice(option)}>{option}</button>)}</div> : null}
     {content.kind === "sentenceBuilding" ? <><p>{content.sourceText}</p><div className="chip-row">{content.tokenBank.map((token, i) => <button key={i} className="chip" disabled={terminal || practiceSaving} onClick={() => setText(value => (value + " " + token).trim())}>{token}</button>)}</div></> : null}
     {!reading && content.kind !== "grammarPractice" ? <div className="field"><label className="field__label" htmlFor="task-answer">Your answer</label><input id="task-answer" className="input" value={text} maxLength={2000} disabled={terminal || practiceSaving} onChange={event => setText(event.target.value)} /></div> : null}
     {checking ? <p className="choice-checking" role="status">Checking your answer…</p> : null}
@@ -178,7 +178,7 @@ function VocabularyLearningFlow({ task, index, total, onNext, onExit }: { task: 
         const selected = answers[question.questionId] === option.optionId || pendingOptionId === option.optionId;
         const result = questionResults[question.questionId];
         const state = !selected ? "" : result === undefined ? " choice--selected" : result ? " choice--correct" : " choice--incorrect";
-        return <button key={option.optionId} className={`choice${state}`} aria-pressed={selected} disabled={!!answers[question.questionId] || checkingQuestion || !!feedback} onClick={() => void chooseAnswer(option.optionId)}>{selected ? <CheckIcon size={16} /> : null}{option.label}</button>;
+        return <button key={option.optionId} className={`choice${state}`} aria-pressed={selected} disabled={!!answers[question.questionId] || checkingQuestion || !!feedback} onClick={() => void chooseAnswer(option.optionId)}>{option.label}</button>;
       })}</div>
       {checkingQuestion ? <p className="choice-checking" role="status">Checking your answer…</p> : null}
       {answers[question.questionId] ? <Feedback tone={questionResults[question.questionId] ? "good" : "warn"}><p role="status">{questionResults[question.questionId] ? "Correct!" : <>Incorrect. The correct answer is <strong>{question.options.find(option => option.optionId === correctOptionIds[question.questionId])?.label}</strong>.</>}</p></Feedback> : null}
@@ -244,7 +244,7 @@ function GrammarLessonFlow({ task, index, total, onNext, onClose }: { task: Sess
       </> : <>
         <h2>{content.focus === "sceneDescription" ? question.translation || "Choose the sentence that describes the scene." : question.prompt}</h2>
         <div className="choice-grid">{choiceOrder(question.options, `${task.id}:${question.questionId}`, option => option.optionId).map(option => <button key={option.optionId} className={`choice${answers[question.questionId] === option.optionId ? " choice--selected" : ""}`} aria-pressed={answers[question.questionId] === option.optionId} disabled={terminal || practiceSaving || checking}
-          onClick={() => setAnswers(value => ({ ...value, [question.questionId]: option.optionId }))}>{answers[question.questionId] === option.optionId ? <CheckIcon size={16} /> : null}{option.label}</button>)}</div>
+          onClick={() => setAnswers(value => ({ ...value, [question.questionId]: option.optionId }))}>{option.label}</button>)}</div>
       </>}
     </div></Card>)}
     {checking ? <p className="choice-checking" role="status">Checking your answers…</p> : null}

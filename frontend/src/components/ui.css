@@ -600,7 +600,7 @@ p[role="alert"]::before { content: "!"; }
 .leave-session__dialog h2 {
   margin-bottom: var(--space-2);
   color: var(--ink);
-  font-size: var(--text-heading);
+  font-size: var(--text-h2);
 }
 
 .leave-session__error {
@@ -1117,7 +1117,7 @@ p[role="alert"]::before { content: "!"; }
   display: flex;
   justify-content: center;
   padding: var(--space-4) var(--space-4) var(--space-2);
-  background: var(--butter);
+  background: #f7e6b4;
   box-shadow: 0 3px 10px rgba(86, 67, 34, 0.07);
 }
 
@@ -1391,7 +1391,7 @@ p[role="alert"]::before { content: "!"; }
 }
 
 .choice--selected {
-  border: var(--stroke) solid var(--teal);
+  border: var(--stroke) solid var(--ink);
   background: #eef7f6;
 }
 
@@ -1428,7 +1428,7 @@ p[role="alert"]::before { content: "!"; }
 
 .sentence-builder__answer {
   align-items: center;
-  background: var(--cream);
+  background: var(--butter);
   border: 1px dashed var(--line);
   border-radius: var(--radius-md);
   display: flex;
@@ -1712,6 +1712,7 @@ p[role="alert"]::before { content: "!"; }
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: var(--text-heading);
   color: var(--ink-muted);
   line-height: 1.55;
   white-space: pre-wrap;
@@ -1728,7 +1729,7 @@ p[role="alert"]::before { content: "!"; }
 }
 
 .journal-card__date {
-  color: var(--ink-muted);
+  color: var(--ink);
   font-size: var(--text-small);
 }
 
@@ -3305,6 +3306,7 @@ p[role="alert"]::before { content: "!"; }
   cursor: pointer;
   text-align: left;
   font-family: var(--font-ui);
+  font-size: var(--text-heading);
   color: inherit;
   transition: background 140ms ease-out, border-color 140ms ease-out;
 }
@@ -3324,8 +3326,8 @@ p[role="alert"]::before { content: "!"; }
 }
 
 .task-row__index {
-  width: 28px;
-  height: 28px;
+  width: 35px;
+  height: 35px;
   border-radius: var(--radius-pill);
   background: var(--cream);
   display: inline-flex;
@@ -3639,8 +3641,8 @@ p[role="alert"]::before { content: "!"; }
   align-items: center;
   gap: var(--space-5);
   padding: var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--paper);
+  border-radius: var(--radius-lg);
+  background: var(--cream);
   color: var(--ink);
   text-align: left;
   border: 1px solid var(--line);
@@ -3657,12 +3659,12 @@ p[role="alert"]::before { content: "!"; }
 
 .profile-avatar {
   display: grid;
-  width: 112px;
-  height: 112px;
-  flex: 0 0 112px;
+  width: 90px;
+  height: 90px;
+  flex: 0 0 90px;
   place-items: center;
   overflow: hidden;
-  background: #fff;
+  background: var(--teal);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
 }
