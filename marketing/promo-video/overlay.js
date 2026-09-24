@@ -105,16 +105,17 @@ function layoutStrand() {
   const wm = $("wm"), F = 236;
   const u = wm.getExtentOfChar(4), last = wm.getExtentOfChar(7);
   const base = 520;
-  const x0 = u.x + F * 0.02, x1 = last.x + last.width * 0.5;
+  const x0 = u.x + F * 0.02;
+  // end just past the last i with a small upward flick, clear of the letter
+  const x1 = last.x + last.width + F * 0.12;
   const pts = [];
   const n = 90;
   for (let k = 0; k <= n; k++) {
     const q = k / n;
-    const x = lerp(x0, x1 + F * 0.16, q);
-    let y = base + F * 0.2 + Math.sin(q * Math.PI * 3.1 + 0.2) * F * 0.045;
-    // the tail curls up into the last i
-    const rise = clamp((q - 0.8) / 0.2);
-    y -= Math.pow(rise, 1.6) * F * 0.36;
+    const x = lerp(x0, x1, q);
+    let y = base + F * 0.2 + Math.sin(q * Math.PI * 3 + 0.2) * F * 0.045;
+    const rise = clamp((q - 0.86) / 0.14);
+    y -= Math.pow(rise, 1.8) * F * 0.13;
     pts.push([x, y]);
   }
   const d = pts.map((p, k) => `${k ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join("");
@@ -128,7 +129,10 @@ function layoutStrand() {
 function drawEnd(t) {
   const end = $("end");
   if (t < T.cut) { end.style.opacity = 0; return; }
-  end.style.opacity = 1 - clamp((t - T.fade_out) / (T.end - T.fade_out - 0.1));
+  // Never fully opaque: Chromium saves opaque frames as RGB PNGs, and a switch
+  // from RGBA to RGB mid-sequence makes ffmpeg drop frames. 0.996 over the
+  // black plate is invisible.
+  end.style.opacity = 0.996 * (1 - clamp((t - T.fade_out) / (T.end - T.fade_out - 0.1)));
   const g = cubicOut(clamp((t - T.logo_chord + 0.2) / 3.2));
   $("glow").style.opacity = g * 0.85;
   $("glow").style.transform = `translateY(${(1 - g) * 90}px)`;

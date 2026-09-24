@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Overlay frames on the plate, add film grain, master the score, mux.
+# Every overlay frame must be RGBA: if the PNG format switches mid-sequence, ffmpeg
+# rebuilds the graph and drops frames (overlay.js keeps the end card below full opacity).
 # Usage: composite.sh <plate.mp4> <overlay-dir> <score.wav> <out.mp4> [crf]
 set -euo pipefail
 PLATE=$1 OV=$2 SCORE=$3 OUT=$4 CRF=${5:-18}

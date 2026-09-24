@@ -17,7 +17,7 @@ It is 100 BPM; every cut lands on a note because the score and the edit share on
 | 0:22.8 | Hard cut to silence | — | — |
 | 0:23.4 | One quiet chord; the wordmark's strand draws itself | — | Linguini |
 | 0:25.2 | | — | "Learn the language of your day." |
-| 0:27 | | — | "Now on Product Hunt" |
+| 0:27 | | — | "Coming soon to Product Hunt" |
 
 ## How it's made
 
