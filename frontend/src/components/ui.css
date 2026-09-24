@@ -952,6 +952,18 @@
   transform: translateY(-50%);
 }
 
+.brandbar__brand {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.brandbar__brand:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
 .brandbar__wordmark {
   display: block;
   width: min(150px, 42vw);
