@@ -27,20 +27,25 @@ export function Login() {
     setSubmitting(true);
     setError(null);
     setMessage(null);
-    const response = mode === "signin"
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/login` },
-      });
-    setSubmitting(false);
-    if (response.error) {
-      setError(response.error.message);
-      return;
-    }
-    if (mode === "signup" && !response.data.session) {
-      setMessage("Check your email to confirm your account, then sign in here.");
+    try {
+      const response = mode === "signin"
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/login` },
+        });
+      if (response.error) {
+        setError(response.error.message);
+        return;
+      }
+      if (mode === "signup" && !response.data.session) {
+        setMessage("Check your email to confirm your account, then sign in here.");
+      }
+    } catch {
+      setError("We could not reach sign-in. Check the Supabase URL and publishable key, then try again.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
