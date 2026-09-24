@@ -143,5 +143,5 @@ function JournalEntryEditor({ entry, onSaved }: { entry: JournalEntry; onSaved: 
   const error = queryError(queryErrorValue);
   if (loading) return <LoadingScreen label="Loading journal…" />;
   if (error || !data) return <ErrorState title="We couldn't open your journal" message={error ?? "Your journal isn't available right now."} retry={() => window.location.reload()} backTo="/journal" />;
-  return <JournalForm entry={entry} date={entry.date} photoOptions={data.photoOptions} onSaved={onSaved} />;
+  return <JournalForm entry={entry} date={entry.date} photoOptions={data.photoOptions} wordSuggestions={data.wordSuggestions} onSaved={onSaved} />;
 }

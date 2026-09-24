@@ -22,7 +22,7 @@ export function JournalNew() {
   const error = queryError(queryErrorValue);
   if (loading) return <LoadingScreen label="Loading journal…" />;
   if (error || !data) return <ErrorState title="We couldn't open your journal" message={error ?? "Your journal isn't available right now."} retry={() => window.location.reload()} backTo="/journal" />;
-  return <JournalForm key={data.entry?.id ?? `new-${data.date}`} entry={data.entry} date={data.date} photoOptions={data.photoOptions} />;
+  return <JournalForm key={data.entry?.id ?? `new-${data.date}`} entry={data.entry} date={data.date} photoOptions={data.photoOptions} wordSuggestions={data.wordSuggestions} />;
 }
 
 export function JournalForm({ entry, date, photoOptions, wordSuggestions, onSaved }: { entry: JournalEntry | null; date: string; photoOptions: JournalPhotoOption[]; wordSuggestions: string[]; onSaved?: (entry: JournalEntry) => void }) {
