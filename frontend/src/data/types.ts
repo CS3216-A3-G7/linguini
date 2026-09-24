@@ -83,3 +83,13 @@ export type LeaderboardRow = {
   xp: number;
   isYou?: boolean;
 };
+
+export type StreakDay = {
+  date: string;
+  active: boolean;
+};
+
+export type Streak = {
+  current: number;
+  days: StreakDay[];
+};

@@ -44,6 +44,7 @@ function LoadedAppState({ account, children }: { account: ReturnType<typeof useA
       queryClient.setQueryData(queryKeys.journals(profileId),
         (rows: JournalEntry[] | undefined) => rows ? [entry, ...rows.filter(row => row.id !== entry.id)].sort((a, b) => b.date.localeCompare(a.date)) : undefined);
       await queryClient.invalidateQueries({ queryKey: queryKeys.journals(profileId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.progress(profileId) });
     },
     onError: (error) => setJournalSaveError(`${friendlyError(error)} Your writing is still here.`),
     onSettled: () => { journalSavingRef.current = false; },

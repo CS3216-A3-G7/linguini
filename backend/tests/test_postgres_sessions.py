@@ -19,6 +19,7 @@ from app.repositories.postgres.tasks import session_tasks, task_attempts
 from app.repositories.postgres.users import users
 from app.repositories.postgres.vocabulary import user_vocabulary_progress, vocabulary_encounters
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
+from app.repositories.postgres.xp import award
 from app.repositories.practice import PracticeConflictError
 from app.schemas.base import utc_now
 from app.schemas.enums import TaskKind
@@ -108,6 +109,31 @@ def analyze(client, sid, confirm=True):
         assert response.status_code == 200, response.text
         detail = client.get(f"/api/v1/sessions/{sid}").json()
     return detail
+
+
+def test_progress_returns_a_current_local_streak(database):
+    engine, owner, profile, client = database
+    with engine.begin() as connection:
+        award(
+            connection,
+            user_id=owner.id,
+            language_profile_id=profile.id,
+            event_type="taskCompleted",
+            idempotency_key="streak-yesterday",
+            occurred_at=utc_now() - timedelta(days=1),
+        )
+        award(
+            connection,
+            user_id=owner.id,
+            language_profile_id=profile.id,
+            event_type="journalEntry",
+            idempotency_key="streak-today",
+        )
+
+    streak = client.get("/api/v1/me/progress").json()["streak"]
+    assert len(streak["days"]) == 7
+    assert streak["current"] == 2
+    assert [day["active"] for day in streak["days"][-2:]] == [True, True]
 
 
 @pytest.mark.parametrize("source", ["preloaded", "userUpload", "camera"])
