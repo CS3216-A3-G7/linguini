@@ -3,7 +3,7 @@ import { Button } from "../components/ui";
 import { ArrowRightIcon, CheckIcon, CloseIcon } from "../components/icons";
 import { TranslationPreview } from "../components/TranslationPreview";
 import { useScene } from "../state/useScene";
-import { practiceStages, taskDone, taskTitle, taskDescription } from "../lib/practiceTasks";
+import { practiceStages, taskDone, taskTitle } from "../lib/practiceTasks";
 import { useAppState } from "../state/useAppState";
 
 export function Learn() {

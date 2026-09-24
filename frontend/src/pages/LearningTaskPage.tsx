@@ -1,7 +1,7 @@
 import { useRef, useState, type TouchEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button, Card, Feedback, IconButton, ProgressTrail } from "../components/ui";
-import { CheckIcon, CloseIcon, SpeakerIcon } from "../components/icons";
+import { CloseIcon, SpeakerIcon } from "../components/icons";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { choiceOrder, practiceStages, taskDone, taskTitle } from "../lib/practiceTasks";

@@ -7,7 +7,7 @@ import { useAuth } from "../state/Auth";
 export function Profile() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { learner, user, activeProfile, progress, progressLoading, progressError, profileError, profileSaving, setLanguage, saveLanguageProfile, saveUser } = useAppState();
+  const { learner, user, activeProfile, progressLoading, progressError, profileError, profileSaving, setLanguage, saveLanguageProfile, saveUser } = useAppState();
 
   return (
     <div className="stack profile-page">
