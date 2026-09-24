@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui";
 import { isSupabaseConfigured, supabase } from "../lib/supabase.ts";
+import { readOnboardingDraft } from "../lib/onboardingDraft";
 import { useAuth } from "../state/Auth";
 
 export function Login() {
@@ -15,7 +16,9 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const destination = (location.state as { from?: string } | null)?.from ?? "/home";
+  const destination = readOnboardingDraft()
+    ? "/onboarding"
+    : (location.state as { from?: string } | null)?.from ?? "/home";
 
   useEffect(() => {
     if (session && !loading) navigate(destination, { replace: true });
