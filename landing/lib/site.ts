@@ -8,7 +8,10 @@ function resolveSiteUrl(): string {
 export const site = {
   name: "Linguini",
   url: resolveSiteUrl().replace(/\/$/, ""),
-  appUrl: (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:5173").replace(/\/$/, ""),
+  appUrl: (
+    process.env.NEXT_PUBLIC_APP_URL ??
+    (process.env.NODE_ENV === "production" ? "https://linguini-navy.vercel.app" : "http://localhost:5173")
+  ).replace(/\/$/, ""),
   title: "Linguini — Learn a language from the photos you take",
   shortTitle: "Linguini",
   description:
