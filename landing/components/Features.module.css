@@ -138,6 +138,7 @@
   background: var(--tomato);
   opacity: 0.75;
   transform-origin: center;
+  transform: scaleY(var(--s));
   animation: wave 1.1s ease-in-out infinite alternate;
   animation-delay: calc(var(--i) * -0.13s);
 }

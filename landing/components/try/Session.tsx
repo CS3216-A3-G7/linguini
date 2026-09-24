@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { languageNames, type Lang, type Scene } from "@/data/types";
 import { appLinks } from "@/lib/site";
 import { speak } from "@/lib/speech";
+import { stripArticle } from "@/lib/words";
 import { ShareBar } from "../ShareBar";
 import { JournalCard } from "../product/JournalCard";
 import { PhotoMarkers } from "../product/PhotoMarkers";
@@ -517,7 +518,7 @@ function JournalStage({
   const draft = scene.journal[lang];
   const [title, setTitle] = useState(draft.title);
   const [body, setBody] = useState(draft.body);
-  const used = words.filter(word => body.toLowerCase().includes(word.replace(/^(el|la|les|le|los|las|l’|l')\s*/i, "").toLowerCase()));
+  const used = words.filter(word => body.toLowerCase().includes(stripArticle(word).toLowerCase()));
 
   return (
     <>

@@ -56,7 +56,9 @@ function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
 }
 
 function fromRoot(relative: string): string {
-  return path.join(process.cwd(), relative);
+  // Callers only read assets/, public/brand, public/pasta and public/photos; those are traced
+  // for /og and /opengraph-image via `outputFileTracingIncludes` in next.config.ts.
+  return path.join(/*turbopackIgnore: true*/ process.cwd(), relative);
 }
 
 async function readArrayBuffer(relative: string): Promise<ArrayBuffer> {

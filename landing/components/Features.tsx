@@ -56,7 +56,7 @@ export function Features() {
                 <span className={styles.micIcon}><Mic size={20} /></span>
                 <span className={styles.wave} aria-hidden="true">
                   {Array.from({ length: 14 }, (_, i) => (
-                    <span key={i} style={{ "--i": i } as React.CSSProperties} />
+                    <span key={i} style={{ "--i": i, "--s": [0.35, 0.6, 0.9, 0.55, 1, 0.7, 0.4, 0.8, 0.95, 0.5, 0.65, 0.3, 0.75, 0.45][i] } as React.CSSProperties} />
                   ))}
                 </span>
                 <span className={styles.heard}><Check size={16} /> Sounds right</span>

@@ -3,6 +3,7 @@
   --py: 0;
   position: relative;
   padding-block: 12px 72px;
+  overflow-x: clip;
   scroll-margin-top: 72px;
 }
 
@@ -84,6 +85,7 @@
 }
 
 .prompt {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -100,22 +102,22 @@
 
 .noodle {
   position: absolute;
+  right: calc(100% + 6px);
+  top: 18px;
   width: 96px;
   height: 48px;
-  margin-left: -560px;
-  margin-top: 64px;
   fill: none;
   stroke: var(--pasta);
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transform: scaleX(-1) rotate(-8deg);
+  transform: scale(-1, -1) rotate(-6deg);
 }
 
 /* Photo ring */
 .ring {
   position: absolute;
-  inset: 0;
+  inset: 0 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -224,6 +226,7 @@
   .stage {
     display: block;
     min-height: 0;
+    place-items: normal;
   }
 
   .copy {
@@ -296,6 +299,10 @@
   .ctas {
     display: grid;
     width: 100%;
+  }
+
+  .tryButton {
+    display: none;
   }
 
   .title {

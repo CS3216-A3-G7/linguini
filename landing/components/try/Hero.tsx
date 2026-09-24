@@ -16,11 +16,11 @@ const slots = [
   { left: "0%", top: "4%", w: 250, r: -7, d: 1.2 },
   { left: "8%", top: "38%", w: 196, r: 5, d: 0.6 },
   { left: "1%", top: "68%", w: 236, r: -3, d: 1 },
-  { left: "21%", top: "80%", w: 176, r: 6, d: 0.5 },
+  { left: "23%", top: "81%", w: 172, r: 6, d: 0.5 },
   { right: "1%", top: "3%", w: 236, r: 6, d: 1.1 },
   { right: "8%", top: "37%", w: 200, r: -5, d: 0.7 },
-  { right: "0%", top: "67%", w: 248, r: 3, d: 1.2 },
-  { right: "21%", top: "81%", w: 172, r: -6, d: 0.5 },
+  { right: "0%", top: "64%", w: 236, r: 3, d: 1.2 },
+  { right: "24%", top: "82%", w: 168, r: -6, d: 0.5 },
 ] as const;
 
 type ViewTransitionDocument = Document & {
@@ -131,7 +131,7 @@ export function Hero() {
               <a href={appLinks.signUp} className="btn">
                 Start learning free
               </a>
-              <button type="button" className="btn btn--teal" onClick={() => pick(scenes[0].id, document.querySelector<HTMLElement>(`[data-print="${scenes[0].id}"]`))}>
+              <button type="button" className={`btn btn--teal ${styles.tryButton}`} onClick={() => pick(scenes[0].id, document.querySelector<HTMLElement>(`[data-print="${scenes[0].id}"]`))}>
                 Try it on a photo <ArrowRight size={20} />
               </button>
             </div>

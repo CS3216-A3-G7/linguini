@@ -3,15 +3,10 @@ import { site } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-        // Share pages are per-visitor journal cards; the OG endpoint only renders images.
-        disallow: ["/share", "/og"],
-      },
-    ],
+    // Everything stays crawlable: social crawlers (e.g. Twitterbot) honour robots.txt, so
+    // blocking /share or /og would break link previews. /share opts out of indexing via
+    // its own `noindex` robots meta instead.
+    rules: [{ userAgent: "*", allow: "/" }],
     sitemap: `${site.url}/sitemap.xml`,
-    host: site.url,
   };
 }

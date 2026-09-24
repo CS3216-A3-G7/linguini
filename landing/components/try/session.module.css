@@ -424,6 +424,11 @@
   border: 0;
 }
 
+.choices,
+.bank {
+  padding: 0;
+}
+
 .choices {
   display: grid;
   grid-template-columns: 1fr 1fr;

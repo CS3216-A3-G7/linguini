@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { Lang } from "@/data/types";
+import { stripArticle } from "@/lib/words";
 import styles from "./product.module.css";
 
 export type JournalCardProps = {
@@ -17,10 +18,10 @@ export type JournalCardProps = {
 function highlightWords(body: string, words: string[]) {
   if (!words.length) return body;
   const escaped = words
-    .map(w => w.replace(/^(el|la|les|le|los|las|l’|l')\s*/i, ""))
+    .map(stripArticle)
     .filter(Boolean)
     .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const pattern = new RegExp(`(?<!\\p{L})(${escaped.join("|")})(?!\\p{L})`, "giu");
+  const pattern = new RegExp(`(?<!\\p{L})((?:${escaped.join("|")})(?:e?s)?)(?!\\p{L})`, "giu");
   return body.split(pattern).map((part, index) =>
     index % 2 === 1 ? <mark key={index} className={styles.hl}>{part}</mark> : part,
   );
