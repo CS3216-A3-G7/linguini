@@ -33,7 +33,7 @@ export function Learn() {
             <CloseIcon size={18} /> Exit
           </Button>
         </div>
-        <p className="muted">Build confidence with each short activity.</p>
+        <p className="muted">Build confidence with each short task.</p>
       </div>
 
       {practiceError ? <p role="alert">{practiceError}</p> : null}
@@ -55,9 +55,8 @@ export function Learn() {
               </span>
               <span className="grow stack-2">
                 <strong>{taskTitle(task)}</strong>
-                <span className="small muted">{taskDescription(task)}</span>
               </span>
-              {isDone ? <span className="pill pill--mastered">{task.status === "skipped" ? "Skipped" : "Done"}</span> : <ArrowRightIcon />}
+              {isDone ? <span className="pill pill--mastered">{task.status === "skipped" ? "Skipped" : ""}</span> : <ArrowRightIcon />}
             </button>
           );
         })}

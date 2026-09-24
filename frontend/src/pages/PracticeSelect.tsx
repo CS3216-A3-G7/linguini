@@ -100,8 +100,9 @@ export function PracticeSelect() {
         <h2 id={dialogTitleId}>Continue your practice?</h2>
         <p>You have a practice waiting for you. Continue where you left off, or choose a new photo.</p>
         <div className="leave-session__actions">
-          <Button block disabled={starting} onClick={() => void continueActive()}>Continue practice</Button>
-          <Button variant="secondary" block disabled={starting} onClick={() => setDismissedSessionId(activeSessionId)}>Choose another photo</Button>
+           <Button variant="secondary" block disabled={starting} onClick={() => setDismissedSessionId(activeSessionId)}>Begin New Practice</Button>
+      
+          <Button block disabled={starting} onClick={() => void continueActive()}>Continue Practice</Button>
         </div>
       </section>
     </div> : null}
