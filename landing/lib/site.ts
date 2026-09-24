@@ -1,3 +1,11 @@
+/** The deployed learner app (the `frontend/` Vercel project). */
+const productionAppUrl = "https://linguini-navy.vercel.app";
+
+function resolveAppUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  return process.env.VERCEL ? productionAppUrl : "http://localhost:5173";
+}
+
 function resolveSiteUrl(): string {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
@@ -8,7 +16,7 @@ function resolveSiteUrl(): string {
 export const site = {
   name: "Linguini",
   url: resolveSiteUrl().replace(/\/$/, ""),
-  appUrl: (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:5173").replace(/\/$/, ""),
+  appUrl: resolveAppUrl().replace(/\/$/, ""),
   title: "Linguini — Learn a language from the photos you take",
   shortTitle: "Linguini",
   description:
