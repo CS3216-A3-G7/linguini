@@ -93,13 +93,6 @@ export function Home() {
   const navigate = useNavigate();
   const { learner, activeProfile, progress, progressLoading, progressError } = useAppState();
   const { vocabulary, vocabularyLoading, vocabularyError } = useVocabularyQuery();
-  const collected = vocabularyLoading || vocabularyError ? null : vocabulary.length;
-  const mastered = vocabularyLoading || vocabularyError ? null : vocabulary.filter(word => word.status === "mastered").length;
-  const scenes = progressLoading || progressError ? null : progress?.scenarios.length ?? 0;
-  const marks = (count: number | null, symbol: string) => Array.from(
-    { length: 5 },
-    (_, index) => <span key={index} className={count !== null && index < Math.min(5, Math.ceil(count / 5)) ? "is-filled" : ""}>{symbol}</span>,
-  );
   const queryClient = useQueryClient();
   const profileId = activeProfile?.id ?? "";
   const { data: resume, error: resumeQueryError, isPending: resumeLoading } = useQuery({
@@ -147,7 +140,10 @@ export function Home() {
       </header>
 
       <section className="home-streak" aria-label="Your seven day learning streak">
-        <h2>Your {streak?.days.length ?? 7}-day streak</h2>
+        <div className="home-streak__heading">
+          <h2>Your {streak?.days.length ?? 7}-day streak</h2>
+          <strong className="home-streak__xp">{progressLoading || progressError ? "--" : progress?.xp ?? 0} XP</strong>
+        </div>
         {progressLoading ? <p role="status">Loading your streak…</p> : progressError ? null : (
           <div className="home-streak__body">
             <ol className="home-streak__week">
@@ -214,15 +210,6 @@ export function Home() {
             <BookIcon size={28} />
             <span>Review words</span>
           </Button>
-        </div>
-      </section>
-
-      <section className="home-journey" aria-label="Your learning journey">
-        <div className="home-journey__heading"><div><h2>Your learning journey</h2><p>Every small step adds up.</p></div><strong>{progressLoading || progressError ? "--" : progress?.xp ?? 0} XP</strong></div>
-        <div className="home-journey__milestones">
-          <div><span className="home-journey__marks" aria-hidden="true">{marks(collected, "●")}</span><strong>{collected ?? "--"} words collected</strong></div>
-          <div><span className="home-journey__marks" aria-hidden="true">{marks(mastered, "★")}</span><strong>{mastered ?? "--"} words mastered</strong></div>
-          <div><span className="home-journey__marks" aria-hidden="true">{marks(scenes, "▣")}</span><strong>{scenes ?? "--"} scenes explored</strong></div>
         </div>
       </section>
 
