@@ -7,8 +7,7 @@
 .tile {
   display: grid;
   align-content: space-between;
-  gap: 28px;
-  min-height: 360px;
+  gap: 24px;
   padding: clamp(24px, 3vw, 36px);
   overflow: hidden;
   border-radius: var(--radius-lg);
@@ -19,7 +18,9 @@
 .wide {
   grid-column: span 2;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-content: center;
   align-items: center;
+  column-gap: 32px;
 }
 
 .cream {
@@ -359,6 +360,42 @@
   gap: 10px;
 }
 
+.spyPhoto {
+  position: relative;
+  aspect-ratio: 1900 / 1267;
+  margin-bottom: 4px;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px var(--teal-dark);
+}
+
+.spyImg {
+  object-fit: cover;
+}
+
+.spyMarker {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 15px;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.spyFound {
+  border-color: var(--teal-dark);
+  background: var(--teal);
+  color: #fff;
+}
+
 .bubbleThem,
 .bubbleYou {
   max-width: 88%;
@@ -444,6 +481,13 @@
   .lone {
     grid-column: 1 / -1;
   }
+
+  .lone {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-content: center;
+    align-items: center;
+    column-gap: 32px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -451,7 +495,8 @@
     grid-template-columns: 1fr;
   }
 
-  .wide {
+  .wide,
+  .lone {
     grid-template-columns: 1fr;
   }
 

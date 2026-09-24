@@ -126,18 +126,31 @@ export function Features() {
             </div>
           </Reveal>
 
-          <Reveal className={`${styles.tile} ${styles.lone}`}>
+          <Reveal className={`${styles.tile} ${styles.wide}`}>
             <div className={styles.text}>
               <h3>I-Spy, both ways</h3>
               <p>First Linguini gives you a clue about your photo. Then it’s your turn to describe something and let Linguini guess.</p>
             </div>
             <div className={styles.chat}>
+              <div className={styles.spyPhoto}>
+                <Image
+                  src="/photos/desk-flatlay.jpg"
+                  alt="A white desk with a notebook, pencil, phone, laptop and a potted plant"
+                  fill
+                  sizes="(max-width: 720px) 90vw, 380px"
+                  className={styles.spyImg}
+                />
+                <span className={`${styles.spyMarker} ${styles.spyFound}`} style={{ left: "17%", top: "12%" }} aria-hidden="true">
+                  <Check size={14} />
+                </span>
+                <span className={styles.spyMarker} style={{ left: "11%", top: "65%" }} aria-hidden="true">?</span>
+              </div>
               <p className={styles.bubbleThem} lang="es">Veo, veo… algo que es verde y está en la mesa.</p>
               <p className={styles.bubbleYou} lang="es">¡La planta! Ahora yo: veo algo negro y pequeño.</p>
             </div>
           </Reveal>
 
-          <Reveal className={`${styles.tile} ${styles.wide} ${styles.sage}`} delay={80}>
+          <Reveal className={`${styles.tile} ${styles.sage} ${styles.lone}`} delay={80}>
             <div className={styles.text}>
               <h3>A streak worth keeping</h3>
               <p>Earn XP for every task, I-Spy win and journal entry. Each day you practise, a farfalle lands on your week.</p>
@@ -152,7 +165,7 @@ export function Features() {
                 ))}
               </div>
               <p className={styles.stats}>
-                <b>420 XP</b> this week · <b>86</b> words collected · <b>19</b> journal pages
+                <b>420</b> XP this week · <b>86</b> words · <b>19</b> pages
               </p>
             </div>
           </Reveal>
