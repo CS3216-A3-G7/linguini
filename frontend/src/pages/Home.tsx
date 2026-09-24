@@ -165,7 +165,7 @@ export function Home() {
           </div>
         )}
       </section>
-
+      <h2>Today's Plan</h2>
       <section className="home-plan" aria-label="Today's plan">
         {progressLoading || resumeLoading ? <p role="status">Loading your practice...</p> : progressError || resumeError ? (
           <p role="alert">{progressError ?? resumeError} Reload to retry.</p>
@@ -173,10 +173,8 @@ export function Home() {
           <Card className="home-featured home-featured--resume">
             <div className="home-featured__image">
               <MediaImage assetId={resume.session.sceneMediaAssetId} title={resume.title} />
-              <span className="home-featured__pill">Featured plan</span>
             </div>
             <div className="home-featured__body">
-              {learner.language ? <p className="home-featured__eyebrow">{learner.language}</p> : null}
               <h3>{resume.title}</h3>
               <p className="home-featured__description">{resume.session.sessionSummary ?? "Pick up where you left off."}</p>
               {resume.progress.totalTaskCount > 0 ? <TaskProgressRing completed={resume.progress.completedTaskCount} total={resume.progress.totalTaskCount} /> : null}
