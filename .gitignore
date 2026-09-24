@@ -5,6 +5,9 @@ dist-ssr/
 
 # Tool caches
 .vite/
+__pycache__/
+launch/media/.venv/
+launch/media/.cache/
 
 # Logs
 logs/

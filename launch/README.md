@@ -7,6 +7,7 @@
 | [Product Hunt submission and channel copy](product-hunt.md) | Paste-ready preview listing, first maker comment, full-release draft, social posts, outreach and reply bank. |
 | [Launch dashboard](plan.md) | Timeline, owner board, go/no-go criteria, launch-day response and retention measures. |
 | [Media kit](media/README.md) | Product Hunt gallery, icon, social square, illustrative teaser and editable source. |
+| [Explainer video script](explainer-script.md) | Script and production notes for the 50-second animated explainer: visual system, second-by-second voiceover, visuals and motion notes, audio, and claims to verify. The rendered video, captions and style frames are in the media kit. |
 
 ## Team decision checklist
 
