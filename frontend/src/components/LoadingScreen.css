@@ -17,11 +17,11 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  width: min(100%, 390px);
-  padding: var(--space-7) var(--space-8) var(--space-8);
+  width: min(100%, 560px);
+  padding: var(--space-5) var(--space-7) var(--space-6);
   border: 2px solid rgba(31, 122, 120, 0.22);
   border-radius: var(--radius-lg);
-  background: var(--paper);
+  background: #fff;
   box-shadow: 0 16px 48px rgba(38, 50, 56, 0.2);
   text-align: center;
   outline: none;
@@ -29,9 +29,9 @@
 
 .loading-screen__pasta-gif {
   display: block;
-  width: min(100%, 240px);
+  width: min(100%, 460px);
   height: auto;
-  margin: calc(-1 * var(--space-4)) 0 calc(-1 * var(--space-2));
+  margin: 0 0 calc(-1 * var(--space-2));
 }
 
 .loading-screen__label {
