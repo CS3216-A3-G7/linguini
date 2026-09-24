@@ -12,6 +12,7 @@ from app.repositories.learning import LearningStorageError
 from app.repositories.media_assets import MediaAssetConflictError, MediaAssetStorageError
 from app.repositories.practice import (
     ActiveSessionExistsError,
+    ActiveSessionLimitReachedError,
     PracticeConflictError,
     PracticeNotFoundError,
     PracticeStorageError,
@@ -108,6 +109,11 @@ def register_learning_errors(app: FastAPI) -> None:
             409,
             "active_session_exists",
             "You have a practice session in progress.",
+        ),
+        ActiveSessionLimitReachedError: (
+            409,
+            "active_session_limit_reached",
+            "You can keep up to three unfinished practices open at once.",
         ),
         JournalStorageError: (500, "journal_storage_error", "Unable to load or save journal data."),
         JournalNotFoundError: (404, "journal_not_found", "Journal not found."),

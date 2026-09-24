@@ -30,6 +30,7 @@ from app.repositories.postgres.vocabulary import (
 )
 from app.repositories.postgres.xp import award, xp_events
 from app.repositories.practice import (
+    ActiveSessionLimitReachedError,
     PracticeConflictError,
     PracticeNotFoundError,
     PracticeStorageError,
@@ -69,6 +70,7 @@ from app.services.session_plan import (
 logger = logging.getLogger(__name__)
 
 TERMINAL = {"completed", "abandoned", "failed"}
+MAX_ACTIVE_SESSIONS = 3
 ALLOWED_TRANSITIONS = {
     "created": {"analyzingScene", "abandoned", "failed"},
     "analyzingScene": {"awaitingObjectReview", "abandoned", "failed"},
@@ -588,6 +590,18 @@ class PostgresWorkflowRepository:
             )
             if existing is not None:
                 return self._detail(c, parse_session(existing))
+            active_count = c.execute(
+                select(func.count()).select_from(sessions).where(
+                    sessions.c.user_id == self.user_id,
+                    sessions.c.language_profile_id == request.language_profile_id,
+                    sessions.c.status.not_in(TERMINAL),
+                )
+            ).scalar_one()
+            if active_count >= MAX_ACTIVE_SESSIONS:
+                raise ActiveSessionLimitReachedError(
+                    "You can keep up to three unfinished practices open at once. "
+                    "Finish or leave one before starting another."
+                )
             session = Session(
                 user_id=self.user_id,
                 language_profile_id=request.language_profile_id,

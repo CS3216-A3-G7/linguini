@@ -315,9 +315,16 @@ def test_multiple_active_sessions_and_owner_scope(database, monkeypatch):
     second_response = create_with_asset(client, profile, asset, "other-asset-key")
     assert second_response.status_code == 202, second_response.text
     second = second_response.json()["session"]["id"]
+    third_asset = upload_asset(engine, owner)
+    third_response = create_with_asset(client, profile, third_asset, "third-asset-key")
+    assert third_response.status_code == 202, third_response.text
+    third = third_response.json()["session"]["id"]
+    fourth = create_with_asset(client, profile, upload_asset(engine, owner), "fourth-asset-key")
+    assert fourth.status_code == 409
+    assert fourth.json()["detail"]["code"] == "active_session_limit_reached"
     with engine.connect() as c:
         ids = c.execute(select(sessions.c.id).where(sessions.c.user_id == owner.id)).scalars().all()
-    assert set(ids) == {UUID(first), UUID(second)}
+    assert set(ids) == {UUID(first), UUID(second), UUID(third)}
 
     # The state machine rejects edges outside ALLOWED_TRANSITIONS.
     repository = PostgresWorkflowRepository(engine, owner.id)
@@ -350,6 +357,7 @@ def test_multiple_active_sessions_and_owner_scope(database, monkeypatch):
     assert client.post(f"/api/v1/sessions/{second}/analyze").status_code == 409
     abandoned = client.get(f"/api/v1/sessions/{second}").json()["session"]
     assert abandoned["status"] == "abandoned" and abandoned["abandonedAt"] is not None
+    assert client.post(f"/api/v1/sessions/{third}/abandon").status_code == 200
 
     created = create_with_asset(client, profile, asset, "other-asset-key-2")
     assert created.status_code == 202, created.text
