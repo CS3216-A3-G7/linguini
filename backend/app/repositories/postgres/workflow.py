@@ -849,13 +849,14 @@ class PostgresWorkflowRepository:
                         "anchor_point": positions.get(object_id, existing[object_id].anchor_point),
                     }
                 )
-                values = {
-                    key: value
-                    for key, value in object_values(obj).items()
-                    if key not in {"id", "session_id"}
-                }
+                values = object_values(obj)
                 c.execute(
-                    update(scene_objects).where(scene_objects.c.id == object_id).values(**values)
+                    upsert(scene_objects)
+                    .values(**values)
+                    .on_conflict_do_update(
+                        index_elements=["id"],
+                        set_={key: value for key, value in values.items() if key != "id"},
+                    )
                 )
             for added in request.added_objects:
                 # Scope client-generated IDs to this session; retries keep the same object.
