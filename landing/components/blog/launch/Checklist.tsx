@@ -1,6 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { ChevronDown } from "@/components/icons";
+import { usePrinting } from "../story/hooks";
 import l from "./launch.module.css";
 
 type Item = { text: string; owner: string };
@@ -124,35 +126,54 @@ function parse(raw: string): Record<string, boolean> {
 
 export function Checklist() {
   const done = parse(useSyncExternalStore(subscribe, read, () => "{}"));
+  const [open, setOpen] = useState(false);
+  const printing = usePrinting();
+  const showAll = open || printing;
   const toggle = (id: string) => write({ ...done, [id]: !done[id] });
   const count = Object.values(done).filter(Boolean).length;
 
   return (
-    <div className={l.checklist}>
+    <div className={l.checklist} data-open={showAll || undefined}>
       <div className={l.checkHead}>
         <span>{count} of {total} done</span>
         <button type="button" className={l.checkReset} onClick={() => write({})}>Reset</button>
         <span className={l.checkMeter}><span style={{ transform: `scaleX(${count / total})` }} /></span>
       </div>
-      {phases.map(phase => (
-        <section key={phase.title} className={l.phase}>
-          <h4>{phase.title} <small>{phase.when}</small></h4>
-          <ul className={l.items}>
-            {phase.items.map(item => {
-              const id = `${phase.title}:${item.text}`;
-              return (
-                <li key={id}>
-                  <label className={l.item}>
-                    <input type="checkbox" checked={!!done[id]} onChange={() => toggle(id)} />
-                    <span>{item.text}</span>
-                    <small>{item.owner}</small>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+      <div id="checklist-phases" className={l.phases}>
+        {phases.map(phase => {
+          const shown = showAll ? phase.items : phase.items.slice(0, 1);
+          const hidden = phase.items.length - shown.length;
+          const phaseDone = phase.items.filter(item => done[`${phase.title}:${item.text}`]).length;
+          return (
+            <section key={phase.title} className={l.phase}>
+              <h4>
+                {phase.title} <small>{phase.when}</small>
+                <span className={l.phaseCount}>{phaseDone}/{phase.items.length}</span>
+              </h4>
+              <ul className={l.items}>
+                {shown.map(item => {
+                  const id = `${phase.title}:${item.text}`;
+                  return (
+                    <li key={id}>
+                      <label className={l.item}>
+                        <input type="checkbox" checked={!!done[id]} onChange={() => toggle(id)} />
+                        <span>{item.text}</span>
+                        <small>{item.owner}</small>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              {hidden ? <p className={l.phaseMore}>+ {hidden} more</p> : null}
+            </section>
+          );
+        })}
+      </div>
+      <button type="button" className={l.checkToggle} aria-expanded={showAll} aria-controls="checklist-phases"
+        onClick={() => setOpen(v => !v)}>
+        {showAll ? "Show less" : `Show all ${total} tasks`}
+        <ChevronDown size={18} />
+      </button>
     </div>
   );
 }

@@ -31,6 +31,16 @@ These commands use the locked `hyperframes@0.8.71` and `gsap@3.15.0` dependencie
 ffmpeg -y -ss 28.5 -i renders/linguini-launch-v2.mp4 -frames:v 1 renders/poster.jpg
 ```
 
+The landing site plays this film, muted with a "Sound on" button, in the blog post "Why we teach with your photos". Refresh its web copies after a re-render, from the repository root:
+
+```sh
+ffmpeg -y -i marketing/videos/launch-film/renders/linguini-launch-v2.mp4 -c:v libx264 -crf 26 -preset slow -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart landing/public/blog/photos/narrated-film-1080p.mp4
+ffmpeg -y -i marketing/videos/launch-film/renders/linguini-launch-v2.mp4 -vf scale=1280:-2 -c:v libx264 -crf 27 -preset slow -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart landing/public/blog/photos/narrated-film-720p.mp4
+ffmpeg -y -ss 7.6 -i marketing/videos/launch-film/renders/linguini-launch-v2.mp4 -frames:v 1 -vf scale=1280:-2 -q:v 3 landing/public/blog/photos/narrated-film-poster.jpg
+```
+
+`landing/public/blog/photos/narrated-film.vtt` copies the cue timings from `voice/narration.srt`. The film already burns its captions into the picture, so the blog doesn't show the track by default.
+
 The optional raw voice regeneration steps are documented in `voice/generate.py` and use `voice/requirements.txt`. The score and effects can be regenerated with `python3 audio/build_audio.py`. `voice/build.py` assembles the locally synthesized narration clips into `voice.wav`, timed SRT captions and the 30 fps amplitude envelope; it expects the `raw-*.wav` and bilingual phrase clips already present in `voice/`. The final stereo mix in `audio/final-mix.wav` combines that voice with the score and effects. Run `bash mix-audio.sh` to rebuild the stereo mix from the retained voice and music/SFX stems. The raw synthetic voice clips are included so a clean checkout can reproduce the timing without calling a paid service.
 
 ## Creative and source notes

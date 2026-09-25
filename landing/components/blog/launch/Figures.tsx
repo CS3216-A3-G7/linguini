@@ -122,69 +122,9 @@ export function LaunchClock() {
         </div>
       </div>
       <figcaption>
-        One Product Hunt day, 00:01 to 23:59 Pacific, is 3:01pm Saturday to 2:59pm Sunday in Singapore. The hours
-        when most of the US is awake land in our night, so we split into shifts.
+        One Product Hunt day runs midnight to midnight in San Francisco. In Singapore that’s 3:01pm Saturday to 2:59pm
+        Sunday. The hours when most of the US is awake fall in our night, so we work in shifts.
       </figcaption>
-    </figure>
-  );
-}
-
-/* ---------- Launch-day runbook ---------- */
-
-const runbook = [
-  { time: "14:00", title: "Last check", text: "Fresh sign-up on a phone, every button on the landing page, dashboards open." },
-  { time: "15:01", title: "Live", text: "Listing goes live on schedule. First comment up. We check the gallery and the link ourselves.", live: true },
-  { time: "15:10", title: "Tell our people", text: "One-to-one messages to friends and testers who asked to hear. X thread, Instagram post and story, LinkedIn." },
-  { time: "16:00", title: "Reply to everything", text: "Every comment gets an answer within the hour. Post in the self-promo spaces we’ve cleared: r/SideProject, the r/Spanish weekly thread, Discord promo channels." },
-  { time: "21:00", title: "US wakes up", text: "9am Saturday on the US east coast. Second Instagram story, reply to the new wave." },
-  { time: "01:00", title: "Night rota", text: "Handover to one responder and one engineer on call. Everyone else sleeps." },
-  { time: "08:00", title: "Sunday morning", text: "Check errors, sign-ups and demo completions. Second nudge in our NUS class chats for anyone who missed it." },
-  { time: "14:59", title: "Day ends", text: "Screenshot the numbers, thank everyone who commented, write down what broke." },
-];
-
-export function Runbook() {
-  const [ref, inView] = useInViewRef<HTMLOListElement>();
-  return (
-    <ol ref={ref} className={l.runbook} data-inview={inView || undefined}>
-      {runbook.map((step, i) => (
-        <li key={step.time} style={{ ["--i" as string]: i }} data-live={step.live || undefined}>
-          <time>{step.time}</time>
-          <div>
-            <b>{step.title}</b>
-            <p>{step.text}</p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-/* ---------- First two weeks: the funnel we are aiming for ---------- */
-
-const funnel = [
-  { label: "Visit from launch links", value: 300, note: "tagged by source" },
-  { label: "Finish the demo", value: 90, note: "30% of visits" },
-  { label: "Sign up for the beta app", value: 30, note: "10% of visits" },
-  { label: "Finish a first lesson", value: 15, note: "half of sign-ups" },
-  { label: "Come back within 7 days", value: 3, note: "the one we care about", key: true },
-];
-
-export function Funnel() {
-  const [ref, inView] = useInViewRef<HTMLDivElement>();
-  return (
-    <figure className={l.funnelFig}>
-      <div ref={ref} className={l.funnel} data-inview={inView || undefined}>
-        {funnel.map((row, i) => (
-          <div key={row.label} className={l.funnelRow} data-key={row.key || undefined} style={{ ["--i" as string]: i }}>
-            <span className={l.funnelLabel}>{row.label}</span>
-            <span className={l.funnelTrack}>
-              <span className={l.funnelBar} style={{ ["--w" as string]: `${Math.max(2, (row.value / 300) * 100)}%` }} />
-            </span>
-            <span className={l.funnelValue}><b>{row.value}</b> <small>{row.note}</small></span>
-          </div>
-        ))}
-      </div>
-      <figcaption>Our targets for the first 14 days, not forecasts. We’ll publish the real numbers either way.</figcaption>
     </figure>
   );
 }
