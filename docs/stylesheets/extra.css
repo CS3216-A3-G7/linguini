@@ -1,0 +1,11 @@
+/* Material renders Mermaid diagrams inside a closed shadow root, so the SVG
+   itself cannot be restyled from here; it scales to its host element instead.
+   Widening the host makes the large ERD legible, and the wrapper scrolls. */
+.erd-scroll {
+  overflow-x: auto;
+}
+
+.erd-scroll .mermaid {
+  width: 1500px;
+  max-width: none;
+}
