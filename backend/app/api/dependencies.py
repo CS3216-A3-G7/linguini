@@ -16,17 +16,19 @@ from app.ai import (
     load_ai_settings,
 )
 from app.ai.features.object_grounding import ObjectGroundingError
-from app.ai.features.scene_analysis import RoutedSceneAnalyzer, UploadedSceneAnalyzer
+from app.ai.features.scene_analysis import RoutedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
 from app.ai.openrouter import OPENROUTER_BASE_URL
 from app.ai.registry import (
+    build_image_moderator,
     build_ispy_clue_generator,
     build_learning_task_generator,
     build_object_grounder,
     build_scene_translator,
-    build_vision_client,
+    build_uploaded_scene_analyzer,
 )
-from app.config import get_demo_user_id, get_media_public_base_url, get_private_media_urls
+from app.api.auth import get_current_user_id
+from app.config import get_media_public_base_url, get_private_media_urls
 from app.repositories.journals import JournalRepository
 from app.repositories.language_profiles import LanguageProfileRepository
 from app.repositories.learning import LearningRepository
@@ -58,7 +60,6 @@ from app.services.scene_analysis import DeterministicSceneAnalyzer
 from app.services.scenes import SceneService
 from app.services.tasks import TaskService
 from app.services.users import UserService
-from app.services.vision_model import VisionModelConfig
 
 
 def get_user_repository(request: Request) -> UserRepository:
@@ -66,9 +67,9 @@ def get_user_repository(request: Request) -> UserRepository:
 
 
 def get_journal_repository(
-    request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
+    request: Request, user_id: Annotated[UUID, Depends(get_current_user_id)]
 ) -> JournalRepository:
-    return PostgresJournalRepository(request.app.state.database_engine, demo_user_id)
+    return PostgresJournalRepository(request.app.state.database_engine, user_id)
 
 
 def get_language_profile_repository(request: Request) -> LanguageProfileRepository:
@@ -77,9 +78,9 @@ def get_language_profile_repository(request: Request) -> LanguageProfileReposito
 
 def get_user_service(
     repository: Annotated[UserRepository, Depends(get_user_repository)],
-    demo_user_id: Annotated[UUID, Depends(get_demo_user_id)],
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
 ) -> UserService:
-    return UserService(repository, demo_user_id)
+    return UserService(repository, user_id)
 
 
 def get_language_profile_service(
@@ -113,11 +114,11 @@ def get_journal_service(
 
 
 def get_learning_repository(
-    request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
+    request: Request, user_id: Annotated[UUID, Depends(get_current_user_id)]
 ) -> LearningRepository:
     return SessionBackedLearningRepository(
         request.app.state.database_engine,
-        demo_user_id,
+        user_id,
         PostgresVocabularyRepository(request.app.state.database_engine),
     )
 
@@ -134,6 +135,8 @@ def get_media_asset_repository(request: Request) -> MediaAssetRepository:
 _IMAGE_DERIVATIVES: ImageDerivatives | None = None
 _OBJECT_GROUNDER_UNINITIALIZED = object()
 _OBJECT_GROUNDER = _OBJECT_GROUNDER_UNINITIALIZED
+_IMAGE_MODERATOR_UNINITIALIZED = object()
+_IMAGE_MODERATOR = _IMAGE_MODERATOR_UNINITIALIZED
 logger = logging.getLogger(__name__)
 
 
@@ -163,6 +166,22 @@ def get_object_grounder(request: Request, settings: AiSettings):
             logger.warning("object grounding is unavailable; using model locations")
             _OBJECT_GROUNDER = None
     return _OBJECT_GROUNDER
+
+
+def get_image_moderator(request: Request, settings: AiSettings):
+    """Load the optional image moderator once; analysis fails open without it."""
+    if hasattr(request.app.state, "image_moderator"):
+        return request.app.state.image_moderator
+    global _IMAGE_MODERATOR
+    if _IMAGE_MODERATOR is _IMAGE_MODERATOR_UNINITIALIZED:
+        try:
+            _IMAGE_MODERATOR = build_image_moderator(settings)
+            if _IMAGE_MODERATOR is not None:
+                logger.info("Image moderation loaded.")
+        except Exception:
+            logger.warning("image moderation is unavailable; uploads skip the check")
+            _IMAGE_MODERATOR = None
+    return _IMAGE_MODERATOR
 
 
 def get_media_asset_service(
@@ -226,7 +245,7 @@ def get_ispy_guess_generator(settings: AiSettings, tracer: AITracer | None = Non
 
 
 def get_practice_repository(
-    request: Request, demo_user_id: Annotated[UUID, Depends(get_demo_user_id)]
+    request: Request, user_id: Annotated[UUID, Depends(get_current_user_id)]
 ) -> PostgresWorkflowRepository:
     engine = request.app.state.database_engine
     settings = get_ai_settings(request)
@@ -237,33 +256,16 @@ def get_practice_repository(
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip(),
     )
 
-    scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
     tracer = get_ai_tracer(request)
     object_grounder = get_object_grounder(request, settings)
-    if scene_config.provider in (
-        AiProvider.OPENAI, AiProvider.GEMINI, AiProvider.OPENROUTER
-    ):
-        if not settings.is_configured(scene_config):
-            uploaded_analyzer = None
-        else:
-            vision_config = VisionModelConfig(
-                model_name=scene_config.model_name,
-                timeout_seconds=scene_config.timeout_seconds,
-                max_output_tokens=scene_config.max_output_tokens or 1500,
-                max_retries=min(scene_config.max_retries, 1),
-            )
-            uploaded_analyzer = UploadedSceneAnalyzer(
-                storage,
-                build_vision_client(scene_config.provider, settings, vision_config),
-                vision_config,
-                tracer=tracer,
-                provider=scene_config.provider.value,
-                object_grounder=object_grounder,
-            )
-    elif scene_config.provider is AiProvider.NONE:
-        uploaded_analyzer = None
-    else:
-        raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_config.provider}")
+    image_moderator = get_image_moderator(request, settings)
+    uploaded_analyzer = build_uploaded_scene_analyzer(
+        settings,
+        storage,
+        tracer,
+        object_grounder=object_grounder,
+        image_moderator=image_moderator,
+    )
     if uploaded_analyzer:
         analyzer = RoutedSceneAnalyzer(deterministic, uploaded_analyzer)
 
@@ -274,7 +276,7 @@ def get_practice_repository(
     ispy_clue_generator = build_ispy_clue_generator(settings, tracer)
     return PostgresWorkflowRepository(
         engine,
-        demo_user_id,
+        user_id,
         analyzer=analyzer,
         translator=translator,
         learning_task_generator=learning_task_generator,

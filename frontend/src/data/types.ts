@@ -1,6 +1,8 @@
 export type WordClass = "noun" | "verb" | "adjective" | "adverb" | "pronoun" | "preposition" | "conjunction" | "interjection" | "determiner" | "phrase" | "other";
 export type VocabStatus = "new" | "learning" | "mastered";
-export type Gender = "la" | "el" | null;
+export type Gender = "la" | "el" | "le" | "l'" | null;
+/** Definite articles accepted as noun gender values (Spanish and French). */
+export const GENDER_ARTICLES: ReadonlySet<string> = new Set(["la", "el", "le", "l'"]);
 
 export type LanguageItem = {
   id: string;
@@ -56,9 +58,11 @@ export type VocabRecord = {
   wordClass: WordClass;
   gender: Gender;
   status: VocabStatus;
+  firstLearnedAt: string | null;
   topic: string;
   sceneId: string;
   example: string;
+  phoneticText?: string | null;
   scenes?: VocabularyScene[];
 };
 
@@ -79,4 +83,14 @@ export type LeaderboardRow = {
   name: string;
   xp: number;
   isYou?: boolean;
+};
+
+export type StreakDay = {
+  date: string;
+  active: boolean;
+};
+
+export type Streak = {
+  current: number;
+  days: StreakDay[];
 };

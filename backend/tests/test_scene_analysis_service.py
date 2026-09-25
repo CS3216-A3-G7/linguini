@@ -2,6 +2,7 @@
 
 import base64
 import json
+import threading
 from contextlib import contextmanager
 from types import SimpleNamespace
 from uuid import uuid4
@@ -9,6 +10,10 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from app.ai.features.moderation import (
+    ImageModerationError,
+    ImageModerationResult,
+)
 from app.ai.features.object_grounding import ObjectGroundingError
 from app.ai.features.scene_analysis import (
     SCENE_ANALYSIS_PROMPT_VERSION,
@@ -133,7 +138,13 @@ def config(**overrides) -> VisionModelConfig:
 
 
 def analyzer(
-    client, tracer=None, provider="openai", storage=None, cfg=None, object_grounder=None
+    client,
+    tracer=None,
+    provider="openai",
+    storage=None,
+    cfg=None,
+    object_grounder=None,
+    image_moderator=None,
 ):
     return UploadedSceneAnalyzer(
         storage or FakeStorage(),
@@ -142,6 +153,7 @@ def analyzer(
         tracer=tracer or NoOpAITracer(),
         provider=provider,
         object_grounder=object_grounder,
+        image_moderator=image_moderator,
     )
 
 
@@ -224,6 +236,63 @@ def test_grounding_failure_keeps_the_valid_scene_analysis_result() -> None:
     ).analyze(session(), asset(), {}, None)
 
     assert [object.label for object in result.objects] == ["chair", "table"]
+
+
+def test_flagged_image_fails_analysis_without_returning_results() -> None:
+    class FlaggingModerator:
+        def moderate(self, image):
+            return ImageModerationResult(flagged=True, categories=("violence",))
+
+    client = FakeVisionClient([VALID_OUTPUT])
+    with pytest.raises(SceneAnalysisModelError) as raised:
+        analyzer(client, image_moderator=FlaggingModerator()).analyze(
+            session(), asset(), {}, None
+        )
+    assert raised.value.code == SceneAnalysisModelErrorCode.IMAGE_REJECTED
+
+
+def test_unflagged_image_returns_the_normal_result() -> None:
+    class PassingModerator:
+        def moderate(self, image):
+            return ImageModerationResult(flagged=False)
+
+    result = analyzer(
+        FakeVisionClient([VALID_OUTPUT]), image_moderator=PassingModerator()
+    ).analyze(session(), asset(), {}, None)
+    assert result.title == "Kitchen"
+
+
+def test_moderation_provider_error_keeps_the_valid_result() -> None:
+    class FailingModerator:
+        def moderate(self, image):
+            raise ImageModerationError("provider unavailable")
+
+    result = analyzer(
+        FakeVisionClient([VALID_OUTPUT]), image_moderator=FailingModerator()
+    ).analyze(session(), asset(), {}, None)
+    assert result.title == "Kitchen"
+
+
+def test_moderation_runs_concurrently_with_the_vision_call() -> None:
+    moderation_entered = threading.Event()
+    generation_entered = threading.Event()
+
+    class GatedModerator:
+        def moderate(self, image):
+            moderation_entered.set()
+            assert generation_entered.wait(timeout=5)
+            return ImageModerationResult(flagged=False)
+
+    class GatedVisionClient(FakeVisionClient):
+        def generate(self, request):
+            generation_entered.set()
+            assert moderation_entered.wait(timeout=5)
+            return super().generate(request)
+
+    result = analyzer(
+        GatedVisionClient([VALID_OUTPUT]), image_moderator=GatedModerator()
+    ).analyze(session(), asset(), {}, None)
+    assert result.title == "Kitchen"
 
 
 def test_request_uses_shared_v2_contract() -> None:

@@ -11,6 +11,7 @@ export interface SessionDestination {
 const failureNotices: Record<string, string> = {
   imageUploadFailed: "We couldn't save your photo. Start a new practice when you are ready.",
   sceneAnalysisFailed: "We couldn't read that photo. Try a new practice with a clearer view.",
+  imageModerationFailed: "That photo can't be used for practice. Choose a different photo and try again.",
   noValidObjects: "We couldn't find anything to learn in that photo. Try a busier scene.",
   vocabularyMappingFailed: "We couldn't turn that scene into words. Start a new practice when you are ready.",
   taskGenerationFailed: "We couldn't build your lesson. Start a new practice when you are ready.",
@@ -24,6 +25,7 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
     case "created":
     case "analyzingScene":
     case "awaitingObjectReview":
+      return { path: `${base}/analysis`, notice: null };
     case "generatingTasks":
       return { path: `${base}/analysis`, notice: null };
     case "ready":
@@ -48,6 +50,9 @@ export function sessionDestination(detail: PracticeDetail): SessionDestination {
 export function isSessionRouteAllowed(detail: PracticeDetail, pathname: string): boolean {
   const canonical = sessionDestination(detail).path;
   if (pathname === canonical) return true;
+  if (detail.session.status === "generatingTasks"
+    && detail.tasks.some(task => task.kind === "vocabularyIntroduction")
+    && pathname.startsWith(`${canonical.slice(0, -"/analysis".length)}/learn`)) return true;
   if (!canonical.endsWith("/learn")) return false;
   return pathname.startsWith(`${canonical}/`) || pathname === `${canonical.slice(0, -"/learn".length)}/mic-test`;
 }

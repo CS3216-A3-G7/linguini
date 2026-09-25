@@ -1,0 +1,110 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+import { useState } from "react";
+import { appLinks } from "@/lib/site";
+import { Check } from "./icons";
+import styles from "./Pricing.module.css";
+
+type Billing = "monthly" | "yearly";
+
+const free = [
+  "One new photo lesson every day",
+  "One journal page a day",
+  "Unlimited replays of our curated scenes",
+  "Spanish and French, from English",
+  "Word cards, I-Spy and sentence games",
+  "Streaks, XP and your pasta avatar",
+];
+
+const plus = [
+  "Up to 10 photo lessons a day",
+  "Pronunciation feedback when you speak",
+  "Review mode for words that haven’t stuck yet",
+  "Up to 10 photos in each journal entry",
+  "Export your journal as a PDF keepsake",
+  "Early access to new languages",
+];
+
+export function Pricing() {
+  const [billing, setBilling] = useState<Billing>("yearly");
+  const yearly = billing === "yearly";
+
+  return (
+    <section id="pricing" className={`section ${styles.section}`} aria-labelledby="pricing-title">
+      <div className="container">
+        <div className="section-head section-head--center">
+          <h2 id="pricing-title" className="section-title">Free to start. Plus when you’re hooked.</h2>
+          <p className="section-lede">
+            One photo lesson and one journal page a day are free. Upgrade when one a day stops being enough.
+          </p>
+        </div>
+
+        <fieldset className={styles.toggle}>
+          <legend className="visually-hidden">Billing period</legend>
+          {(["monthly", "yearly"] as const).map(option => (
+            <label key={option} className={styles.toggleOption}>
+              <input
+                type="radio"
+                name="billing"
+                value={option}
+                checked={billing === option}
+                onChange={() => setBilling(option)}
+                className="visually-hidden"
+              />
+              {option === "monthly" ? "Monthly" : "Yearly"}
+              {option === "yearly" ? <span className={styles.save}>Save 48%</span> : null}
+            </label>
+          ))}
+        </fieldset>
+
+        <div className={styles.plans}>
+          <article className={`${styles.plan} ${styles.free}`} aria-labelledby="plan-free">
+            <header className={styles.planHead}>
+              <h3 id="plan-free" className={styles.planName}>Free</h3>
+              <p className={styles.planPitch}>For a daily habit, on the house.</p>
+            </header>
+            <p className={styles.price}>
+              <span className={styles.amount}>$0</span>
+              <span className={styles.per}>forever</span>
+            </p>
+            <a href={appLinks.signUp} className="btn btn--teal btn--block">Start learning free</a>
+            <ul className={styles.features}>
+              {free.map(item => (
+                <li key={item}><Check size={18} className={styles.tick} />{item}</li>
+              ))}
+            </ul>
+          </article>
+
+          <article className={`${styles.plan} ${styles.plus}`} aria-labelledby="plan-plus">
+            <Image src="/pasta/farfalle.webp" alt="" width={360} height={281} className={styles.bow} />
+            <header className={styles.planHead}>
+              <h3 id="plan-plus" className={styles.planName}>Plus</h3>
+              <p className={styles.planPitch}>For learners who photograph everything.</p>
+            </header>
+            <p className={styles.price} aria-live="polite">
+              <span className={styles.amount}>{yearly ? "$4.17" : "$7.99"}</span>
+              <span className={styles.per}>
+                per month
+                <span className={styles.billed}>{yearly ? "billed $49.99 yearly" : "billed monthly"}</span>
+              </span>
+            </p>
+            <a href={`${appLinks.signUp}&plan=plus-${billing}`} className="btn btn--block">Try Plus free for 7 days</a>
+            <ul className={styles.features}>
+              {plus.map(item => (
+                <li key={item}><Check size={18} className={styles.tick} />{item}</li>
+              ))}
+            </ul>
+          </article>
+        </div>
+
+        <p className={styles.founding}>
+          <strong>Founding Plus:</strong> our first 300 members lock in $34.99 a year and get early access to competitive
+          I-Spy. <Link href="/blog/linguini-business-model">How we priced Linguini</Link>
+        </p>
+        <p className={styles.note}>Prices in US dollars. Cancel any time; your journal stays yours on the free plan.</p>
+      </div>
+    </section>
+  );
+}

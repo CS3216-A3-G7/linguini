@@ -32,9 +32,19 @@ class SceneTranslationRequest(ApiModel):
 class TranslatedTerm(ApiModel):
     key: NonEmptyText
     source: NonEmptyText
-    translation: Annotated[str, Field(min_length=1, max_length=300)]
+    translation: NonEmptyText = Field(
+        max_length=300,
+        description=("Required target-language translation for this object, attribute or "
+                     "relationship. Never empty or null, including for non-objects."),
+    )
     article: Annotated[str, Field(min_length=1, max_length=20)] | None = None
     gender: Annotated[str, Field(pattern="^(masculine|feminine)$")] | None = None
+    phonetic_text: Annotated[str, Field(min_length=1, max_length=300)] | None = Field(
+        default=None,
+        description=("Approximate English-sound respelling of the translated word "
+                     "(not IPA, no slashes); the stressed syllable in caps, "
+                     "e.g. \"MEH-sah\". Supply for every object."),
+    )
 
 
 class SceneTranslationResult(ApiModel):

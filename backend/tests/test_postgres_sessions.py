@@ -19,6 +19,7 @@ from app.repositories.postgres.tasks import session_tasks, task_attempts
 from app.repositories.postgres.users import users
 from app.repositories.postgres.vocabulary import user_vocabulary_progress, vocabulary_encounters
 from app.repositories.postgres.workflow import PostgresWorkflowRepository
+from app.repositories.postgres.xp import award
 from app.repositories.practice import PracticeConflictError
 from app.schemas.base import utc_now
 from app.schemas.enums import TaskKind
@@ -108,6 +109,31 @@ def analyze(client, sid, confirm=True):
         assert response.status_code == 200, response.text
         detail = client.get(f"/api/v1/sessions/{sid}").json()
     return detail
+
+
+def test_progress_returns_a_current_local_streak(database):
+    engine, owner, profile, client = database
+    with engine.begin() as connection:
+        award(
+            connection,
+            user_id=owner.id,
+            language_profile_id=profile.id,
+            event_type="taskCompleted",
+            idempotency_key="streak-yesterday",
+            occurred_at=utc_now() - timedelta(days=1),
+        )
+        award(
+            connection,
+            user_id=owner.id,
+            language_profile_id=profile.id,
+            event_type="journalEntry",
+            idempotency_key="streak-today",
+        )
+
+    streak = client.get("/api/v1/me/progress").json()["streak"]
+    assert len(streak["days"]) == 7
+    assert streak["current"] == 2
+    assert [day["active"] for day in streak["days"][-2:]] == [True, True]
 
 
 @pytest.mark.parametrize("source", ["preloaded", "userUpload", "camera"])
@@ -303,23 +329,28 @@ def age_session(engine, session_id, status, processing_started_at):
         )
 
 
-def test_active_session_replacement_and_owner_scope(database, monkeypatch):
+def test_multiple_active_sessions_and_owner_scope(database, monkeypatch):
     engine, owner, profile, client = database
     first = create_run(client, profile)["session"]["id"]
     # The same image under a different key continues the open run.
     continued = create_run(client, profile, "replacement-key")
     assert continued["session"]["id"] == first
     assert client.get(f"/api/v1/sessions/{first}").json()["session"]["status"] == "created"
-    # A different image conflicts while a session is still active.
+    # A different image creates another unfinished session.
     asset = upload_asset(engine, owner)
-    conflict = create_with_asset(client, profile, asset, "other-asset-key")
-    assert conflict.status_code == 409
-    detail = conflict.json()["detail"]
-    assert detail["code"] == "active_session_exists"
-    assert detail["activeSessionId"] == first
+    second_response = create_with_asset(client, profile, asset, "other-asset-key")
+    assert second_response.status_code == 202, second_response.text
+    second = second_response.json()["session"]["id"]
+    third_asset = upload_asset(engine, owner)
+    third_response = create_with_asset(client, profile, third_asset, "third-asset-key")
+    assert third_response.status_code == 202, third_response.text
+    third = third_response.json()["session"]["id"]
+    fourth = create_with_asset(client, profile, upload_asset(engine, owner), "fourth-asset-key")
+    assert fourth.status_code == 409
+    assert fourth.json()["detail"]["code"] == "active_session_limit_reached"
     with engine.connect() as c:
         ids = c.execute(select(sessions.c.id).where(sessions.c.user_id == owner.id)).scalars().all()
-    assert ids == [UUID(first)]
+    assert set(ids) == {UUID(first), UUID(second), UUID(third)}
 
     # The state machine rejects edges outside ALLOWED_TRANSITIONS.
     repository = PostgresWorkflowRepository(engine, owner.id)
@@ -346,7 +377,14 @@ def test_active_session_replacement_and_owner_scope(database, monkeypatch):
     completed = client.get(f"/api/v1/sessions/{first}").json()["session"]
     assert completed["status"] == "completed" and completed["completedAt"] is not None
 
-    # A terminal session frees the profile; discard is the only route to abandoned.
+    # The second unfinished session remains available after the first completes.
+    assert client.get(f"/api/v1/sessions/{second}").status_code == 200
+    assert client.post(f"/api/v1/sessions/{second}/abandon").status_code == 200
+    assert client.post(f"/api/v1/sessions/{second}/analyze").status_code == 409
+    abandoned = client.get(f"/api/v1/sessions/{second}").json()["session"]
+    assert abandoned["status"] == "abandoned" and abandoned["abandonedAt"] is not None
+    assert client.post(f"/api/v1/sessions/{third}/abandon").status_code == 200
+
     created = create_with_asset(client, profile, asset, "other-asset-key-2")
     assert created.status_code == 202, created.text
     replacement = created.json()["session"]["id"]

@@ -2,7 +2,7 @@
 
 from uuid import NAMESPACE_URL, uuid5
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.repositories.postgres.vocabulary import vocabulary_items, vocabulary_translations
@@ -30,7 +30,8 @@ UPLOAD_WORDS = {
 
 
 def bootstrap_word(
-    connection, language, source_language, word, translation, part="noun", gender=None, example=None
+    connection, language, source_language, word, translation, part="noun", gender=None,
+    example=None, phonetic_text=None,
 ):
     """Reuse catalog records; deterministic IDs make concurrent bootstrap safe."""
     row = (
@@ -49,6 +50,12 @@ def bootstrap_word(
     )
     if row:
         item = VocabularyItem.model_validate(dict(row))
+        if phonetic_text and not item.phonetic_text:
+            connection.execute(
+                update(vocabulary_items).where(vocabulary_items.c.id == item.id)
+                .values(phonetic_text=phonetic_text)
+            )
+            item = item.model_copy(update={"phonetic_text": phonetic_text})
     else:
         item = VocabularyItem(
             id=uuid5(
@@ -60,6 +67,7 @@ def bootstrap_word(
             part_of_speech=part,
             gender=gender,
             example_sentence=example,
+            phonetic_text=phonetic_text,
         )
         connection.execute(
             insert(vocabulary_items)
@@ -130,6 +138,8 @@ def build_objects(connection, session, asset, profile, scene):
                     "width": 0.05,
                     "height": 0.05,
                 },
+                anchor_point={"x": float(entry["x"]) / 100, "y": float(entry["y"]) / 100},
+                attributes=entry.get("attributes") or None,
             )
             objects.append(obj)
             words.append(word)
@@ -233,6 +243,9 @@ def build_ispy_clue_tasks(session_id, result: ISpyClueResult, objects, words):
             public_content=dict(
                 kind="ispyRound",
                 clue=clue.clue,
+                # Falls back to the clue itself so the reveal control always
+                # has something to show.
+                clue_translation=clue.clue_translation.strip() or clue.clue,
                 interaction_mode="selectObject",
                 options=options,
                 encouragement="Keep looking closely!",
@@ -299,6 +312,7 @@ def build_tasks(session_id, objects, words, translations, uploaded, translated_s
             translation=translated.translated_text,
             part_of_speech=item.part_of_speech,
             gender=item.gender,
+            phonetic_text=item.phonetic_text,
             example_sentence=item.example_sentence,
         )
         for scene_object, item, translated in zip(objects, words, translations, strict=True)
@@ -326,6 +340,7 @@ def build_tasks(session_id, objects, words, translations, uploaded, translated_s
                     target_text=term.translation,
                     translation=_display_source(term.source),
                     part_of_speech=part_of_speech,
+                    phonetic_text=term.phonetic_text,
                 )
             )
     questions = []
@@ -396,6 +411,7 @@ def build_tasks(session_id, objects, words, translations, uploaded, translated_s
         dict(
             kind="ispyRound",
             clue=f"Find: {translation.translated_text}",
+            clue_translation=f"Find: {word.display_text}",
             interaction_mode="selectObject",
             options=[
                 dict(option_id=str(o.id), label=w.display_text, scene_object_id=o.id)

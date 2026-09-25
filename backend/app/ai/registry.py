@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from app.ai.features.ispy_clues import ISpyClueService
 from app.ai.features.learning_tasks import LearningTaskService
+from app.ai.features.moderation import ImageModerator, OpenAIImageModerator
 from app.ai.features.object_grounding import GroundingDinoObjectGrounder, ObjectGrounder
+from app.ai.features.scene_analysis import UploadedSceneAnalyzer
 from app.ai.features.translation import SceneTranslationService
 from app.ai.observability import AITracer
 from app.ai.openrouter import OPENROUTER_BASE_URL
@@ -17,12 +19,14 @@ from app.ai.settings import (
     AiFeature,
     AiProvider,
     AiSettings,
+    ImageModerationProvider,
     ObjectGroundingProvider,
 )
 from app.ai.text_gemini import GeminiTextClient
 from app.ai.text_model import TextModelClient, TextModelConfig
 from app.ai.text_openai import OpenAITextClient
 from app.ai.vision_gemini import GeminiVisionClient
+from app.services.image_storage import ImageStorage
 from app.services.vision_model import VisionModelClient, VisionModelConfig
 from app.services.vision_openai import OpenAIVisionClient
 
@@ -56,14 +60,73 @@ def build_vision_client(
     raise ValueError(f"unsupported vision provider {provider!r}")
 
 
+def build_uploaded_scene_analyzer(
+    settings: AiSettings,
+    storage: ImageStorage,
+    tracer: AITracer,
+    object_grounder: ObjectGrounder | None = None,
+    image_moderator: ImageModerator | None = None,
+) -> UploadedSceneAnalyzer | None:
+    """Build the configured uploaded-photo analyzer, or ``None`` when off.
+
+    ``None`` preserves the workflow's deterministic scene fallback. The
+    caller routes only non-preloaded media through the returned analyzer.
+    """
+    scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
+    if scene_config.provider in (
+        AiProvider.OPENAI, AiProvider.GEMINI, AiProvider.OPENROUTER
+    ):
+        if not settings.is_configured(scene_config):
+            return None
+        vision_config = VisionModelConfig(
+            model_name=scene_config.model_name,
+            timeout_seconds=scene_config.timeout_seconds,
+            max_output_tokens=scene_config.max_output_tokens or 1500,
+            max_retries=min(scene_config.max_retries, 1),
+        )
+        return UploadedSceneAnalyzer(
+            storage,
+            build_vision_client(scene_config.provider, settings, vision_config),
+            vision_config,
+            tracer=tracer,
+            provider=scene_config.provider.value,
+            object_grounder=object_grounder,
+            image_moderator=image_moderator,
+        )
+    if scene_config.provider is AiProvider.NONE:
+        return None
+    raise ValueError(f"Unsupported SCENE_ANALYSIS_PROVIDER: {scene_config.provider}")
+
+
 def build_object_grounder(settings: AiSettings) -> ObjectGrounder | None:
     """Build the configured local detector, or leave model coordinates alone."""
     config = settings.object_grounding
     if config.provider is ObjectGroundingProvider.NONE:
         return None
     if config.provider is ObjectGroundingProvider.GROUNDING_DINO:
-        return GroundingDinoObjectGrounder(config.model_name, config.threshold)
+        return GroundingDinoObjectGrounder(
+            config.model_name,
+            config.threshold,
+            max_labels=config.max_labels,
+            max_image_side=config.max_image_side,
+        )
     raise ValueError(f"unsupported object grounding provider {config.provider!r}")
+
+
+def build_image_moderator(settings: AiSettings) -> ImageModerator | None:
+    """Build the configured image moderator, or ``None`` when turned off."""
+    config = settings.image_moderation
+    if config.provider is ImageModerationProvider.NONE:
+        return None
+    if config.provider is ImageModerationProvider.OPENAI:
+        if not settings.openai_api_key:
+            return None
+        return OpenAIImageModerator(
+            settings.openai_api_key,
+            config.model_name,
+            timeout_seconds=config.timeout_seconds,
+        )
+    raise ValueError(f"unsupported image moderation provider {config.provider!r}")
 
 
 def build_scene_translator(

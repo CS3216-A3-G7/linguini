@@ -1,44 +1,32 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card, Noodle, StatusPill, XpPill } from "../components/ui";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { useVocabularyQuery } from "../state/queries";
-import { createPractice, getPracticeSummary } from "../lib/api";
+import { getPracticeSummary } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
 
 export function SessionSummary() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, activeProfile, completionPending, completionError, retryCompletion } = useAppState();
-  const { vocabulary } = useVocabularyQuery();
-  const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
-  const requestKey = useRef(crypto.randomUUID());
+  const { session, completionError, retryCompletion } = useAppState();
+  const { vocabulary } = useVocabularyQuery(); 
+  const [startError] = useState<string | null>(null);
+  // Stats render from the in-flight numbers straight away; the completion
+  // mutation invalidates this key so final XP replaces them once it lands.
   const { data, error: queryErrorValue, isPending: loading } = useQuery({
     queryKey: queryKeys.sessionSummary(scene.sessionId!),
     queryFn: () => getPracticeSummary(scene.sessionId!),
-    // Summary XP is only final once the completion write lands.
-    enabled: !(completionPending && session?.session.id === scene.sessionId),
   });
   const error = queryError(queryErrorValue);
   const completed = session?.session.status === "completed";
   const revisit = scene.items.filter(item => data?.learnedVocabularyIds.includes(
     session?.sceneObjects.find(object => object.id === item.id)?.vocabularyItemId ?? ""
   )).slice(0, 3);
-  const busy = useRef(false);
-  const practiseAgain = async () => {
-    if (starting || busy.current || !activeProfile) return;
-    busy.current = true;
-    setStarting(true); setStartError(null);
-    try {
-      const next = await createPractice(activeProfile.id, scene.mediaAssetId, requestKey.current);
-      navigate(sessionDestination(next).path);
-    } catch (error) { setStartError(error instanceof Error ? error.message : "Unable to start practice."); }
-    finally { busy.current = false; setStarting(false); }
-  };
+  
   return <div className="stack">
     <p className="small muted">{completed ? "Session and XP saved." : "XP is saved after each action."}</p>
     {session?.session.status === "inProgress" ? <Button onClick={() => navigate(sessionDestination(session).path)}>Continue unfinished practice</Button> : null}
@@ -67,7 +55,6 @@ export function SessionSummary() {
     <div className="stack-2">
       <Button block onClick={() => navigate("/journal/new")}>Write today&apos;s journal entry</Button>
       <Button variant="secondary" block onClick={() => navigate("/vocabulary")}>Review difficult words</Button>
-      <Button variant="secondary" block disabled={starting || !activeProfile} onClick={() => void practiseAgain()}>Practise again</Button>
       <Button variant="quiet" block onClick={() => navigate("/home")}>Back home</Button>
     </div>
   </div>;

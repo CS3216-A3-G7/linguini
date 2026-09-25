@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { BookIcon, CameraIcon, HomeIcon, JournalIcon, PersonIcon } from "./icons";
 import { BrandBar } from "./ui";
 import { BackActionProvider, useRegisteredBackAction } from "./BackAction";
+import { useAuth } from "../state/Auth";
 
 const items = [
   { to: "/home", label: "Home", Icon: HomeIcon },
@@ -17,11 +18,14 @@ export function AppShell() {
     pathname === "/journal/new" ||
     /^\/journal\/[^/]+$/.test(pathname) ||
     pathname === "/profile/edit";
-  const usesWideCanvas = ["/home", "/practice", "/vocabulary", "/journal"].includes(pathname);
+  const usesWideCanvas =
+    ["/home", "/practice", "/vocabulary", "/journal"].includes(pathname) ||
+    pathname === "/journal/new" ||
+    /^\/journal\/[^/]+$/.test(pathname);
 
   return (
     <div className="shell shell--app">
-      <BrandBar back={isDetailPage} />
+      <BrandBar back={isDetailPage} homeTo="/home" />
       <main className={`shell__content${usesWideCanvas ? " shell__content--desktop-wide" : ""}`}>
         <Outlet />
       </main>
@@ -52,12 +56,13 @@ export function FocusShell() {
 
 function FocusShellView() {
   const { pathname } = useLocation();
+  const { session } = useAuth();
   const backAction = useRegisteredBackAction();
   const usesWideCanvas = pathname.endsWith("/analysis");
 
   return (
     <div className="shell shell--focus">
-      <BrandBar back={pathname !== "/"} onBack={backAction.onBack} backLabel={backAction.backLabel} />
+      <BrandBar back={pathname !== "/"} onBack={backAction.onBack} backLabel={backAction.backLabel} homeTo={session ? "/home" : "/"} />
       <main
         className={`shell__content${usesWideCanvas ? " shell__content--desktop-wide" : ""}`}
         style={{ paddingBottom: "var(--space-8)" }}

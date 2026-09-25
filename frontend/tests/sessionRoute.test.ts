@@ -54,6 +54,15 @@ test("generation stays on analysis until ready for the mic check", () => {
   assert.equal(sessionDestination(detail("ready")).path, "/practice/sessions/s1/mic-test");
 });
 
+test("early vocabulary opens learning and never advances to I-Spy while generating", () => {
+  for (const status of ["pending", "completed", "skipped"] as const) {
+    const generating = detail("generatingTasks", [task("learn", status, 0)]);
+    assert.equal(sessionDestination(generating).path, "/practice/sessions/s1/analysis");
+    assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/learn/learn-0"), true);
+    assert.equal(isSessionRouteAllowed(generating, "/practice/sessions/s1/ispy-1"), false);
+  }
+});
+
 test("inProgress resumes at the first unfinished stage", () => {
   const pendingLearn = [task("learn", "pending", 0), task("clues", "pending", 1), task("reflection", "pending", 2)];
   assert.equal(sessionDestination(detail("inProgress", pendingLearn)).path, "/practice/sessions/s1/learn");
@@ -128,7 +137,7 @@ test("loading copy matches the destination segment", () => {
 });
 
 test("failed sessions carry a notice per failure code", () => {
-  for (const code of ["imageUploadFailed", "sceneAnalysisFailed", "noValidObjects", "vocabularyMappingFailed", "taskGenerationFailed"] as const) {
+  for (const code of ["imageUploadFailed", "sceneAnalysisFailed", "imageModerationFailed", "noValidObjects", "vocabularyMappingFailed", "taskGenerationFailed"] as const) {
     const dest = sessionDestination(detail("failed", [], code));
     assert.equal(dest.path, "/practice");
     assert.ok(dest.notice?.length);

@@ -22,7 +22,11 @@ Fill these variables in `backend/.env.local`:
 | --- | --- |
 | `DATABASE_URL` | Backend PostgreSQL URI. In Supabase's Connect dialog, copy the direct or **session pooler** connection URI, replace the password, and use `sslmode=require`. Session pooler port is 5432; transaction pooler port 6543 is not supported by this backend. URL-encode special characters in credentials. |
 | `DIRECT_URL` | Prisma migration URI: direct connection or session pooler. Use a database role permitted to apply DDL. |
-| `DEMO_USER_ID` | UUID of an existing `users` row. The default example UUID must exist in your database to use `/me`. This is temporary demo identity, not authentication. |
+| `DEMO_USER_ID` | Only applies when `AUTH_MODE=demo` (local dev/tests): UUID of the `users` row used for requests without a bearer token. Must not be set in deployed environments. |
+| `AUTH_MODE` | `supabase` (default) verifies `Authorization: Bearer` tokens against the project JWKS; `demo` keeps the unauthenticated `DEMO_USER_ID` fallback. |
+| `SUPABASE_JWT_AUDIENCE` | Expected JWT `aud`; defaults to `authenticated`. |
+| `SUPABASE_JWT_SECRET` | Legacy HS256-signing projects only; asymmetric projects verify via JWKS. |
+| `AUTH_ALLOW_ANONYMOUS` | `true` accepts Supabase anonymous-sign-in tokens (`is_anonymous` claim). |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins, including the port; defaults to `http://localhost:5173`. |
 | `MEDIA_PUBLIC_BASE_URL` | Public Supabase Storage bucket URL, e.g. `https://PROJECT.supabase.co/storage/v1/object/public/media-assets`. Shared base URL for public media assets in this bucket. |
 
@@ -52,9 +56,8 @@ engine per process and disposes it at shutdown.
 
 ### Image uploads
 
-Uploads currently use the existing `DEMO_USER_ID` identity, as explicitly chosen
-for this demo. This is not authentication; replace the current-user dependency
-with verified authentication before making user-owned uploads publicly available.
+Uploads use the authenticated user's identity: requests must carry a Supabase
+`Authorization: Bearer` access token (or run with `AUTH_MODE=demo` locally).
 The server requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; uploads use the
 private `media-assets` bucket. Install backend dependencies to include Pillow.
 
@@ -175,6 +178,43 @@ create metadata only; they do not upload files. This configuration serves public
 preloaded images; use the private mode above for private buckets.
 See [Supabase public URLs](https://supabase.com/docs/reference/javascript/file-buckets-getpublicurl).
 
+#### Precomputing scene vocabulary
+
+`python -m app.scripts.precompute_preloaded_scenes` (run from `backend/`)
+analyses the six bundled scene images once per image with the configured
+scene-analysis provider, translates the detected objects into French and
+Spanish, and stores the assembled suggested words in
+`preloaded_scenes.content.items` so the Scene Analysis review screen opens
+with words already on the photo. Tasks are **not** precomputed — the runtime
+workflow still generates real tasks, rounds and prompts; the script only
+writes minimal placeholders for them.
+
+```sh
+python -m app.scripts.precompute_preloaded_scenes --dry-run --json out.json
+python -m app.scripts.precompute_preloaded_scenes --slug calle-mayor --language fr
+python -m app.scripts.precompute_preloaded_scenes --emit-migration migration.sql
+python -m app.scripts.precompute_preloaded_scenes --from-json out.json --emit-migration migration.sql
+```
+
+`--slug` and `--language` are repeatable and default to all six base scenes
+and both languages (`fr`, `es`). `--dry-run` computes and validates rows
+without writing to the database. `--json` dumps the computed rows and media
+assets for reuse; `--from-json` reloads that file (re-validating every row)
+instead of calling any AI provider, so SQL regeneration or the database write
+never re-bills the model. `--emit-migration` writes an idempotent
+`INSERT ... ON CONFLICT (slug) DO UPDATE` migration; the generated French rows
+reuse the existing `media_assets` rows, so no asset inserts are emitted.
+Environment values are read from `backend/.env.local` (or `--env-file PATH`).
+
+Required environment: `DATABASE_URL`, `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `MEDIA_STORAGE_BUCKET`, plus the AI
+configuration. Canonical key names are `AI_OPENAI_API_KEY` and
+`AI_GEMINI_API_KEY`; plain `OPENAI_API_KEY`/`GEMINI_API_KEY` are accepted as
+fallbacks. Provider and model selection use `AI_SCENE_ANALYSIS_PROVIDER` /
+`AI_SCENE_ANALYSIS_MODEL` and `AI_SCENE_TRANSLATION_PROVIDER` /
+`AI_SCENE_TRANSLATION_MODEL`. Keep keys only in `backend/.env.local`; never
+commit them.
+
 | Data | Runtime storage |
 | --- | --- |
 | Users and language profiles | `users`, `language_profiles` |
@@ -202,8 +242,9 @@ This supports fresh installations without a JSON file or an import command.
 
 The legacy `app/import_*.py` tools, JSON fixtures, and file-backed test adapters
 have been removed. Existing migrated user data stays in PostgreSQL. Fresh databases
-contain the catalog but no demo users or learner history; provision a user and set
-`DEMO_USER_ID` to that user's UUID before using the demo API.
+contain the catalog but no demo users or learner history; the API provisions a
+`users` row on the first authenticated request, or set `AUTH_MODE=demo` with
+`DEMO_USER_ID` pointing at an existing row for local development.
 
 Repository interfaces and shared errors remain in `app/repositories/`;
 SQLAlchemy implementations live in `app/repositories/postgres/`. Services depend
@@ -247,8 +288,9 @@ atomically. Prisma records the relations; SQL defines the deferred-check behavio
 
 Practice actions, evaluated attempts, encounters, and vocabulary counters commit in
 one transaction. Stable event identities and a user lock prevent duplicate credit
-under concurrent retries. A new session abandons the prior active session for the
-same profile. Task answers are private and are omitted from every public task response.
+under concurrent retries. Learners can leave up to three unfinished sessions open and
+resume an open session from the home screen. Task answers are private and are omitted
+from every public task response.
 
 Journals are unique per user/local date across all target languages. Saves append
 immutable revisions, with identical retries avoiding duplicate revisions. Media
@@ -287,7 +329,7 @@ dimensions and caller-supplied metadata.
 
 ## Remaining integration work
 
-Authentication, real image analysis, AI generation and speech evaluation
+Real image analysis, AI generation and speech evaluation
 are not implemented. Uploaded images use validated storage uploads and deterministic
 placeholder objects. Vocabulary "Move" is still local frontend state. Session learning credit comes from persisted
 vocabulary encounters; analysis and skipped tasks award none. Daily vocabulary, home aggregation, and other unfinished

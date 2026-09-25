@@ -30,13 +30,17 @@ from app.repositories.postgres.vocabulary import (
 )
 from app.repositories.postgres.xp import award, xp_events
 from app.repositories.practice import (
-    ActiveSessionExistsError,
+    ActiveSessionLimitReachedError,
     PracticeConflictError,
     PracticeNotFoundError,
     PracticeStorageError,
 )
 from app.schemas.base import utc_now
-from app.schemas.enums import SessionStatus
+from app.schemas.enums import (
+    SessionStatus,
+    VocabularyEncounterOutcome,
+    VocabularyEncounterType,
+)
 from app.schemas.media import MediaAsset, SceneObject, SceneObjectRelation
 from app.schemas.sessions import Session, SessionDetailResponse, SessionSummaryResponse
 from app.schemas.tasks import (
@@ -66,6 +70,7 @@ from app.services.session_plan import (
 logger = logging.getLogger(__name__)
 
 TERMINAL = {"completed", "abandoned", "failed"}
+MAX_ACTIVE_SESSIONS = 3
 ALLOWED_TRANSITIONS = {
     "created": {"analyzingScene", "abandoned", "failed"},
     "analyzingScene": {"awaitingObjectReview", "abandoned", "failed"},
@@ -315,9 +320,13 @@ class PostgresWorkflowRepository:
             )
             if question is None or option_id not in {item.option_id for item in question.options}:
                 raise PracticeConflictError("Choose one of the offered answers.")
+            correct_option_id = task.answer_key.correct_option_ids.get(question_id)
+            if correct_option_id is None:
+                raise PracticeConflictError("This question has no answer key.")
             return CheckVocabularyAnswerResponse(
                 question_id=question_id,
-                is_correct=task.answer_key.correct_option_ids.get(question_id) == option_id,
+                is_correct=correct_option_id == option_id,
+                correct_option_id=correct_option_id,
             )
 
     def _detail(self, c, session):
@@ -562,24 +571,36 @@ class PostgresWorkflowRepository:
                         raise PracticeConflictError("This request key was used for another image.")
                     return self._detail(c, parse_session(existing))
             self._reap(c, request.language_profile_id)
+            # Re-selecting an image resumes its unfinished session, but an
+            # unfinished session for another image must never block a learner
+            # from starting a new one.
             existing = (
                 c.execute(
                     select(sessions).where(
                         sessions.c.user_id == self.user_id,
                         sessions.c.language_profile_id == request.language_profile_id,
+                        sessions.c.scene_media_asset_id == request.media_asset_id,
                         sessions.c.status.not_in(TERMINAL),
                     )
+                    .order_by(sessions.c.started_at.desc().nulls_last(), sessions.c.id.desc())
+                    .limit(1)
                 )
                 .mappings()
                 .one_or_none()
             )
             if existing is not None:
-                if existing["scene_media_asset_id"] == request.media_asset_id:
-                    return self._detail(c, parse_session(existing))
-                raise ActiveSessionExistsError(
-                    "You have a practice session in progress. "
-                    "Continue it or discard it before starting a new one.",
-                    active_session_id=existing["id"],
+                return self._detail(c, parse_session(existing))
+            active_count = c.execute(
+                select(func.count()).select_from(sessions).where(
+                    sessions.c.user_id == self.user_id,
+                    sessions.c.language_profile_id == request.language_profile_id,
+                    sessions.c.status.not_in(TERMINAL),
+                )
+            ).scalar_one()
+            if active_count >= MAX_ACTIVE_SESSIONS:
+                raise ActiveSessionLimitReachedError(
+                    "You can keep up to three unfinished practices open at once. "
+                    "Finish or leave one before starting another."
                 )
             session = Session(
                 user_id=self.user_id,
@@ -650,6 +671,14 @@ class PostgresWorkflowRepository:
                 raise PracticeNotFoundError("Curated scene not found.")
             claimed = self._transition(c, session, "analyzingScene")
             detail = self._detail(c, claimed)
+        if asset.source == "preloaded":
+            # Curated scenes already have their objects, marker positions,
+            # attributes and relations saved. Set up the fresh learner session
+            # on this request instead of showing the uploaded-photo animation.
+            self._run_scene_analysis(
+                session_id, profile_id, claimed, asset, dict(profile), dict(scene)
+            )
+            return self.get(session_id, profile_id)
         self.background.submit(
             self._run_scene_analysis,
             session_id,
@@ -688,14 +717,21 @@ class PostgresWorkflowRepository:
                         ],
                     },
                 )
-        except Exception:
+        except Exception as error:
             logger.exception("Scene analysis failed for session %s.", session_id)
             try:
+                # Compare by value: the enum is a StrEnum and importing the
+                # scene-analysis feature here would create an import cycle.
+                failure_code = (
+                    "imageModerationFailed"
+                    if getattr(error, "code", None) == "imageModerationFailed"
+                    else "sceneAnalysisFailed"
+                )
                 with self.transaction() as c:
                     current = self._session(c, session_id)
                     if current.status == "analyzingScene":
                         self._transition(
-                            c, current, "failed", failure_code="sceneAnalysisFailed"
+                            c, current, "failed", failure_code=failure_code
                         )
             except Exception:
                 logger.exception(
@@ -770,6 +806,8 @@ class PostgresWorkflowRepository:
     def _review(self, session_id, profile_id, request):
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
+            if session.status == "generatingTasks":
+                raise PracticeConflictError("The confirmed scene is already generating tasks.")
             if session.status in TERMINAL:
                 raise PracticeConflictError("This session cannot be edited.")
             tasks = self._tasks(c, session_id)
@@ -789,19 +827,36 @@ class PostgresWorkflowRepository:
             existing = {obj.id: obj for obj in detail.scene_objects}
             if any(object_id not in existing for object_id in request.accepted_object_ids):
                 raise PracticeConflictError("An object does not belong to this session.")
+            if any(item.id not in existing for item in request.repositioned_objects):
+                raise PracticeConflictError("A marker does not belong to this session.")
+            if request.scene_title is not None:
+                c.execute(
+                    update(sessions)
+                    .where(sessions.c.id == session_id)
+                    .values(session_title=request.scene_title)
+                )
+                session = session.model_copy(update={"session_title": request.scene_title})
             profile = (
                 c.execute(select(language_profiles).where(language_profiles.c.id == profile_id))
                 .mappings()
                 .one()
             )
+            positions = {item.id: item.anchor_point for item in request.repositioned_objects}
             for object_id in request.accepted_object_ids:
                 obj = existing[object_id].model_copy(
-                    update={"attributes": request.object_attributes.get(object_id) or None}
+                    update={
+                        "attributes": request.object_attributes.get(object_id) or None,
+                        "anchor_point": positions.get(object_id, existing[object_id].anchor_point),
+                    }
                 )
+                values = object_values(obj)
                 c.execute(
                     upsert(scene_objects)
-                    .values(**object_values(obj))
-                    .on_conflict_do_nothing(index_elements=["id"])
+                    .values(**values)
+                    .on_conflict_do_update(
+                        index_elements=["id"],
+                        set_={key: value for key, value in values.items() if key != "id"},
+                    )
                 )
             for added in request.added_objects:
                 # Scope client-generated IDs to this session; retries keep the same object.
@@ -884,6 +939,7 @@ class PostgresWorkflowRepository:
         lessons = []
         ispy_clues = []
         ispy_descriptions = []
+        introduction_id = None
         with self.transaction() as c:
             session = self._session(c, session_id, profile_id)
             profile = (
@@ -918,24 +974,79 @@ class PostgresWorkflowRepository:
                     ],
                 }
                 translated_scene = self.translator.translate(payload)
-                if self.learning_task_generator:
-                    try:
-                        lessons = build_grammar_lessons(
-                            session_id,
-                            self.learning_task_generator.generate(
-                                _learning_task_payload(
-                                    payload, translated_scene, detail.scene_object_relations
-                                )
-                            ),
-                        )
-                    except Exception:
-                        # AI grammar is an enhancement. A bad provider response
-                        # must not abandon a learner's otherwise valid session.
-                        logger.exception(
-                            "Learning-task generation failed for session %s; "
-                            "using the deterministic lesson plan.",
-                            session_id,
-                        )
+                # Commit translations before the slower lesson/clue calls so
+                # polling clients can show useful content while tasks are built.
+                draft = {
+                    **(session.analysis_draft or {}),
+                    "translationPreview": translated_scene.model_dump(
+                        mode="json", by_alias=True
+                    ),
+                }
+                c.execute(
+                    update(sessions).where(sessions.c.id == session.id)
+                    .values(analysis_draft=draft)
+                )
+                # The translation checkpoint also publishes task 1. Keep the
+                # vocabulary bootstrap in this transaction so the learner can
+                # start as soon as the translation response is committed.
+                for obj in objects:
+                    translated = {row.key: row for row in translated_scene.objects}[str(obj.id)]
+                    word, _source_translation = bootstrap_word(
+                        c,
+                        profile["target_language_code"],
+                        profile["source_language_code"],
+                        translated.translation,
+                        obj.label,
+                        gender=translated.gender,
+                        phonetic_text=translated.phonetic_text,
+                    )
+                    c.execute(
+                        update(scene_objects)
+                        .where(scene_objects.c.id == obj.id)
+                        .values(vocabulary_item_id=word.id)
+                    )
+                detail = self._detail(c, session)
+                objects = list(detail.scene_objects)
+                words_by_id = {word.id: word for word in detail.vocabulary}
+                translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
+                words = [words_by_id[obj.vocabulary_item_id] for obj in objects]
+                translations = [translations_by_id[obj.vocabulary_item_id] for obj in objects]
+                rebuilt = build_tasks(
+                    session_id, objects, words, translations, False, translated_scene
+                )
+                introduction = next(
+                    task for task in rebuilt if task.kind == "vocabularyIntroduction"
+                )
+                introduction.order_index = 0
+                c.execute(insert(session_tasks).values(**entity_values(introduction)))
+                introduction_id = introduction.id
+                # Translation is the moment a learner has collected these
+                # words. Persist a "new" vocabulary record now, rather than
+                # waiting for task completion, so leaving the lesson does not
+                # discard their image vocabulary.
+                for word in words:
+                    record_vocabulary_evidence(
+                        c,
+                        user_id=self.user_id,
+                        vocabulary_item_id=word.id,
+                        encounter=VocabularyEncounter(
+                            id=uuid5(session_id, f"translated:{word.id}"),
+                            user_id=self.user_id,
+                            vocabulary_item_id=word.id,
+                            session_id=session_id,
+                            session_task_id=introduction.id,
+                            encounter_type=VocabularyEncounterType.INTRODUCED,
+                            outcome=VocabularyEncounterOutcome.COMPLETED,
+                        ),
+                    )
+
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.status in TERMINAL:
+                return
+            detail = self._detail(c, session)
+            objects = list(detail.scene_objects)
+            if self.translator:
                 translated_objects = {row.key: row for row in translated_scene.objects}
                 for obj in objects:
                     translated = translated_objects[str(obj.id)]
@@ -946,53 +1057,15 @@ class PostgresWorkflowRepository:
                         translated.translation,
                         obj.label,
                         gender=translated.gender,
+                        phonetic_text=translated.phonetic_text,
                     )
                     c.execute(
                         update(scene_objects)
                         .where(scene_objects.c.id == obj.id)
                         .values(vocabulary_item_id=word.id)
                     )
-                draft = {
-                    **(session.analysis_draft or {}),
-                    "translationPreview": translated_scene.model_dump(
-                        mode="json", by_alias=True
-                    ),
-                }
-                c.execute(
-                    update(sessions)
-                    .where(sessions.c.id == session.id)
-                    .values(analysis_draft=draft)
-                )
-                session = session.model_copy(update={"analysis_draft": draft})
                 detail = self._detail(c, session)
                 objects = list(detail.scene_objects)
-                words_by_id = {word.id: word for word in detail.vocabulary}
-                if self.ispy_clue_generator:
-                    try:
-                        ispy_clues = build_ispy_clue_tasks(
-                            session_id,
-                            self.ispy_clue_generator.generate(
-                                _ispy_clue_payload(
-                                    payload, translated_scene, objects,
-                                    detail.scene_object_relations,
-                                )
-                            ),
-                            objects,
-                            [words_by_id[obj.vocabulary_item_id] for obj in objects],
-                        )
-                    except ISpyClueGenerationError:
-                        # A clue is additive. Keep the deterministic round instead of
-                        # failing a learner's complete practice session.
-                        logger.exception("I-Spy clue generation failed for session %s.", session_id)
-                if self.ispy_guess_generator:
-                    ispy_descriptions = build_ispy_description_tasks(
-                        session_id,
-                        objects,
-                        [words_by_id[obj.vocabulary_item_id] for obj in objects],
-                        _ispy_guess_context(
-                            payload, translated_scene, objects, detail.scene_object_relations
-                        ),
-                    )
             words_by_id = {word.id: word for word in detail.vocabulary}
             translations_by_id = {word.vocabulary_item_id: word for word in detail.translations}
             if any(
@@ -1011,6 +1084,59 @@ class PostgresWorkflowRepository:
                 False,
                 getattr(detail, "translation_preview", None),
             )
+            if introduction_id is None:
+                # Deterministic/demo task generation has no translation
+                # checkpoint, so create task 1 with the regular task plan.
+                introduction = next(
+                    task for task in rebuilt if task.kind == "vocabularyIntroduction"
+                )
+                introduction.order_index = 0
+                c.execute(insert(session_tasks).values(**entity_values(introduction)))
+                introduction_id = introduction.id
+
+        # No transaction or user lock spans these slow calls: task 1 is committed
+        # and can be started, answered and completed while the rest is generated.
+        if self.translator:
+            if self.learning_task_generator:
+                try:
+                    lessons = build_grammar_lessons(
+                        session_id,
+                        self.learning_task_generator.generate(
+                            _learning_task_payload(
+                                payload, translated_scene, detail.scene_object_relations
+                            )
+                        ),
+                    )
+                except Exception:
+                    logger.exception(
+                        "Learning-task generation failed for session %s; "
+                        "using the deterministic lesson plan.", session_id,
+                    )
+            if self.ispy_clue_generator:
+                try:
+                    ispy_clues = build_ispy_clue_tasks(
+                        session_id,
+                        self.ispy_clue_generator.generate(
+                            _ispy_clue_payload(
+                                payload, translated_scene, objects, detail.scene_object_relations
+                            )
+                        ),
+                        objects, words,
+                    )
+                except ISpyClueGenerationError:
+                    logger.exception("I-Spy clue generation failed for session %s.", session_id)
+            if self.ispy_guess_generator:
+                ispy_descriptions = build_ispy_description_tasks(
+                    session_id, objects, words,
+                    _ispy_guess_context(
+                        payload, translated_scene, objects, detail.scene_object_relations
+                    ),
+                )
+
+        with self.transaction() as c:
+            session = self._session(c, session_id, profile_id)
+            if session.status in TERMINAL:
+                return
             learning = [
                 task for task in rebuilt if task.kind not in {"ispyRound", "reflection"}
             ]
@@ -1025,6 +1151,9 @@ class PostgresWorkflowRepository:
                 ] + lessons
             rebuilt = [*learning, *clues, *descriptions]
             for index, task in enumerate(rebuilt):
+                if task.id == introduction_id:
+                    # Preserve any progress/attempts already made in task 1.
+                    continue
                 task.order_index = index
                 c.execute(insert(session_tasks).values(**entity_values(task)))
             self._transition(c, session, "inProgress")
@@ -1039,7 +1168,8 @@ class PostgresWorkflowRepository:
                 raise PracticeConflictError("Session is already terminal.")
             tasks = self._tasks(c, session.id)
             if not abandon and (
-                not tasks or any(t.status not in {"completed", "skipped"} for t in tasks)
+                session.status == "generatingTasks"
+                or not tasks or any(t.status not in {"completed", "skipped"} for t in tasks)
             ):
                 raise PracticeConflictError("Complete or skip every task first.")
             session = self._transition(c, session, target)
@@ -1191,7 +1321,12 @@ class PostgresWorkflowRepository:
                 or (action == "skip" and task.status == "skipped")
             )
             if not retry:
-                if session.status != "inProgress" or task.status in {"completed", "skipped"}:
+                early_vocabulary = (
+                    session.status == "generatingTasks" and task.kind == "vocabularyIntroduction"
+                )
+                if (session.status != "inProgress" and not early_vocabulary) or task.status in {
+                    "completed", "skipped"
+                }:
                     raise PracticeConflictError(
                         f"Task or session is not active; session is '{session.status}'."
                     )
@@ -1258,7 +1393,21 @@ class PostgresWorkflowRepository:
                             for question in task.public_content.questions
                         }
                         correct_count = sum(question_results.values())
-                        evaluation_details = {"questionResults": question_results}
+                        # Released only with the graded attempt so each question
+                        # can show its own correct answer.
+                        correct_answers = {
+                            question.question_id: expected
+                            for question in task.public_content.questions
+                            if (
+                                expected := task.answer_key.correct_option_ids.get(
+                                    question.question_id
+                                )
+                            )
+                        }
+                        evaluation_details = {
+                            "questionResults": question_results,
+                            "correctAnswers": correct_answers,
+                        }
                         feedback_message = (
                             f"{correct_count} of {len(question_results)} questions correct."
                         )

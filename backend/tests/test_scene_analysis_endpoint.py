@@ -25,8 +25,8 @@ def test_analyzer_runs_once_and_review_state_never_reanalyzes(database, monkeypa
     sid = create_run(client, profile)["session"]["id"]
     first = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert first.status_code == 200, first.text
-    # Analysis is claimed on the request and finished in the background job.
-    assert first.json()["session"]["status"] == "analyzingScene"
+    # Curated scenes use their saved analysis and are ready for review directly.
+    assert first.json()["session"]["status"] == "awaitingObjectReview"
     repeat = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert repeat.status_code == 200, repeat.text
     assert repeat.json()["session"]["status"] == "awaitingObjectReview"
@@ -100,7 +100,7 @@ def test_analyze_persists_title_summary_and_draft(database):
     _, _, profile, client = database
     sid = create_run(client, profile)["session"]["id"]
     claimed = client.post(f"/api/v1/sessions/{sid}/analyze").json()
-    assert claimed["session"]["status"] == "analyzingScene"
+    assert claimed["session"]["status"] == "awaitingObjectReview"
     detail = client.get(f"/api/v1/sessions/{sid}").json()
     objects = detail["sceneObjects"]
     relations = detail["sceneObjectRelations"]
@@ -126,7 +126,7 @@ def test_analyzer_failure_marks_session_failed(database, monkeypatch):
     # A provider failure surfaces as a failed session, not a request error.
     response = client.post(f"/api/v1/sessions/{sid}/analyze")
     assert response.status_code == 200, response.text
-    assert response.json()["session"]["status"] == "analyzingScene"
+    assert response.json()["session"]["status"] == "failed"
     session = client.get(f"/api/v1/sessions/{sid}").json()["session"]
     assert session["status"] == "failed"
     assert session["failureCode"] == "sceneAnalysisFailed"

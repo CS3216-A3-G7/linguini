@@ -21,9 +21,11 @@ test("keys are stable and serialisable", () => {
   }
 });
 
-test("queryError maps errors to display strings", () => {
-  assert.equal(queryError(new Error("Request failed.")), "Request failed.");
-  assert.equal(queryError("oops"), "Unable to load data.");
+test("queryError hides technical failures behind actionable learner copy", () => {
+  assert.equal(queryError(new Error("Request failed.")), "We couldn't connect just now. Check your connection and try again.");
+  assert.equal(queryError({ status: 409, code: "active_session_limit_reached" }), "You can keep up to three unfinished practices open. Finish or leave one before starting another.");
+  assert.equal(queryError({ status: 500 }), "Something went wrong on our side. Please try again in a moment.");
+  assert.equal(queryError("oops"), "We couldn't load this right now. Please try again.");
   assert.equal(queryError(null), null);
   assert.equal(queryError(undefined), null);
 });

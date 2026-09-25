@@ -13,13 +13,23 @@ from app.repositories.postgres.scenes import (
 )
 from app.repositories.scenes import SceneStorageError
 from app.schemas.scenes import PreloadedSceneDetail
+from app.services.scenes import SceneService
 
 
 def store_scene(connection, scene):
     connection.execute(insert(media_assets).values(**scene.media_asset.model_dump(by_alias=False)))
     values = scene.model_dump(
         by_alias=False,
-        exclude={"items", "tasks", "rounds", "prompts", "media_asset", "scene_id", "image_url"},
+        exclude={
+            "items",
+            "tasks",
+            "rounds",
+            "prompts",
+            "relations",
+            "media_asset",
+            "scene_id",
+            "image_url",
+        },
     )
     connection.execute(
         insert(preloaded_scenes).values(
@@ -27,7 +37,9 @@ def store_scene(connection, scene):
             slug=scene.scene_id,
             media_asset_id=scene.media_asset.id,
             content=scene.model_dump(
-                mode="json", by_alias=True, include={"items", "tasks", "rounds", "prompts"}
+                mode="json",
+                by_alias=True,
+                include={"items", "tasks", "rounds", "prompts", "relations"},
             ),
         )
     )
@@ -126,11 +138,122 @@ def test_transaction_rolls_back_media_on_invalid_scene(database, source):
         )
 
 
+def test_french_scene_round_trip(database, source):
+    engine, *_ = database
+    source["languageCode"] = "fr"
+    source["language"] = "French"
+    source["items"][0]["gender"] = "le"
+    source["items"][1]["gender"] = "l'"
+    scene = PreloadedSceneDetail.model_validate(source)
+    with engine.begin() as connection:
+        store_scene(connection, scene)
+    try:
+        service = SceneService(PostgresSceneRepository(engine))
+        french = service.list_scenes("fr")
+        assert source["sceneId"] in {row.scene_id for row in french}
+        assert service.list_scenes("es")
+        fetched = service.get_scene(source["sceneId"], "fr")
+        assert [item.gender for item in fetched.items][:2] == ["le", "l'"]
+    finally:
+        with engine.begin() as connection:
+            connection.execute(
+                delete(preloaded_scenes).where(
+                    preloaded_scenes.c.slug == source["sceneId"]
+                )
+            )
+            connection.execute(
+                delete(media_assets).where(
+                    media_assets.c.id == UUID(source["mediaAsset"]["id"])
+                )
+            )
+
+
 def test_database_errors_are_controlled():
     engine = MagicMock()
     engine.connect.side_effect = OperationalError("select", {}, Exception("private"))
     with pytest.raises(SceneStorageError, match="Unable to load scenes"):
         PostgresSceneRepository(engine).list_scenes()
+
+
+def test_precompute_helpers_build_valid_content():
+    from app.ai.features.translation.schemas import TranslatedTerm
+    from app.schemas.media import AnchorPoint, BoundingBox, MediaAsset, SceneObject
+    from app.scripts.precompute_preloaded_scenes import (
+        build_items,
+        build_scene_content,
+        dedupe_objects,
+        marker_percent,
+        normalized_gender,
+    )
+
+    session_id = uuid4()
+    objects = [
+        SceneObject(
+            session_id=session_id,
+            label="Street",
+            bounding_box=BoundingBox(x="0.1", y="0.2", width="0.4", height="0.2"),
+        ),
+        SceneObject(
+            session_id=session_id,
+            label="school",
+            anchor_point=AnchorPoint(x="0.5", y="0.5"),
+        ),
+        SceneObject(session_id=session_id, label="STREET"),
+    ]
+    kept = dedupe_objects(objects)
+    assert [obj.label for obj in kept] == ["Street", "school"]
+    assert marker_percent(kept[0]) == (30.0, 30.0)
+    assert marker_percent(kept[1]) == (50.0, 50.0)
+
+    terms = [
+        TranslatedTerm(
+            key=str(kept[0].id), source="Street", translation="rue",
+            article="la", gender="feminine",
+        ),
+        TranslatedTerm(
+            key=str(kept[1].id), source="school", translation="école",
+            article="l'", gender="feminine",
+        ),
+    ]
+    examples = {str(kept[0].id): ("La rue est calme.", "The street is quiet.")}
+    items = build_items(kept, terms, examples, "fr")
+    assert items[0]["id"] == "street"
+    assert items[0]["word"] == "la rue"
+    assert items[0]["translation"] == "the Street"
+    assert items[0]["gender"] == "la"
+    assert items[1]["id"] == "school"
+    assert items[1]["word"] == "l'école"
+    assert items[1]["gender"] == "l'"
+    assert items[1]["example"] == ""
+
+    assert normalized_gender("du", "masculine", "fr") == "le"
+    assert normalized_gender("du", "feminine", "es") == "la"
+    assert normalized_gender(None, None, "es") is None
+
+    asset = MediaAsset(
+        media_type="image", source="preloaded",
+        storage_key="preloaded/scenes/street.jpg", mime_type="image/jpeg",
+        width=320, height=200,
+    )
+    content = build_scene_content(
+        slug="rue-principale", language_code="fr", language="French",
+        title="A walk downtown", description="A busy street.",
+        difficulty="beginner", media_asset=asset, items=items,
+    )
+    detail = PreloadedSceneDetail.model_validate(
+        {
+            **content,
+            "sceneId": "rue-principale",
+            "languageCode": "fr",
+            "language": "French",
+            "title": "A walk downtown",
+            "description": "A busy street.",
+            "difficulty": "beginner",
+            "mediaAsset": asset,
+        }
+    )
+    assert len(detail.items) == 2
+    assert detail.tasks[0].item_ids == [item["id"] for item in items]
 
 
 @pytest.mark.parametrize("invalid", ["duplicate", "reference", "coordinates"])

@@ -1,6 +1,8 @@
-import type { LeaderboardRow, ScenarioProgress, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
+import { GENDER_ARTICLES } from "../data/types.ts";
+import type { Gender, LeaderboardRow, ScenarioProgress, Streak, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";
+import { getAccessToken } from "./supabase.ts";
 
 // The Node test runner has no import.meta.env; read process.env there.
 const envBaseUrl = import.meta.env?.VITE_API_BASE_URL
@@ -110,22 +112,25 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   if (!apiBaseUrl) {
-    throw new Error("Set VITE_API_BASE_URL in frontend/.env.local and restart Vite.");
+    throw new Error("The app is still being set up. Please try again in a moment.");
   }
 
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, { ...options, signal });
+    const headers = new Headers(options?.headers);
+    const token = await getAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    response = await fetch(`${apiBaseUrl}${path}`, { ...options, headers, signal });
   } catch (error) {
     if (signal?.aborted) throw error;
-    throw new Error("Cannot reach the API. Check that the backend is running and CORS allows this origin.");
+    throw new Error("We couldn't connect right now. Please check your connection and try again.");
   }
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     const message = typeof body?.detail?.message === "string" ? body.detail.message : "Request failed.";
     const code = typeof body?.detail?.code === "string" ? body.detail.code : null;
     const activeSessionId = typeof body?.detail?.activeSessionId === "string" ? body.detail.activeSessionId : null;
-    throw new ApiError(`${message} (HTTP ${response.status})`, response.status, code, activeSessionId);
+    throw new ApiError(message, response.status, code, activeSessionId);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -164,6 +169,7 @@ export interface ProgressResponse {
   xp: number;
   scenarios: ScenarioProgress[];
   leaderboard: LeaderboardRow[];
+  streak: Streak;
 }
 
 interface DailyVocabularyItem {
@@ -173,9 +179,10 @@ interface DailyVocabularyItem {
     partOfSpeech: WordClass;
     gender: string | null;
     exampleSentence: string | null;
+    phoneticText?: string | null;
   };
   translation: { translatedText: string } | null;
-  progress: { status: VocabStatus } | null;
+  progress: { status: VocabStatus; firstLearnedAt?: string | null } | null;
   sceneId: string | null;
   topic: string | null;
   scenes?: VocabularyScene[];
@@ -226,12 +233,14 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
     word: item.vocabulary.displayText,
     translation: item.translation?.translatedText ?? "Translation unavailable",
     wordClass: item.vocabulary.partOfSpeech,
-    gender: item.vocabulary.gender === "la" || item.vocabulary.gender === "el" ? item.vocabulary.gender : null,
+    gender: item.vocabulary.gender != null && GENDER_ARTICLES.has(item.vocabulary.gender) ? item.vocabulary.gender as Gender : null,
     status: item.progress?.status ?? "new",
+    firstLearnedAt: item.progress?.firstLearnedAt ?? null,
     topic: item.topic ?? "Uncategorised",
     sceneId: item.sceneId ?? "",
     scenes: item.scenes ?? [],
     example: item.vocabulary.exampleSentence ?? "",
+    phoneticText: item.vocabulary.phoneticText ?? null,
   }));
 }
 
@@ -267,8 +276,13 @@ export interface JournalPhotoOption {
   completedAt: string;
 }
 export async function getJournalContext(date?: string, signal?: AbortSignal) {
-  const context = await request<{ localDate: string; journal: JournalRecord | null; eligiblePhotos: JournalPhotoOption[] }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
-  return { date: context.localDate, entry: context.journal ? await getJournal(context.journal.id, signal) : null, photoOptions: context.eligiblePhotos };
+  const context = await request<{ localDate: string; journal: JournalRecord | null; eligiblePhotos: JournalPhotoOption[]; suggestedWords: string[] }>(`/api/v1/journal/${date ?? "today"}/context`, signal);
+  return {
+    date: context.localDate,
+    entry: context.journal ? await getJournal(context.journal.id, signal) : null,
+    photoOptions: context.eligiblePhotos,
+    wordSuggestions: context.suggestedWords ?? [],
+  };
 }
 export type JournalDraft = Pick<JournalEntry, "title" | "mediaAssetId" | "body" | "wordsUsed"> & { photoAssetIds?: string[] };
 export async function saveJournal(draft: JournalDraft, profileId: string, id?: string, date?: string) {
@@ -318,7 +332,7 @@ export interface SessionProgress {
 }
 export type SessionStatus = "created" | "analyzingScene" | "awaitingObjectReview" | "generatingTasks" | "ready" | "inProgress" | "completed" | "abandoned" | "failed";
 export interface PracticeDetail {
-  session: { id: string; status: SessionStatus; sceneMediaAssetId: string; sessionTitle: string | null; sessionSummary: string | null; failureCode: "imageUploadFailed" | "sceneAnalysisFailed" | "noValidObjects" | "vocabularyMappingFailed" | "taskGenerationFailed" | null };
+  session: { id: string; status: SessionStatus; sceneMediaAssetId: string; sessionTitle: string | null; sessionSummary: string | null; failureCode: "imageUploadFailed" | "sceneAnalysisFailed" | "imageModerationFailed" | "noValidObjects" | "vocabularyMappingFailed" | "taskGenerationFailed" | null };
   mediaAsset: { id: string; source: "preloaded" | "camera" | "userUpload" };
   sceneId: string | null; title: string;
   analysisMode: "placeholder" | null;
@@ -362,14 +376,16 @@ export interface GrammarLessonQuestion {
 export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string } | { inputMode: "vocabularyReview"; answers: Record<string, string>; typedAnswers: Record<string, string> };
 export interface TaskActionResult {
   task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;
-  attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null; evaluationDetails?: { questionResults?: Record<string, boolean>; guessedObjectKey?: string | null; ambiguous?: boolean } | null } | null;
+  attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null; evaluationDetails?: { questionResults?: Record<string, boolean>; correctAnswers?: Record<string, string>; guessedObjectKey?: string | null; ambiguous?: boolean } | null } | null;
 }
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
 export interface PracticeReview {
+  sceneTitle?: string;
   acceptedObjectIds: string[];
   relations: SceneObjectRelation[];
   addedObjects: { id: string; label: string; x: number; y: number }[];
   objectAttributes: Record<string, Record<string, string>>;
+  repositionedObjects: { id: string; anchorPoint: { x: number; y: number } }[];
 }
 export const reviewPractice = (id: string, review: PracticeReview) => write<PracticeDetail>(`/api/v1/sessions/${id}/review`, "PUT", review);
 export const getPractice = (id: string) => request<PracticeDetail>(`/api/v1/sessions/${id}`);
@@ -379,7 +395,7 @@ export const createPractice = (profileId: string, assetId: string, key: string) 
 });
 export const taskAction = (id: string, action: "start" | "complete" | "skip" | "attempts", body: unknown = {}) => write<TaskActionResult>(`/api/v1/tasks/${id}/${action}`, "POST", body);
 export const checkVocabularyAnswer = (id: string, questionId: string, optionId: string) =>
-  write<{ questionId: string; isCorrect: boolean }>(`/api/v1/tasks/${id}/check-vocabulary-answer`, "POST", { questionId, optionId });
+  write<{ questionId: string; isCorrect: boolean; correctOptionId: string }>(`/api/v1/tasks/${id}/check-vocabulary-answer`, "POST", { questionId, optionId });
 export const completePractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/complete`, "POST", {});
 export const abandonPractice = (id: string) => write<{ id: string; status: string }>(`/api/v1/sessions/${id}/abandon`, "POST", {});
 export const getPracticeSummary = (id: string) => request<{ progress: SessionProgress; learnedVocabularyIds: string[]; xpEarned: number; ispyCorrectCount: number; ispyAttemptCount: number }>(`/api/v1/sessions/${id}/summary`);

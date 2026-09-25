@@ -1,28 +1,19 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ApiError, getActivePractice } from "../lib/api";
-import type { PracticeDetail } from "../lib/api";
+import { getActivePractice } from "../lib/api";
 import { sessionDestination } from "../lib/sessionRoute";
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import { LoadingScreen } from "./LoadingScreen";
+import { ErrorState } from "./ErrorState";
 
 export function SceneRoute() {
   const { sceneId = "" } = useParams();
   const { startSession } = useAppState();
-  const [resume, setResume] = useState<PracticeDetail | null>(null);
   const load = useCallback(async () => {
-    try {
-      const active = await getActivePractice();
-      return active?.sceneId === sceneId ? active : await startSession(sceneId);
-    } catch (reason) {
-      if (reason instanceof ApiError && reason.code === "active_session_exists" && reason.activeSessionId) {
-        const existing = await getActivePractice().catch(() => null);
-        if (existing) { setResume(existing); return null; }
-      }
-      throw reason;
-    }
+    const active = await getActivePractice();
+    return active?.sceneId === sceneId ? active : await startSession(sceneId);
   }, [sceneId, startSession]);
   // Side-effecting session resolution: never served from or retained in cache.
   const { data, error: queryErrorValue } = useQuery({
@@ -31,11 +22,7 @@ export function SceneRoute() {
     staleTime: 0, gcTime: 0, retry: false, refetchOnMount: "always",
   });
   const error = queryError(queryErrorValue);
-  if (resume) {
-    const dest = sessionDestination(resume);
-    return <Navigate replace to={dest.path} state={dest.notice ? { practiceNotice: dest.notice } : undefined} />;
-  }
-  if (error) return <p role="alert">{error}</p>;
+  if (error) return <ErrorState title="We couldn't open that scene" message={error} retry={() => window.location.reload()} backTo="/practice" backLabel="Choose another image" />;
   if (!data) return <LoadingScreen label="Loading session..." />;
   return <Navigate replace to={sessionDestination(data).path} />;
 }

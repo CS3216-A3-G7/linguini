@@ -32,6 +32,11 @@ class ObjectGroundingProvider(StrEnum):
     GROUNDING_DINO = "groundingDino"
 
 
+class ImageModerationProvider(StrEnum):
+    NONE = "none"
+    OPENAI = "openai"
+
+
 class AiFeature(StrEnum):
     SCENE_ANALYSIS = "sceneAnalysis"
     SCENE_TRANSLATION = "sceneTranslation"
@@ -74,6 +79,18 @@ class ObjectGroundingSettings(BaseModel):
     provider: ObjectGroundingProvider = ObjectGroundingProvider.NONE
     model_name: str = ""
     threshold: float = Field(default=0.35, ge=0, le=1)
+    max_labels: int = Field(default=12, gt=0)
+    max_image_side: int = Field(default=1024, gt=0)
+
+
+class ImageModerationSettings(BaseModel):
+    """Configuration for the optional upload-image moderation pass."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider: ImageModerationProvider = ImageModerationProvider.NONE
+    model_name: str = ""
+    timeout_seconds: int = Field(default=30, gt=0)
 
 
 class AiSettings(BaseModel):
@@ -86,6 +103,7 @@ class AiSettings(BaseModel):
     general_api_key: str = ""
     observability: ObservabilitySettings = ObservabilitySettings()
     object_grounding: ObjectGroundingSettings = ObjectGroundingSettings()
+    image_moderation: ImageModerationSettings = ImageModerationSettings()
     scene_analysis: FeatureModelConfig
     scene_translation: FeatureModelConfig
     learning_task: FeatureModelConfig
@@ -367,11 +385,86 @@ def _parse_object_grounding(env: Mapping[str, str]) -> ObjectGroundingSettings:
     )
     try:
         return ObjectGroundingSettings(
-            provider=provider, model_name=model_name, threshold=threshold
+            provider=provider,
+            model_name=model_name,
+            threshold=threshold,
+            max_labels=_parse_positive_int(
+                env,
+                "AI_OBJECT_GROUNDING_MAX_LABELS",
+                12,
+                "object grounding max labels",
+            ),
+            max_image_side=_parse_positive_int(
+                env,
+                "AI_OBJECT_GROUNDING_MAX_IMAGE_SIDE",
+                1024,
+                "object grounding max image side",
+            ),
         )
     except ValueError as exc:
         raise AiConfigurationError(
             f"Invalid object grounding configuration: {exc}"
+        ) from exc
+
+
+def _parse_positive_int(
+    env: Mapping[str, str], name: str, default: int, kind: str
+) -> int:
+    raw = _read(env, name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise AiConfigurationError(
+            f"Invalid {kind}: {raw!r} ({name} must be a positive integer)"
+        ) from exc
+    if value <= 0:
+        raise AiConfigurationError(
+            f"Invalid {kind}: {raw!r} ({name} must be a positive integer)"
+        )
+    return value
+
+
+def _parse_image_moderation(env: Mapping[str, str]) -> ImageModerationSettings:
+    raw_provider = (_read(env, "AI_IMAGE_MODERATION_PROVIDER") or "none").casefold()
+    try:
+        provider = ImageModerationProvider(raw_provider)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in ImageModerationProvider)
+        raise AiConfigurationError(
+            "Invalid image moderation provider: "
+            f"{raw_provider!r} (allowed: {allowed})"
+        ) from exc
+    model_name = _read(env, "AI_IMAGE_MODERATION_MODEL") or (
+        "omni-moderation-latest"
+        if provider is ImageModerationProvider.OPENAI
+        else ""
+    )
+    raw_timeout = _read(env, "AI_IMAGE_MODERATION_TIMEOUT_SECONDS") or "30"
+    try:
+        timeout_seconds = int(raw_timeout)
+    except ValueError as exc:
+        raise AiConfigurationError(
+            "Invalid timeout for imageModeration: "
+            f"{raw_timeout!r} (AI_IMAGE_MODERATION_TIMEOUT_SECONDS must be a "
+            "positive integer number of seconds)"
+        ) from exc
+    if timeout_seconds <= 0:
+        raise AiConfigurationError(
+            "Invalid timeout for imageModeration: "
+            f"{raw_timeout!r} (AI_IMAGE_MODERATION_TIMEOUT_SECONDS must be a "
+            "positive integer number of seconds)"
+        )
+    try:
+        return ImageModerationSettings(
+            provider=provider,
+            model_name=model_name,
+            timeout_seconds=timeout_seconds,
+        )
+    except ValueError as exc:
+        raise AiConfigurationError(
+            f"Invalid image moderation configuration: {exc}"
         ) from exc
 
 
@@ -406,13 +499,15 @@ def _load_feature(
             model_name=_parse_model(env, feature, stem, provider),
             timeout_seconds=_parse_timeout(env, feature, stem),
             max_output_tokens=max_output_tokens,
-            # Generated lessons and I-Spy clues are structured responses. One
+            # Translations, lessons and I-Spy clues are structured responses. One
             # repair attempt avoids replacing a usable session when a provider
             # misses a non-schema constraint; an explicit 0 still disables it.
             max_retries=(
                 1
                 if max_retries is None
-                and feature in {AiFeature.LEARNING_TASK, AiFeature.ISPY_CLUE}
+                and feature in {
+                    AiFeature.SCENE_TRANSLATION, AiFeature.LEARNING_TASK, AiFeature.ISPY_CLUE
+                }
                 else 0 if max_retries is None else max_retries
             ),
         )
@@ -453,6 +548,7 @@ def load_ai_settings(env: Mapping[str, str] | None = None) -> AiSettings:
         general_api_key=_read(env, "AI_API_KEY") or "",
         observability=_parse_observability(env),
         object_grounding=_parse_object_grounding(env),
+        image_moderation=_parse_image_moderation(env),
         **{
             field: _load_feature(env, feature)
             for feature, field in _FEATURE_FIELDS.items()
@@ -476,6 +572,14 @@ def load_ai_settings(env: Mapping[str, str] | None = None) -> AiSettings:
                     f"{feature.value}: missing {config.provider.value} API key "
                     f"(set {key_var})"
                 )
+        if (
+            settings.image_moderation.provider is ImageModerationProvider.OPENAI
+            and not settings.openai_api_key
+        ):
+            problems.append(
+                "imageModeration: missing openai API key "
+                "(set AI_OPENAI_API_KEY)"
+            )
         observability = settings.observability
         if observability.enabled:
             if not observability.public_key:

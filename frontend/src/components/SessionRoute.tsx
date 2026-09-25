@@ -1,6 +1,6 @@
 import { practiceScene } from "../lib/practiceScene";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, Navigate, Outlet, useLocation, useParams } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getPractice, mediaImageUrl } from "../lib/api";
 import type { PracticeDetail } from "../lib/api";
@@ -8,8 +8,10 @@ import { isPreTaskStep, isSessionRouteAllowed, sessionDestination, sessionLoadin
 import { queryError, queryKeys } from "../lib/queryKeys";
 import { useAppState } from "../state/useAppState";
 import type { Scene } from "../data/types";
-import { ScenePhoto } from "./ScenePhoto";
 import { LoadingScreen } from "./LoadingScreen";
+import { ErrorState } from "./ErrorState";
+import { AnalysisScan } from "./AnalysisScan";
+import { TranslationPreview } from "./TranslationPreview";
 
 export function SessionRoute() {
   const { sessionId = "" } = useParams();
@@ -43,14 +45,21 @@ function SessionLoader({ id }: { id: string }) {
   });
   const error = queryError(queryErrorValue);
   const copy = sessionLoadingCopy(location.pathname);
-  if (loading) return copy.scan && preview ? <div className="stack analysis-page">
+  const earlyReady = session?.session.id === id && ["generatingTasks", "ready", "inProgress"].includes(session.session.status)
+    && session.tasks.some(task => task.kind === "vocabularyIntroduction");
+  if (loading && !earlyReady && session?.session.id === id && session.session.status === "generatingTasks" && session.translationPreview) return <div className="stack analysis-page">
+    <h1>Scene analysis</h1>
+    <TranslationPreview preview={session.translationPreview} scene={preview ?? undefined} />
+    <section role="status" className="panel-note"><h2>Generating tasks...</h2><p className="muted">Explore your translations while we prepare your practice.</p></section>
+  </div>;
+  if (loading && !earlyReady) return copy.scan && preview ? <div className="stack analysis-page">
     <h1>{copy.title}</h1>
     <section className="analysis-loading" aria-live="polite" aria-busy="true">
-      <div className="analysis-scan" aria-hidden="true"><ScenePhoto scene={preview} items={[]} /><span className="analysis-scan__line" /></div>
+      <AnalysisScan scene={preview} />
       <div className="analysis-loading__copy"><h2>{copy.heading}</h2><p className="muted">This will only take a moment.</p></div>
     </section>
   </div> : <LoadingScreen label={copy.heading} />;
-  if (!data || error) return <div className="stack"><p role="alert">{error ?? "Session unavailable."}</p><button onClick={() => window.location.reload()}>Retry</button><Link to="/practice">Choose an image</Link></div>;
+  if ((!data && !earlyReady) || error) return <ErrorState title="We couldn't open this practice" message={error ?? "This practice isn't available right now."} retry={() => window.location.reload()} backTo="/practice" backLabel="Choose another image" />;
   const current = session?.session.id === id
     ? practiceScene(session, mediaImageUrl(session.mediaAsset.id, 1280), learner.language)
     : data;

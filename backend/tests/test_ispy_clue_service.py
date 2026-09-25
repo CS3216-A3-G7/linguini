@@ -317,6 +317,30 @@ def test_clue_naming_its_answer_is_rejected(clue_text) -> None:
         generate(data=data, cfg=config(max_retries=0))
 
 
+def test_clue_translation_naming_the_answer_is_rejected() -> None:
+    data = clues()
+    data["clues"][0]["clueTranslation"] = "is a red cup on the left"
+    with pytest.raises(ISpyClueGenerationError):
+        generate(data=data, cfg=config(max_retries=0))
+
+
+def test_clue_translation_repeating_the_opening_is_rejected() -> None:
+    data = clues()
+    data["clues"][0]["clueTranslation"] = (
+        "I spy with my little eye, something that is red"
+    )
+    with pytest.raises(ISpyClueGenerationError):
+        generate(data=data, cfg=config(max_retries=0))
+
+
+def test_clue_translation_is_carried_through() -> None:
+    data = clues()
+    data["clues"][0]["clueTranslation"] = "is red and on the left"
+    result, _ = generate(data=data)
+    assert result.clues[0].clue_translation == "is red and on the left"
+    assert result.clues[1].clue_translation == ""
+
+
 def test_clue_naming_only_another_object_is_accepted() -> None:
     data = clues()
     data["clues"][0]["clue"] = "está encima de la mesa y es roja"

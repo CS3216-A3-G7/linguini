@@ -2,6 +2,22 @@ import type { SessionTask } from "./api";
 
 export const taskDone = (task: SessionTask) => task.status === "completed" || task.status === "skipped";
 
+/** Keep answer choices stable for a task while varying their position between questions. */
+export function choiceOrder<T>(options: readonly T[], seed: string, value: (option: T) => string): T[] {
+  const rank = (input: string) => {
+    let hash = 2166136261;
+    for (const character of `${seed}:${input}`) {
+      hash ^= character.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  };
+  return options
+    .map((option, index) => ({ option, index, rank: rank(value(option)) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(({ option }) => option);
+}
+
 export function practiceStages(tasks: SessionTask[]) {
   const ordered = [...tasks].sort((a, b) => a.orderIndex - b.orderIndex);
   return {

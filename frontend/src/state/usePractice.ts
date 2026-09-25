@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
+import { analyzePractice, ApiError, completePractice, createPractice, getPractice, getPracticeSummary, getSceneDetail, reviewPractice, taskAction } from "../lib/api";
 import type { PracticeReview } from "../lib/api";
 import type { PracticeDetail, SessionStatus, TaskAnswer, TaskActionResult } from "../lib/api";
 import { applyTaskResult } from "../lib/practiceUpdates";
-import { queryKeys } from "../lib/queryKeys";
+import { friendlyError, queryKeys } from "../lib/queryKeys";
 
 const PROCESSING = ["analyzingScene", "generatingTasks"];
 
@@ -37,11 +37,16 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
         data = await getPractice(id);
       }
     }
-    // Scene analysis can take ~60s, so poll for up to a minute before stalling.
-    for (let attempt = 0; attempt < 40 && PROCESSING.includes(data.session.status); attempt += 1) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+    // Once task 1 is usable, keep checking in the background through slower
+    // lesson/clue calls and their retries (up to five minutes).
+    if (version === loadVersion.current) setSession(data);
+    for (let attempt = 0; attempt < (data.tasks.length ? 200 : 40) && PROCESSING.includes(data.session.status); attempt += 1) {
+      // Poll quickly until the first vocabulary task is committed, then use a
+      // slower cadence while the remaining AI calls finish in the background.
+      await new Promise(resolve => setTimeout(resolve, data.tasks.length ? 1500 : 300));
       if (version !== loadVersion.current) break;
       data = await getPractice(id);
+      if (version === loadVersion.current) setSession(data);
     }
     if (version === loadVersion.current) {
       setSession(data);
@@ -60,7 +65,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
     setError(null);
     try { await loadSession(id); }
     catch (error) {
-      setError(error instanceof Error ? error.message : "Unable to check your scene. Please retry.");
+      setError(friendlyError(error));
       setStalled(true);
     }
   }, [loadSession]);
@@ -79,7 +84,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       setSession(value => applyTaskResult(value, session.session.id, result));
       learningDirty.current = true;
       return result;
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to save task. Retry your action."); return null; }
+    } catch (e) { setError(friendlyError(e)); return null; }
     finally { busy.current = false; setSaving(false); }
   }, [session]);
   const flushLearningChanges = useCallback(() => {
@@ -94,14 +99,20 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       setSession(current => current?.session.id === sessionId
         ? { ...current, session: { ...current.session, status: previousStatus } }
         : current);
-      setCompletionError(error instanceof Error ? error.message : "Unable to complete session.");
+      setCompletionError(friendlyError(error));
     },
     onSuccess: (completed, { sessionId }) => {
       setSession(current => current?.session.id === completed.id
         ? { ...current, session: { ...current.session, status: completed.status as SessionStatus } }
         : current);
       flushLearningChanges();
+      // Refetch the final XP, and warm the cache when the summary screen has
+      // not mounted yet so it renders without a visible fetch.
       void queryClient.invalidateQueries({ queryKey: queryKeys.sessionSummary(sessionId) });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.sessionSummary(sessionId),
+        queryFn: () => getPracticeSummary(sessionId),
+      });
     },
     onSettled: () => { completing.current = false; },
   });
@@ -136,7 +147,7 @@ export function usePractice(_userId: string, profileId: string, onLearningChange
       return true;
     } catch (error) {
       setSession(current => current?.session.id === previous.session.id ? previous : current);
-      setError(error instanceof Error ? error.message : "Unable to save your words.");
+      setError(friendlyError(error));
       return false;
     } finally { busy.current = false; setSaving(false); }
   }, [session, loadSession]);
