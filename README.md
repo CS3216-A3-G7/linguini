@@ -7,6 +7,8 @@
 
 <p align="center"><strong>Learn the language of your day</strong></p>
 
+**Live application:** [Open Linguini](https://linguini-navy.vercel.app/)
+
 ## Group members
 
 | Matriculation number | Name | Contribution to the assignment |
@@ -74,3 +76,4 @@ Windows/PowerShell setup, environment variables and API details are in the app R
 - Keep credentials in ignored `.env.local` files. Never commit database URLs, Supabase keys or API keys.
 
 More agent-facing conventions live in [AGENTS.md](AGENTS.md).
+Each section has their own AGENT.md file i.e backend and frontend have separate conventions.
