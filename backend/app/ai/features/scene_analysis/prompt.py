@@ -1,7 +1,7 @@
 # ruff: noqa: E501 — prompt text is user-approved and must stay verbatim.
 """Versioned prompt for scene analysis.
 
-``scene-analysis.v2`` asks a vision model for a structured JSON description of a
+``scene-analysis.v3`` asks a vision model for a structured JSON description of a
 photograph: a short scene title, labelled objects with normalized bounding
 boxes and typed attributes, and spatial relations between objects. The
 ``SceneAnalysisModelResult`` schema in ``app/ai/scene_analysis/schemas.py`` is
@@ -9,7 +9,7 @@ the runtime contract for this output; keep both in sync when bumping the
 version. Both providers use this exact prompt and schema.
 """
 
-SCENE_ANALYSIS_PROMPT_VERSION = "scene-analysis.v2"
+SCENE_ANALYSIS_PROMPT_VERSION = "scene-analysis.v3"
 SCENE_ANALYSIS_SCHEMA_VERSION = "scene-analysis-result.v2"
 
 SCENE_ANALYSIS_SYSTEM_PROMPT = """## Task
@@ -34,8 +34,9 @@ You are a vision-to-JSON extractor for a vocabulary-learning app. Users photogra
 - If an object appears more than once, list it only once.
 - Avoid duplicate labels unless the image clearly contains distinct instances worth distinguishing individually.
 - Give each object a unique temporary key: "object_1", "object_2", etc.
-- Give each object an approximate normalized bounding box, using the image's top-left as (0,0) and bottom-right as (1,1), with all coordinates between 0 and 1. For every box, x + width ≤ 1 and y + height ≤ 1.
-- Give each object an `anchorPoint` with normalized x and y coordinates between 0 and 1. Choose the visually representative point where the numbered marker should appear; do not calculate it mechanically from the bounding-box centre. Keep it on the visible object, especially for wide, irregular, or partially occluded objects.
+- Give each object a normalized `boundingBox`, using the image's top-left as (0,0) and bottom-right as (1,1), with all coordinates between 0 and 1. For every box, x + width ≤ 1 and y + height ≤ 1.
+- The box must tightly enclose only that object's visible pixels: each edge touches the outermost visible point of the object on that side, with no surrounding background, no padding, and no neighbouring objects included. Estimate coordinates by mentally dividing the image into a grid, then re-check each of the four edges against the object's silhouette before answering.
+- Give each object an `anchorPoint` with normalized x and y coordinates between 0 and 1. It must lie strictly inside the bounding box and on a visible part of the object. Choose the visual centre of the object's most salient, recognisable region — the centre of mass of the visible region, not the geometric centre of the box. This matters most for wide, irregular, or partially occluded objects, where the box centre often falls off the object.
 - Give each object a `confidenceScore` between 0.0 and 1.0, reflecting how visually certain the detection is — lower it for objects that are blurry, partially occluded, small, or ambiguous rather than omitting them.
 
 ## Attribute Rules
