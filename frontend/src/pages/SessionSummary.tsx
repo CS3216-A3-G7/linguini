@@ -1,44 +1,41 @@
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button, Card, Noodle, StatusPill, XpPill } from "../components/ui";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
-import { createPractice, getPracticeSummary } from "../lib/api";
-import { useApiData } from "../lib/useApiData";
+import { useVocabularyQuery } from "../state/queries";
+import { getPracticeSummary } from "../lib/api";
+import { sessionDestination } from "../lib/sessionRoute";
+import { queryError, queryKeys } from "../lib/queryKeys";
 
 export function SessionSummary() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, activeProfile, vocabulary } = useAppState();
-  const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
-  const requestKey = useRef(crypto.randomUUID());
-  const load = useCallback(() => getPracticeSummary(scene.sessionId!), [scene.sessionId]);
-  const { data, error, loading } = useApiData(load);
+  const { session, completionError, retryCompletion } = useAppState();
+  const { vocabulary } = useVocabularyQuery(); 
+  const [startError] = useState<string | null>(null);
+  // Stats render from the in-flight numbers straight away; the completion
+  // mutation invalidates this key so final XP replaces them once it lands.
+  const { data, error: queryErrorValue, isPending: loading } = useQuery({
+    queryKey: queryKeys.sessionSummary(scene.sessionId!),
+    queryFn: () => getPracticeSummary(scene.sessionId!),
+  });
+  const error = queryError(queryErrorValue);
   const completed = session?.session.status === "completed";
   const revisit = scene.items.filter(item => data?.learnedVocabularyIds.includes(
     session?.sceneObjects.find(object => object.id === item.id)?.vocabularyItemId ?? ""
   )).slice(0, 3);
-  const busy = useRef(false);
-  const practiseAgain = async () => {
-    if (starting || busy.current || !activeProfile) return;
-    busy.current = true;
-    setStarting(true); setStartError(null);
-    try {
-      const next = await createPractice(activeProfile.id, scene.mediaAssetId, requestKey.current);
-      navigate("/practice/sessions/" + next.session.id + "/analysis");
-    } catch (error) { setStartError(error instanceof Error ? error.message : "Unable to start practice."); }
-    finally { busy.current = false; setStarting(false); }
-  };
+  
   return <div className="stack">
-    <p className="small muted">{completed ? "Session and XP saved." : "XP is saved after each action."}</p>
-    {session?.session.status === "inProgress" ? <Button onClick={() => navigate("/practice/sessions/" + scene.sessionId + "/learn")}>Continue unfinished practice</Button> : null}
+    {session?.session.status === "inProgress" ? <Button onClick={() => navigate(sessionDestination(session).path)}>Continue unfinished practice</Button> : null}
     <div className="center-text stack-2" style={{ alignItems: "center" }}>
       <img className="mascot" src="/linguini-logo.png" width={120} height={120} alt="Linguini mascot" /><h1>{completed ? "Good job!" : "Your session"}</h1><Noodle className="noodle-divider summary__noodle" />
       <p className="muted">You practised {scene.title.toLowerCase()}.</p>
     </div>
     {loading ? <p role="status">Loading your results...</p> : null}
     {error || startError ? <p role="alert">{error || startError}</p> : null}
+    {completionError ? <><p role="alert">{completionError}</p><Button onClick={retryCompletion}>Retry saving your session</Button></> : null}
     {data ? <>
       <div className="stat-grid">
         <div className="stat"><div className="stat__value">{data.xpEarned}</div><span className="stat__label">XP earned</span></div>
@@ -57,7 +54,6 @@ export function SessionSummary() {
     <div className="stack-2">
       <Button block onClick={() => navigate("/journal/new")}>Write today&apos;s journal entry</Button>
       <Button variant="secondary" block onClick={() => navigate("/vocabulary")}>Review difficult words</Button>
-      <Button variant="secondary" block disabled={starting || !activeProfile} onClick={() => void practiseAgain()}>Practise again</Button>
       <Button variant="quiet" block onClick={() => navigate("/home")}>Back home</Button>
     </div>
   </div>;

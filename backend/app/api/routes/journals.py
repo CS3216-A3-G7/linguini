@@ -1,7 +1,8 @@
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.dependencies import get_journal_service
 from app.api.errors import service_not_implemented
@@ -27,8 +28,10 @@ JournalServiceDep = Annotated[JournalService, Depends(get_journal_service)]
 
 
 @router.get("/journals", response_model=list[JournalDetailResponse])
-def list_journals(service: JournalServiceDep) -> list[JournalDetailResponse]:
-    return service.list_entries()
+def list_journals(
+    service: JournalServiceDep, limit: int = Query(default=365, ge=1, le=365)
+) -> list[JournalDetailResponse]:
+    return service.list_entries(limit)
 
 
 @router.get("/journal/today/context", response_model=JournalTodayContextResponse)
@@ -39,6 +42,20 @@ def get_today_journal_context(service: JournalServiceDep) -> JournalTodayContext
 @router.put("/journal/today", response_model=Journal)
 def upsert_today_journal(request: UpsertTodayJournalRequest, service: JournalServiceDep) -> Journal:
     return service.upsert_today(request)
+
+
+@router.get("/journal/{local_date}/context", response_model=JournalTodayContextResponse)
+def get_journal_day_context(
+    local_date: date, service: JournalServiceDep
+) -> JournalTodayContextResponse:
+    return service.day_context(local_date)
+
+
+@router.put("/journal/{local_date}", response_model=Journal)
+def upsert_journal_day(
+    local_date: date, request: UpsertTodayJournalRequest, service: JournalServiceDep
+) -> Journal:
+    return service.upsert(request, local_date)
 
 
 @router.get("/journals/{journal_id}", response_model=JournalDetailResponse)

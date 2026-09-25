@@ -3,58 +3,62 @@ import { Button, Card, IconButton, Tabs } from "../components/ui";
 import { BookIcon, CloseIcon, FilterIcon, SpeakerIcon } from "../components/icons";
 import { SceneVisual } from "../components/SceneVisual";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ErrorState } from "../components/ErrorState";
 import type { VocabStatus, WordClass } from "../data/types";
+import { mediaImageUrl } from "../lib/api";
+import { groupVocabularyByPhoto, vocabularyCategories } from "../lib/vocabularyGroups";
 import { speak } from "../lib/speech";
 import { useAppState } from "../state/useAppState";
+import { useScenesQuery, useVocabularyQuery } from "../state/queries";
 
-const statusLabels: { id: VocabStatus; label: string }[] = [
+type VocabularyStatusFilter = VocabStatus | "all";
+
+const statusLabels: { id: VocabularyStatusFilter; label: string }[] = [
+  { id: "all", label: "All" },
   { id: "new", label: "New" },
   { id: "learning", label: "Learning" },
-  { id: "familiar", label: "Familiar" },
   { id: "mastered", label: "Mastered" },
 ];
 
 export function Vocabulary() {
-  const { vocabulary, vocabularyLoading, vocabularyError, scenes, scenesLoading, scenesError, learner } = useAppState();
+  const { learner } = useAppState();
+  const { vocabulary, vocabularyLoading, vocabularyError } = useVocabularyQuery();
+  const { scenes, scenesLoading, scenesError } = useScenesQuery();
   const wordClasses: (WordClass | "all")[] = ["all", ...new Set(vocabulary.map(item => item.wordClass))];
   const [view, setView] = useState<"scenes" | "list">("scenes");
-  const [status, setStatus] = useState<VocabStatus>("learning");
+  const [status, setStatus] = useState<VocabularyStatusFilter>("all");
   const [wordClass, setWordClass] = useState<WordClass | "all">("all");
-  const [topic, setTopic] = useState<string>("all");
+  const [category, setCategory] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [draftWordClass, setDraftWordClass] = useState<WordClass | "all">("all");
-  const [draftTopic, setDraftTopic] = useState<string>("all");
+  const [draftCategory, setDraftCategory] = useState<string>("all");
   const filterSheetRef = useRef<HTMLDivElement>(null);
 
   const statusTabs = statusLabels.map(({ id, label }) => ({ id, label }));
 
-  const topics = useMemo(
-    () => ["all", ...Array.from(new Set(vocabulary.map((item) => item.topic)))],
-    [vocabulary],
+  const categories = useMemo(
+    () => [
+      "all",
+      ...Array.from(new Set(vocabulary.flatMap(item => vocabularyCategories(item, scenes)))),
+    ],
+    [vocabulary, scenes],
   );
 
   const rows = vocabulary.filter(
     (item) =>
-      item.status === status &&
+      (status === "all" || item.status === status) &&
       (wordClass === "all" || item.wordClass === wordClass) &&
-      (topic === "all" || item.topic === topic),
+      (category === "all" || vocabularyCategories(item, scenes).includes(category)),
   );
 
   const sceneGroups = useMemo(
-    () =>
-      scenes
-        .map((scene) => ({
-          scene,
-          words: vocabulary.filter((item) => item.sceneId === scene.id),
-        }))
-        .filter((group) => group.words.length > 0),
+    () => groupVocabularyByPhoto(vocabulary, scenes, (id) => mediaImageUrl(id, 640)).sceneGroups,
     [vocabulary, scenes],
   );
-  const ungrouped = vocabulary.filter(item => !scenes.some(scene => scene.id === item.sceneId));
 
   const openFilters = () => {
     setDraftWordClass(wordClass);
-    setDraftTopic(topic);
+    setDraftCategory(category);
     setShowFilters(true);
   };
 
@@ -62,7 +66,7 @@ export function Vocabulary() {
 
   const applyFilters = () => {
     setWordClass(draftWordClass);
-    setTopic(draftTopic);
+    setCategory(draftCategory);
     setShowFilters(false);
   };
 
@@ -94,14 +98,14 @@ export function Vocabulary() {
   }, [showFilters]);
 
   if (vocabularyLoading) return <LoadingScreen label="Loading vocabulary..." />;
-  if (vocabularyError) return <p role="alert">{vocabularyError} Reload to retry.</p>;
+  if (vocabularyError) return <ErrorState title="We couldn't load your vocabulary" message={vocabularyError} retry={() => window.location.reload()} />;
 
   return (
     <div className="stack vocabulary-page">
       <div className="vocabulary-page__header">
         <div>
           <h1>Vocabulary</h1>
-          <p className="small muted">Words collected from the places you explored.</p>
+          <p className="small muted">Words learned from your photos and the scenes you explored.</p>
         </div>
       </div>
 
@@ -114,7 +118,7 @@ export function Vocabulary() {
         <span className="vocabulary-page__view-icon" aria-hidden="true">
           <BookIcon size={22} />
         </span>
-        <span>{view === "scenes" ? "View Vocabulary List" : "View Words by Scene"}</span>
+        <span>{view === "scenes" ? "View Vocabulary List" : "View Words by Photo"}</span>
       </Button>
 
       {view === "list" ? (
@@ -172,15 +176,15 @@ export function Vocabulary() {
             </fieldset>
 
             <fieldset className="vocabulary-filter-group">
-              <legend>Topic</legend>
+              <legend>Image</legend>
               <div className="chip-row">
-                {topics.map((option) => (
+                {categories.map((option) => (
                   <button
                     key={option}
                     type="button"
-                    className={`chip${option === draftTopic ? " chip--selected" : ""}`}
-                    aria-pressed={option === draftTopic}
-                    onClick={() => setDraftTopic(option)}
+                    className={`chip${option === draftCategory ? " chip--selected" : ""}`}
+                    aria-pressed={option === draftCategory}
+                    onClick={() => setDraftCategory(option)}
                   >
                     {option}
                   </button>
@@ -206,12 +210,14 @@ export function Vocabulary() {
                 </div>
               </div>
 
-              <p className="vocabulary-card__example">{item.example}</p>
+              {item.phoneticText ? <p className="small muted" aria-label="Pronunciation">{item.phoneticText}</p> : null}
 
               <div className="vocabulary-card__footer">
                 <div className="vocabulary-card__tags">
                   <span className="pill pill--new">{item.wordClass}</span>
-                  <span className="pill pill--new">{item.topic}</span>
+                  {vocabularyCategories(item, scenes).map((imageTitle) => (
+                    <span key={imageTitle} className="pill pill--new">{imageTitle}</span>
+                  ))}
                 </div>
                 <IconButton
                   className="vocabulary-card__audio"
@@ -239,18 +245,9 @@ export function Vocabulary() {
           {scenesLoading ? <p role="status">Loading scenes...</p> : null}
           {scenesError ? <p role="alert">{scenesError} Your words are still available below.</p> : null}
           {!vocabulary.length ? <Card><p>No saved words yet. Practise a scene to collect words.</p></Card> : null}
-          {ungrouped.length ? <section className="vocabulary-scene">
-            <div className="vocabulary-scene__content">
-              <h2>Other collected words</h2>
-              <div className="vocabulary-scene__words">{ungrouped.map(item => <div key={item.id} className="vocabulary-scene__word">
-                <span><strong>{item.word}</strong><small>{item.translation}</small></span>
-                <IconButton label={`Hear ${item.word}`} onClick={() => speak(item.word, learner.languageCode)}><SpeakerIcon size={18} /></IconButton>
-              </div>)}</div>
-            </div>
-          </section> : null}
           {sceneGroups.map(({ scene, words }) => (
             <section key={scene.id} className="vocabulary-scene">
-              <SceneVisual scene={scene} className="vocabulary-scene__image" />
+              <SceneVisual scene={scene} className="vocabulary-scene__image" lazy />
               <div className="vocabulary-scene__content">
                 <div className="vocabulary-scene__heading">
                   <h2>{scene.title}</h2>

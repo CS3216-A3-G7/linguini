@@ -12,6 +12,7 @@ from app.schemas.enums import TaskKind
 from app.schemas.media import MediaAsset
 from app.schemas.sessions import Session
 from app.schemas.tasks import SessionTaskPublic, SubmitTaskAttemptRequest
+from app.schemas.translation import SceneTranslationResult
 from app.schemas.vocabulary import VocabularyItem, VocabularyTranslation
 from app.services.session_plan import UPLOAD_WORDS, build_objects, build_tasks
 
@@ -75,10 +76,16 @@ def make_plan(uploaded=True, language="es"):
 @pytest.mark.parametrize("uploaded", [False, True])
 def test_every_task_kind_is_persistable_skippable_and_private(uploaded):
     objects, tasks = make_plan(uploaded)
-    assert {t.kind for t in tasks} == set(TaskKind)
-    assert len(tasks) == len(TaskKind)
-    assert all(o.selection_status == "accepted" and o.vocabulary_item_id for o in objects)
-    assert all(t.is_skippable and t.scene_object_id in {o.id for o in objects} for t in tasks)
+    # Grammar lessons come from the learning-task generator, not the deterministic plan.
+    expected = set(TaskKind) - {TaskKind.GRAMMAR_LESSON}
+    assert {t.kind for t in tasks} == expected
+    assert len(tasks) == len(expected)
+    assert all(o.vocabulary_item_id for o in objects)
+    assert all(
+        t.is_skippable
+        and (t.scene_object_id is None or t.scene_object_id in {o.id for o in objects})
+        for t in tasks
+    )
     for task in tasks:
         public = SessionTaskPublic.from_internal(task).model_dump(mode="json")
         assert "answerKey" not in public
@@ -89,8 +96,68 @@ def test_every_task_kind_is_persistable_skippable_and_private(uploaded):
 def test_upload_placeholders_cover_supported_languages(language):
     objects, tasks = make_plan(language=language)
     assert len(objects) == 3
-    assert all("?" not in o.confirmed_label for o in objects)
-    assert tasks[0].public_content.target_text == UPLOAD_WORDS[language][1][0]
+    assert all("?" not in o.label for o in objects)
+    assert [word.target_text for word in tasks[0].public_content.words] == [
+        entry[0] for entry in UPLOAD_WORDS[language]
+    ]
+
+
+def test_vocabulary_lesson_includes_translated_attributes_and_relationships():
+    objects, tasks = make_plan()
+    _, base_tasks = make_plan()
+    # Reuse the deterministic plan inputs while adding translated scene descriptors.
+    vocabulary_task = base_tasks[0]
+    assert all(word.term_type == "object" for word in vocabulary_task.public_content.words)
+    translated_scene = SceneTranslationResult(
+        objects=[
+            {
+                "key": str(objects[0].id),
+                "source": "chair",
+                "translation": "silla",
+                "article": "la",
+                "gender": "feminine",
+            }
+        ],
+        attributes=[{"key": "object-1:color", "source": "blue", "translation": "azul"}],
+        relationships=[{"key": "relation-1", "source": "nextTo", "translation": "al lado de"}],
+    )
+    # The helper data can be read from the already-created object task.
+    words = []
+    translations = []
+    for learning_word in vocabulary_task.public_content.words:
+        words.append(
+            VocabularyItem(
+                id=learning_word.vocabulary_item_id,
+                language_code="es",
+                lemma=learning_word.target_text,
+                display_text=learning_word.target_text,
+                part_of_speech=learning_word.part_of_speech,
+            )
+        )
+        translations.append(
+            VocabularyTranslation(
+                vocabulary_item_id=learning_word.vocabulary_item_id,
+                source_language_code="en",
+                translated_text=learning_word.translation,
+            )
+        )
+    enriched = build_tasks(
+        vocabulary_task.session_id,
+        objects,
+        words,
+        translations,
+        True,
+        translated_scene,
+    )[0].public_content
+    assert enriched.words[0].target_text == "la silla"
+    descriptors = [
+        (word.target_text, word.translation, word.term_type)
+        for word in enriched.words[-2:]
+    ]
+    assert descriptors == [
+        ("azul", "blue", "attribute"),
+        ("al lado de", "next to", "relationship"),
+    ]
 
 
 def attempt(data):
@@ -99,16 +166,22 @@ def attempt(data):
 
 def test_evaluation_uses_private_keys_and_checks_modes():
     objects, tasks = make_plan()
-    pronunciation = tasks[1]
-    assert evaluate(pronunciation, attempt({"inputMode": "text", "text": "  MESA  "}))
-    assert not evaluate(pronunciation, attempt({"inputMode": "text", "text": "wrong"}))
+    vocabulary = tasks[0]
+    answers = vocabulary.answer_key.correct_option_ids
+    assert evaluate(
+        vocabulary,
+        attempt({"inputMode": "vocabularyReview", "answers": answers}),
+    )
+    wrong = answers | {next(iter(answers)): "wrong"}
+    with pytest.raises(PracticeConflictError):
+        evaluate(vocabulary, attempt({"inputMode": "vocabularyReview", "answers": wrong}))
     with pytest.raises(PracticeConflictError):
         evaluate(tasks[0], attempt({"inputMode": "text", "text": "mesa"}))
     with pytest.raises(PracticeConflictError):
-        evaluate(tasks[6], attempt({"inputMode": "objectSelection", "sceneObjectId": str(uuid4())}))
+        evaluate(tasks[5], attempt({"inputMode": "objectSelection", "sceneObjectId": str(uuid4())}))
     assert evaluate(
-        tasks[6], attempt({"inputMode": "objectSelection", "sceneObjectId": str(objects[1].id)})
+        tasks[5], attempt({"inputMode": "objectSelection", "sceneObjectId": str(objects[1].id)})
     )
-    assert evaluate(tasks[7], attempt({"inputMode": "text", "text": "I practised today."})) is None
+    assert evaluate(tasks[6], attempt({"inputMode": "text", "text": "I practised today."})) is None
     with pytest.raises(PracticeConflictError):
-        evaluate(pronunciation, attempt({"inputMode": "multipleChoice", "optionId": "mesa"}))
+        evaluate(vocabulary, attempt({"inputMode": "multipleChoice", "optionId": "mesa"}))

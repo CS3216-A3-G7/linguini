@@ -21,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from app.database import read_connection
 from app.repositories.postgres.practice import sessions
 from app.repositories.postgres.users import users
 from app.repositories.tasks import TaskConflictError, TaskNotFoundError, TaskStorageError
@@ -117,7 +118,7 @@ class PostgresTaskRepository:
         if order_by is not None:
             statement = statement.order_by(order_by)
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 return [
                     model.model_validate(dict(row))
                     for row in connection.execute(statement).mappings()

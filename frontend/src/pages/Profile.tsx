@@ -1,18 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { Button, Card } from "../components/ui";
+import { ChevronRightIcon } from "../components/icons";
 import { useAppState } from "../state/useAppState";
+import { useAuth } from "../state/Auth";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { learner, vocabulary, journal, user, activeProfile, progress, progressLoading, progressError,
-    vocabularyLoading, vocabularyError, journalLoading, journalError } = useAppState();
-  const metrics = [
-    { value: vocabularyLoading || vocabularyError ? "--" : vocabulary.length, label: "Words" },
-    { value: vocabularyLoading || vocabularyError ? "--" : vocabulary.filter(word => word.status === "mastered").length, label: "Mastered" },
-    { value: progressLoading || progressError ? "--" : progress?.scenarios.reduce((sum, scene) => sum + scene.completedTaskCount, 0) ?? 0, label: "Tasks" },
-    { value: journalLoading || journalError ? "--" : journal.length, label: "Journals" },
-  ];
-  const preference = activeProfile ? { speech: "Speaking", text: "Typing", both: "Both" }[activeProfile.preferredInputMode] : "Not set";
+  const { signOut } = useAuth();
+  const { learner, user, activeProfile, progressLoading, progressError, profileError, profileSaving, setLanguage, saveLanguageProfile, saveUser } = useAppState();
 
   return (
     <div className="stack profile-page">
@@ -20,104 +15,90 @@ export function Profile() {
         <h2>Profile</h2>
       </div>
 
-      <button
-        type="button"
-        className="profile-identity-card"
-        aria-label="Edit profile"
-        onClick={() => navigate("/profile/edit")}
-      >
+      <section className="profile-identity-card" aria-label="Profile">
         <span className="profile-avatar">
-          <img src="/pasta-assets/farfalle.png" alt="Farfalle pasta" />
+          <img src={`/pasta-assets/${localStorage.getItem("linguini-avatar") ?? "farfalle"}.png`} alt="Profile avatar" />
         </span>
-        <span className="profile-identity__details">
-          <h3>{learner.name}</h3>
+        <button type="button" className="profile-identity__details profile-name-link" onClick={() => navigate("/profile/edit")} aria-label="Change profile name and avatar">
+          <h2>{learner.name}</h2>
           <span>{user ? `Joined ${new Date(user.createdAt).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}` : ""}</span>
-          <small>Edit profile</small>
-        </span>
-
-      </button>
-
-      <div className="profile-streak-card">
-        <span>Learning XP</span>
-        <strong>{progressLoading || progressError ? "--" : progress?.xp ?? 0} XP</strong>
-      </div>
-
-      {progressLoading || vocabularyLoading || journalLoading ? <p role="status">Loading your progress...</p> : null}
-      {[progressError, vocabularyError, journalError].filter(Boolean).map((error, index) => <p key={index} role="alert">{error} Reload to retry.</p>)}
-      <section className="profile-section">
-        <div className="profile-section__heading">
-          <h2>Your progress</h2>
-
-        </div>
-        <div className="profile-progress-grid">
-          {metrics.map((metric) => (
-            <div key={metric.label} className="profile-progress-stat">
-              <strong>{metric.value}</strong>
-              <span>{metric.label}</span>
-            </div>
-          ))}
-        </div>
+          <ChevronRightIcon size={20} />
+        </button>
       </section>
+      {progressLoading ? <p role="status">Loading your profile...</p> : null}
+      {progressError ? <p role="alert">{progressError} Reload to retry.</p> : null}
+      {profileError ? <p role="alert">{profileError}</p> : null}
+
 
       <section className="profile-section">
         <h2>Learning setup</h2>
         <Card plain className="profile-settings-card">
-          <div className="profile-setting">
+          <label className="profile-setting">
             <span>
               <strong>Target language</strong>
               <small>The language you are learning</small>
             </span>
-            <b>{learner.languageFlag} {learner.language}</b>
-          </div>
+            <select disabled={profileSaving} value={learner.languageCode} onChange={event => void setLanguage(event.target.value, learner.dailyMinutes ?? 10)}>
+              <option value="es">🇪🇸 Spanish</option><option value="fr">🇫🇷 French</option>
+            </select>
+          </label>
 
-          <div className="profile-setting">
+          <label className="profile-setting">
             <span>
               <strong>Daily goal</strong>
               <small>Time set aside each day</small>
             </span>
-            <b>{learner.dailyMinutes ? `${learner.dailyMinutes} min` : "Not set"}</b>
-          </div>
+            <select disabled={profileSaving || !activeProfile} value={learner.dailyMinutes ?? 10} onChange={event => void saveLanguageProfile({ dailyGoalMinutes: Number(event.target.value) })}>
+              {[5, 10, 15, 20].map(minutes => <option key={minutes} value={minutes}>{minutes} min</option>)}
+            </select>
+          </label>
 
-          <div className="profile-setting">
+          <label className="profile-setting">
             <span>
               <strong>Practice preference</strong>
               <small>How you prefer to respond</small>
             </span>
-            <b>{preference}</b>
-          </div>
+            <select disabled={profileSaving || !activeProfile} value={activeProfile?.preferredInputMode ?? "both"} onChange={event => void saveLanguageProfile({ preferredInputMode: event.target.value as "speech" | "text" | "both" })}>
+              <option value="both">Both</option><option value="speech">Speaking</option><option value="text">Typing</option>
+            </select>
+          </label>
         </Card>
       </section>
 
       <section className="profile-section">
         <h2>Permissions</h2>
         <Card plain className="profile-settings-card">
-          <div className="profile-setting">
-            <span>
-              <strong>Microphone</strong>
-              <small>Used for pronunciation practice</small>
-            </span>
-            <b>{learner.micOn ? "On" : "Off"}</b>
-          </div>
-          <div className="profile-setting" >
+          
+          <label className="profile-setting" >
             <span>
               <strong>Camera</strong>
               <small>Used to capture scenes for learning</small>
             </span>
-            <b>{learner.cameraOn ? "On" : "Off"}</b>
-          </div>
+            <input type="checkbox" disabled={profileSaving} checked={learner.cameraOn} onChange={event => void saveUser({ cameraEnabled: event.target.checked })} />
+          </label>
         </Card>
       </section>
 
       <aside className="profile-ai-note">
         <strong>How AI helps</strong>
         <p>
-          Linguini suggests objects, vocabulary, and practice prompts from your scenes. You
-          always review the suggestions and decide what to keep, change, or remove.
+          Linguini uses AI in a few specific places: it detects the objects in your scene
+          photos, translates that vocabulary into your learning language, and writes the
+          I-Spy clues and practice tasks from the words you keep. Every suggestion is yours
+          to review — you decide what to keep, change, or remove before a lesson starts.
         </p>
       </aside>
 
-      <Button block className="profile-logout" onClick={() => navigate("/")}>
-        Back to welcome
+      <aside className="profile-ai-note">
+        <strong>Your privacy</strong>
+        <p>
+          Your photos are stored securely and are only used to generate your own lessons.
+          They are never shared with other learners and never used to train AI models.
+        </p>
+      </aside>
+
+      <Button block className="profile-logout" onClick={() => void signOut()}>
+        Log Out
       </Button>
     </div>
   );

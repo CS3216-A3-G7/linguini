@@ -9,6 +9,7 @@ type Props = {
   onMarkerClick?: (item: LanguageItem) => void;
   onLocationSelect?: (position: { x: number; y: number }) => void;
   locationLabel?: string;
+  lazy?: boolean;
 };
 
 export function ScenePhoto({
@@ -18,6 +19,7 @@ export function ScenePhoto({
   onMarkerClick,
   onLocationSelect,
   locationLabel,
+  lazy,
 }: Props) {
   const markers = items ?? scene.items;
 
@@ -48,7 +50,7 @@ export function ScenePhoto({
       tabIndex={onLocationSelect ? 0 : undefined}
       aria-label={onLocationSelect ? locationLabel ?? "Choose a location in the scene" : undefined}
     >
-      <SceneVisual scene={scene} className="scene__art" />
+      <SceneVisual scene={scene} className="scene__art" lazy={lazy} />
       {markers.map((item) => {
         const active = item.id === activeItemId;
         const custom = item.id.startsWith("custom-");
@@ -56,6 +58,8 @@ export function ScenePhoto({
           "scene__marker",
           custom ? "scene__marker--custom" : "",
           active ? "scene__marker--active" : "",
+          item.y < 12 ? "scene__marker--below" : "",
+          item.x > 86 ? "scene__marker--left" : "",
         ]
           .filter(Boolean)
           .join(" ");
@@ -71,11 +75,11 @@ export function ScenePhoto({
             aria-label={`Marker ${item.marker}: ${item.word}`}
             aria-pressed={active}
           >
-            {item.marker}
+            <span className="scene__marker-label">{item.marker}</span>
           </button>
         ) : (
           <span key={item.id} className={className} style={style} aria-hidden="true">
-            {item.marker}
+            <span className="scene__marker-label">{item.marker}</span>
           </span>
         );
       })}

@@ -19,6 +19,7 @@ def test_openapi_contains_core_workflow_routes() -> None:
         "/api/v1/tasks/{task_id}/attempts",
         "/api/v1/tasks/{task_id}/skip",
         "/api/v1/journal/today/context",
+        "/api/v1/journal/{local_date}/context",
         "/api/v1/journals/{journal_id}/revisions",
     }
 

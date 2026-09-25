@@ -1,5 +1,7 @@
 from collections.abc import Callable
+from datetime import date
 from typing import Protocol
+from uuid import UUID
 
 from app.schemas.journals import JournalDetailResponse
 
@@ -9,6 +11,10 @@ class JournalStorageError(Exception):
 
 
 class JournalConflictError(Exception):
+    pass
+
+
+class FutureJournalDateError(JournalConflictError):
     pass
 
 
@@ -64,5 +70,11 @@ def validate_entries(rows: list[JournalDetailResponse]) -> None:
 
 class JournalRepository(Protocol):
     def read(self) -> list[JournalDetailResponse]: ...
+
+    def read_for_user(self, limit: int | None = None) -> list[JournalDetailResponse]: ...
+
+    def read_one(self, journal_id: UUID) -> JournalDetailResponse | None: ...
+
+    def read_for_date(self, local_date: date) -> JournalDetailResponse | None: ...
 
     def change[T](self, action: Callable[[list[JournalDetailResponse]], T]) -> T: ...

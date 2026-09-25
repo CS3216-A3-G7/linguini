@@ -11,3 +11,13 @@ class PracticeNotFoundError(Exception):
 
 class PracticeConflictError(Exception):
     pass
+
+
+class ActiveSessionExistsError(PracticeConflictError):
+    def __init__(self, message: str, active_session_id) -> None:
+        super().__init__(message)
+        self.active_session_id = active_session_id
+
+
+class ActiveSessionLimitReachedError(PracticeConflictError):
+    pass

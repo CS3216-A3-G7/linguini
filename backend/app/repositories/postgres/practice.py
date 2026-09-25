@@ -1,5 +1,8 @@
 """Session table definitions and progress derived from normalized encounters."""
 
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from sqlalchemy import (
     Column,
     DateTime,
@@ -10,8 +13,9 @@ from sqlalchemy import (
     func,
     select,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ENUM, JSONB
 
+from app.schemas.enums import SessionFailureCode, SessionStatus
 from app.schemas.progress import StoredProgress
 
 sessions = Table(
@@ -21,16 +25,35 @@ sessions = Table(
     Column("user_id", Uuid, nullable=False),
     Column("language_profile_id", Uuid, nullable=False),
     Column("scene_media_asset_id", Uuid, nullable=False),
-    Column("status", String(20), nullable=False),
+    Column(
+        "session_status",
+        ENUM(
+            SessionStatus,
+            name="session_status",
+            schema="public",
+            values_callable=lambda statuses: [status.value for status in statuses],
+            create_type=False,
+        ),
+        key="status",
+        nullable=False,
+    ),
     Column("started_at", DateTime(timezone=True)),
     Column("completed_at", DateTime(timezone=True)),
     Column("abandoned_at", DateTime(timezone=True)),
-    Column("analysis_draft", JSONB),
-    Column("plan_version", String(100)),
-    Column("failure_code", String(100)),
+    Column("analysis_draft", JSONB(none_as_null=True)),
+    Column("session_title", String),
+    Column("session_summary", String),
+    Column(
+        "failure_code",
+        ENUM(
+            SessionFailureCode,
+            name="session_failure_code",
+            schema="public",
+            values_callable=lambda codes: [code.value for code in codes],
+            create_type=False,
+        ),
+    ),
     Column("idempotency_key", String(200)),
-    Column("created_at", DateTime(timezone=True), nullable=False),
-    Column("updated_at", DateTime(timezone=True), nullable=False),
     schema="public",
 )
 
@@ -41,30 +64,45 @@ class SessionBackedLearningRepository:
         self.user_id = user_id
         self.vocabulary = vocabulary
 
-    def get_progress(self, user_id, language_code=None):
+    def get_progress(self, user_id, language_code=None, timezone="UTC"):
         from app.repositories.postgres.language_profiles import language_profiles
         from app.repositories.postgres.scenes import preloaded_scenes
         from app.repositories.postgres.tasks import session_tasks
-        from app.repositories.postgres.vocabulary import vocabulary_encounters, vocabulary_items
-        from app.schemas.progress import ScenarioProgress
+        from app.repositories.postgres.xp import xp_events
+        from app.schemas.progress import ScenarioProgress, Streak, StreakDay
 
         if user_id != self.user_id:
             return None
         with self.engine.connect() as connection:
-            query = (
-                select(func.count())
-                .select_from(vocabulary_encounters)
-                .join(
-                    vocabulary_items,
-                    vocabulary_items.c.id == vocabulary_encounters.c.vocabulary_item_id,
-                )
-                .where(vocabulary_encounters.c.user_id == user_id)
+            activity_query = select(xp_events.c.amount, xp_events.c.occurred_at).where(
+                xp_events.c.user_id == user_id
             )
             if language_code:
-                query = query.where(
-                    func.lower(vocabulary_items.c.language_code) == language_code.lower()
+                activity_query = activity_query.join(
+                    language_profiles,
+                    language_profiles.c.id == xp_events.c.language_profile_id,
+                ).where(
+                    func.lower(language_profiles.c.target_language_code) == language_code.lower()
                 )
-            xp = connection.execute(query).scalar_one() * 5
+            activity_rows = connection.execute(activity_query).all()
+            xp = sum(row.amount for row in activity_rows)
+            learner_timezone = ZoneInfo(timezone)
+            today = datetime.now(learner_timezone).date()
+            streak_dates = [today - timedelta(days=offset) for offset in range(6, -1, -1)]
+            active_dates = {
+                local_date
+                for _, occurred_at in activity_rows
+                if (local_date := occurred_at.astimezone(learner_timezone).date()) <= today
+            }
+            current_streak = 0
+            for day in reversed(streak_dates):
+                if day not in active_dates:
+                    break
+                current_streak += 1
+            streak = Streak(
+                current=current_streak,
+                days=[StreakDay(date=day, active=day in active_dates) for day in streak_dates],
+            )
             query = (
                 select(sessions, preloaded_scenes.c.slug, preloaded_scenes.c.title)
                 .join(language_profiles, language_profiles.c.id == sessions.c.language_profile_id)
@@ -74,10 +112,9 @@ class SessionBackedLearningRepository:
                 )
                 .where(
                     sessions.c.user_id == user_id,
-                    sessions.c.plan_version.is_not(None),
                     sessions.c.status.in_(["inProgress", "completed"]),
                 )
-                .order_by(sessions.c.created_at)
+                .order_by(sessions.c.started_at)
             )
             if language_code:
                 query = query.where(
@@ -113,6 +150,7 @@ class SessionBackedLearningRepository:
                 xp=xp,
                 scenarios=list(scenarios.values()),
                 leaderboard=[],
+                streak=streak,
             )
 
     def list_vocabulary(self, user_id):

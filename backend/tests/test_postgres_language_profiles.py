@@ -85,7 +85,8 @@ def test_profile_api_switching_and_isolation(database):
         )
         assert response.status_code == 201
         french = response.json()
-        assert client.get("/api/v1/preloaded-scenes").json() == []
+        scenes = client.get("/api/v1/preloaded-scenes").json()
+        assert len(scenes) == 6 and {row["languageCode"] for row in scenes} == {"fr"}
         assert client.get("/api/v1/me/vocabulary").json()["items"] == []
         rows = client.get("/api/v1/me/language-profiles").json()
         assert len(rows) == 2 and sum(row["isActive"] for row in rows) == 1

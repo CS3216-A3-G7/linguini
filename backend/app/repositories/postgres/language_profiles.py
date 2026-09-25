@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from app.database import read_connection
 from app.repositories.language_profiles import (
     LanguageProfileConflictError,
     LanguageProfileNotFoundError,
@@ -73,7 +74,7 @@ class PostgresLanguageProfileRepository:
 
     def list_for_user(self, user_id: UUID) -> list[LanguageProfile]:
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 rows = connection.execute(
                     select(language_profiles)
                     .where(language_profiles.c.user_id == user_id)

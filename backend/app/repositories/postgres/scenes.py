@@ -18,12 +18,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.database import read_connection
 from app.repositories.postgres.media_assets import media_assets
 from app.repositories.scenes import SceneStorageError
 from app.schemas.media import MediaAsset
 from app.schemas.scenes import PreloadedSceneDetail
 
-CONTENT_FIELDS = {"items", "tasks", "rounds", "prompts"}
+CONTENT_FIELDS = {"items", "tasks", "rounds", "prompts", "relations"}
 preloaded_scenes = Table(
     "preloaded_scenes",
     MetaData(),
@@ -50,7 +51,7 @@ class PostgresSceneRepository:
 
     def list_scenes(self) -> list[PreloadedSceneDetail]:
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 rows = connection.execute(
                     select(
                         preloaded_scenes,
@@ -66,7 +67,11 @@ class PostgresSceneRepository:
                 ).mappings()
                 result = []
                 for row in rows:
-                    content = {key: row["content"][key] for key in CONTENT_FIELDS}
+                    content = {
+                        key: row["content"].get(key, []) if key == "relations"
+                        else row["content"][key]
+                        for key in CONTENT_FIELDS
+                    }
                     asset = MediaAsset.model_validate(
                         {column.name: row[f"asset_{column.name}"] for column in media_assets.c}
                     )

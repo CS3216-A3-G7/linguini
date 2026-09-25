@@ -15,6 +15,7 @@ from app.schemas.media import (
     MediaAsset,
     MediaAssetResponse,
 )
+from app.services.image_derivatives import ImageDerivatives
 from app.services.image_storage import ImageStorage, InvalidImageUpload
 from app.services.media_urls import MediaUrlError
 from app.services.users import UserService
@@ -30,15 +31,26 @@ class MediaAssetService:
         repository: MediaAssetRepository,
         users: UserService,
         storage: ImageStorage | None = None,
+        derivatives: ImageDerivatives | None = None,
     ) -> None:
         self.repository = repository
         self.users = users
         self.storage = storage
+        self.derivatives = derivatives
 
     def _storage(self) -> ImageStorage:
         if self.storage is None:
             raise MediaUrlError("Storage is not configured.")
         return self.storage
+
+    def _derivatives(self) -> ImageDerivatives:
+        if self.derivatives is None:
+            raise MediaUrlError("Image derivatives are not configured.")
+        return self.derivatives
+
+    def read_image(self, asset_id: UUID, width: int) -> bytes:
+        asset = self.get_asset(asset_id)
+        return self._derivatives().get(asset.storage_key, width)
 
     def _response(self, asset: MediaAsset) -> MediaAssetResponse:
         return MediaAssetResponse(

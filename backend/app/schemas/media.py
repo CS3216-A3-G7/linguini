@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Annotated, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from pydantic import AwareDatetime, Field, field_validator, model_validator
+from pydantic import AwareDatetime, Field, model_validator
 
-from app.schemas.base import ApiModel, EntityModel, NonEmptyText, UnitScore
-from app.schemas.enums import MediaSource, MediaType, SceneObjectSelectionStatus
+from app.schemas.base import ApiModel, EntityModel, JsonObject, NonEmptyText, UnitScore
+from app.schemas.enums import MediaSource, MediaType
 
 
 class MediaAsset(EntityModel):
@@ -63,23 +63,36 @@ class BoundingBox(ApiModel):
         return self
 
 
-class SceneObject(EntityModel):
+class AnchorPoint(ApiModel):
+    """Normalized representative point used for the scene marker."""
+
+    x: Annotated[Decimal, Field(ge=0, le=1)]
+    y: Annotated[Decimal, Field(ge=0, le=1)]
+
+
+class SceneObject(ApiModel):
+    id: UUID = Field(default_factory=uuid4)
     session_id: UUID
-    media_asset_id: UUID
-    detected_label: NonEmptyText
-    confirmed_label: Annotated[str, Field(min_length=1, max_length=200)] | None = None
-    selection_status: SceneObjectSelectionStatus = SceneObjectSelectionStatus.SUGGESTED
-    bounding_box: BoundingBox
-    confidence: UnitScore | None = None
+    label: NonEmptyText
+    bounding_box: BoundingBox | None = None
+    anchor_point: AnchorPoint | None = None
+    attributes: JsonObject | None = None
+    confidence_score: UnitScore | None = None
+    source_object_key: NonEmptyText | None = None
     vocabulary_item_id: UUID | None = None
 
+
+class SceneObjectRelation(ApiModel):
+    id: UUID = Field(default_factory=uuid4)
+    subject_scene_object_id: UUID
+    relation: Annotated[str, Field(min_length=1, max_length=200)]
+    reference_scene_object_id: UUID
+    source_relation_key: NonEmptyText | None = None
+
     @model_validator(mode="after")
-    def corrected_objects_need_a_label(self) -> SceneObject:
-        if (
-            self.selection_status is SceneObjectSelectionStatus.CORRECTED
-            and self.confirmed_label is None
-        ):
-            raise ValueError("corrected scene objects require confirmedLabel")
+    def distinct_objects(self):
+        if self.subject_scene_object_id == self.reference_scene_object_id:
+            raise ValueError("A relation must connect two different objects.")
         return self
 
 
@@ -111,35 +124,6 @@ class ConfirmMediaUploadRequest(ApiModel):
 class MediaAssetResponse(MediaAsset):
     signed_url: str
     expires_in_seconds: int = 3600
-
-
-class SceneObjectReviewItem(ApiModel):
-    scene_object_id: UUID
-    selection_status: SceneObjectSelectionStatus
-    confirmed_label: Annotated[str, Field(min_length=1, max_length=200)] | None = None
-
-    @model_validator(mode="after")
-    def validate_correction(self) -> SceneObjectReviewItem:
-        if (
-            self.selection_status is SceneObjectSelectionStatus.CORRECTED
-            and self.confirmed_label is None
-        ):
-            raise ValueError("corrected objects require confirmedLabel")
-        return self
-
-
-class ReviewSceneObjectsRequest(ApiModel):
-    objects: Annotated[list[SceneObjectReviewItem], Field(min_length=1)]
-
-    @field_validator("objects")
-    @classmethod
-    def unique_scene_objects(
-        cls, value: list[SceneObjectReviewItem]
-    ) -> list[SceneObjectReviewItem]:
-        object_ids = [item.scene_object_id for item in value]
-        if len(object_ids) != len(set(object_ids)):
-            raise ValueError("each scene object may appear only once")
-        return value
 
 
 class PreloadedScene(ApiModel):

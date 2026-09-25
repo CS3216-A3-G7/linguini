@@ -1,10 +1,6 @@
-import { useCallback } from "react";
-import { getMedia } from "../lib/api";
-import { useApiData } from "../lib/useApiData";
+import { mediaImageUrl } from "../lib/api";
 import { SceneImage } from "./SceneImage";
-export function MediaImage({ assetId, title, imageUrl }: { assetId: string; title: string; imageUrl?: string | null }) {
-  const load = useCallback(async () => imageUrl ?? (await getMedia(assetId)).signedUrl, [assetId, imageUrl]);
-  const { data, loading } = useApiData(load);
-  if (loading) return <span role="status">Loading image...</span>;
-  return <SceneImage scene={{ title, imageUrl: data }} />;
+
+export function MediaImage({ assetId, title, width = 640, lazy }: { assetId: string; title: string; width?: 320 | 640 | 1280; lazy?: boolean }) {
+  return <SceneImage scene={{ title, imageUrl: mediaImageUrl(assetId, width) }} lazy={lazy} />;
 }

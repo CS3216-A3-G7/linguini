@@ -1,5 +1,6 @@
 """SQLAlchemy metadata persistence; only trusted server code may register assets."""
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -18,7 +19,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.repositories.media_assets import MediaAssetConflictError, MediaAssetStorageError
+from app.database import read_connection
+from app.repositories.media_assets import (
+    MediaAssetConflictError,
+    MediaAssetStorageError,
+    SessionImage,
+)
 from app.schemas.media import MediaAsset
 
 media_assets = Table(
@@ -48,13 +54,94 @@ class PostgresMediaAssetRepository:
         if not asset_ids:
             return {}
         try:
-            with self.engine.connect() as connection:
+            with read_connection(self.engine) as connection:
                 rows = connection.execute(
                     select(media_assets).where(media_assets.c.id.in_(asset_ids))
                 ).mappings()
                 return {row["id"]: MediaAsset.model_validate(dict(row)) for row in rows}
         except (SQLAlchemyError, ValidationError) as exc:
             raise MediaAssetStorageError("Unable to read media assets.") from exc
+
+    def list_completed_session_images(
+        self, user_id: UUID, start: datetime, end: datetime
+    ) -> list[SessionImage]:
+        from app.repositories.postgres.practice import sessions
+
+        try:
+            with read_connection(self.engine) as connection:
+                rows = connection.execute(
+                    select(
+                        sessions.c.id.label("session_id"),
+                        sessions.c.completed_at,
+                        media_assets,
+                    )
+                    .select_from(
+                        sessions.join(
+                            media_assets,
+                            sessions.c.scene_media_asset_id == media_assets.c.id,
+                        )
+                    )
+                    .where(
+                        sessions.c.user_id == user_id,
+                        sessions.c.status == "completed",
+                        sessions.c.completed_at >= start,
+                        sessions.c.completed_at < end,
+                        media_assets.c.media_type == "image",
+                    )
+                    .order_by(sessions.c.completed_at.asc())
+                ).mappings()
+                seen: set[UUID] = set()
+                images: list[SessionImage] = []
+                asset_columns = {column.key for column in media_assets.c}
+                for row in rows:
+                    asset = MediaAsset.model_validate(
+                        {key: value for key, value in dict(row).items() if key in asset_columns}
+                    )
+                    if asset.id in seen:
+                        continue
+                    seen.add(asset.id)
+                    images.append(
+                        SessionImage(
+                            session_id=row["session_id"],
+                            completed_at=row["completed_at"],
+                            asset=asset,
+                        )
+                    )
+                return images
+        except (SQLAlchemyError, ValidationError) as exc:
+            raise MediaAssetStorageError("Unable to read session images.") from exc
+
+    def list_session_translation_suggestions(
+        self, user_id: UUID, language_profile_id: UUID, start: datetime, end: datetime
+    ) -> list[str]:
+        """Return every translated object, attribute, and relation from a day's photos."""
+        from app.repositories.postgres.practice import sessions
+
+        try:
+            with read_connection(self.engine) as connection:
+                drafts = connection.execute(
+                    select(sessions.c.analysis_draft).where(
+                        sessions.c.user_id == user_id,
+                        sessions.c.language_profile_id == language_profile_id,
+                        sessions.c.started_at >= start,
+                        sessions.c.started_at < end,
+                    ).order_by(sessions.c.started_at.asc(), sessions.c.id.asc())
+                ).scalars()
+                suggestions: list[str] = []
+                seen: set[str] = set()
+                for draft in drafts:
+                    preview = draft.get("translationPreview", {}) if isinstance(draft, dict) else {}
+                    for category in ("objects", "attributes", "relationships"):
+                        for term in preview.get(category, []):
+                            word = term.get("translation") if isinstance(term, dict) else None
+                            normalized = word.strip() if isinstance(word, str) else ""
+                            key = normalized.casefold()
+                            if normalized and key not in seen:
+                                suggestions.append(normalized)
+                                seen.add(key)
+                return suggestions
+        except SQLAlchemyError as exc:
+            raise MediaAssetStorageError("Unable to read session suggestions.") from exc
 
     def create(self, asset: MediaAsset) -> MediaAsset:
         try:

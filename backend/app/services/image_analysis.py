@@ -12,10 +12,10 @@ class PlaceholderImageExtractor:
             SceneObject(
                 id=uuid5(session_id, f"placeholder-v1:{label}"),
                 session_id=session_id,
-                media_asset_id=asset.id,
-                detected_label=label,
+                label=label,
                 bounding_box={"x": x, "y": y, "width": 0.2, "height": 0.25},
-                confidence=None,
+                confidence_score=None,
+                source_object_key=f"placeholder-v1:{label}",
             )
             for label, x, y in [("chair", 0.1, 0.5), ("table", 0.4, 0.4), ("plant", 0.7, 0.15)]
         ]

@@ -22,7 +22,11 @@ Fill these variables in `backend/.env.local`:
 | --- | --- |
 | `DATABASE_URL` | Backend PostgreSQL URI. In Supabase's Connect dialog, copy the direct or **session pooler** connection URI, replace the password, and use `sslmode=require`. Session pooler port is 5432; transaction pooler port 6543 is not supported by this backend. URL-encode special characters in credentials. |
 | `DIRECT_URL` | Prisma migration URI: direct connection or session pooler. Use a database role permitted to apply DDL. |
-| `DEMO_USER_ID` | UUID of an existing `users` row. The default example UUID must exist in your database to use `/me`. This is temporary demo identity, not authentication. |
+| `DEMO_USER_ID` | Only applies when `AUTH_MODE=demo` (local dev/tests): UUID of the `users` row used for requests without a bearer token. Must not be set in deployed environments. |
+| `AUTH_MODE` | `supabase` (default) verifies `Authorization: Bearer` tokens against the project JWKS; `demo` keeps the unauthenticated `DEMO_USER_ID` fallback. |
+| `SUPABASE_JWT_AUDIENCE` | Expected JWT `aud`; defaults to `authenticated`. |
+| `SUPABASE_JWT_SECRET` | Legacy HS256-signing projects only; asymmetric projects verify via JWKS. |
+| `AUTH_ALLOW_ANONYMOUS` | `true` accepts Supabase anonymous-sign-in tokens (`is_anonymous` claim). |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins, including the port; defaults to `http://localhost:5173`. |
 | `MEDIA_PUBLIC_BASE_URL` | Public Supabase Storage bucket URL, e.g. `https://PROJECT.supabase.co/storage/v1/object/public/media-assets`. Shared base URL for public media assets in this bucket. |
 
@@ -52,9 +56,8 @@ engine per process and disposes it at shutdown.
 
 ### Image uploads
 
-Uploads currently use the existing `DEMO_USER_ID` identity, as explicitly chosen
-for this demo. This is not authentication; replace the current-user dependency
-with verified authentication before making user-owned uploads publicly available.
+Uploads use the authenticated user's identity: requests must carry a Supabase
+`Authorization: Bearer` access token (or run with `AUTH_MODE=demo` locally).
 The server requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; uploads use the
 private `media-assets` bucket. Install backend dependencies to include Pillow.
 
@@ -175,6 +178,43 @@ create metadata only; they do not upload files. This configuration serves public
 preloaded images; use the private mode above for private buckets.
 See [Supabase public URLs](https://supabase.com/docs/reference/javascript/file-buckets-getpublicurl).
 
+#### Precomputing scene vocabulary
+
+`python -m app.scripts.precompute_preloaded_scenes` (run from `backend/`)
+analyses the six bundled scene images once per image with the configured
+scene-analysis provider, translates the detected objects into French and
+Spanish, and stores the assembled suggested words in
+`preloaded_scenes.content.items` so the Scene Analysis review screen opens
+with words already on the photo. Tasks are **not** precomputed — the runtime
+workflow still generates real tasks, rounds and prompts; the script only
+writes minimal placeholders for them.
+
+```sh
+python -m app.scripts.precompute_preloaded_scenes --dry-run --json out.json
+python -m app.scripts.precompute_preloaded_scenes --slug calle-mayor --language fr
+python -m app.scripts.precompute_preloaded_scenes --emit-migration migration.sql
+python -m app.scripts.precompute_preloaded_scenes --from-json out.json --emit-migration migration.sql
+```
+
+`--slug` and `--language` are repeatable and default to all six base scenes
+and both languages (`fr`, `es`). `--dry-run` computes and validates rows
+without writing to the database. `--json` dumps the computed rows and media
+assets for reuse; `--from-json` reloads that file (re-validating every row)
+instead of calling any AI provider, so SQL regeneration or the database write
+never re-bills the model. `--emit-migration` writes an idempotent
+`INSERT ... ON CONFLICT (slug) DO UPDATE` migration; the generated French rows
+reuse the existing `media_assets` rows, so no asset inserts are emitted.
+Environment values are read from `backend/.env.local` (or `--env-file PATH`).
+
+Required environment: `DATABASE_URL`, `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `MEDIA_STORAGE_BUCKET`, plus the AI
+configuration. Canonical key names are `AI_OPENAI_API_KEY` and
+`AI_GEMINI_API_KEY`; plain `OPENAI_API_KEY`/`GEMINI_API_KEY` are accepted as
+fallbacks. Provider and model selection use `AI_SCENE_ANALYSIS_PROVIDER` /
+`AI_SCENE_ANALYSIS_MODEL` and `AI_SCENE_TRANSLATION_PROVIDER` /
+`AI_SCENE_TRANSLATION_MODEL`. Keep keys only in `backend/.env.local`; never
+commit them.
+
 | Data | Runtime storage |
 | --- | --- |
 | Users and language profiles | `users`, `language_profiles` |
@@ -183,7 +223,6 @@ See [Supabase public URLs](https://supabase.com/docs/reference/javascript/file-b
 | Practice | `sessions`, `scene_objects` |
 | Tasks | `session_tasks`, `task_attempts`, `task_hints` |
 | Journals | `journals`, `journal_media`, `journal_revisions`, `journal_suggestions`, `journal_word_mentions` |
-| AI observability | `ai_generation_runs` |
 | Preloaded scene definitions, markers, demo questions and prompts | `preloaded_scenes` |
 
 The scene catalog is read from PostgreSQL through `PostgresSceneRepository`.
@@ -203,8 +242,9 @@ This supports fresh installations without a JSON file or an import command.
 
 The legacy `app/import_*.py` tools, JSON fixtures, and file-backed test adapters
 have been removed. Existing migrated user data stays in PostgreSQL. Fresh databases
-contain the catalog but no demo users or learner history; provision a user and set
-`DEMO_USER_ID` to that user's UUID before using the demo API.
+contain the catalog but no demo users or learner history; the API provisions a
+`users` row on the first authenticated request, or set `AUTH_MODE=demo` with
+`DEMO_USER_ID` pointing at an existing row for local development.
 
 Repository interfaces and shared errors remain in `app/repositories/`;
 SQLAlchemy implementations live in `app/repositories/postgres/`. Services depend
@@ -248,8 +288,9 @@ atomically. Prisma records the relations; SQL defines the deferred-check behavio
 
 Practice actions, evaluated attempts, encounters, and vocabulary counters commit in
 one transaction. Stable event identities and a user lock prevent duplicate credit
-under concurrent retries. A new session abandons the prior active session for the
-same profile. Task answers are private and are omitted from every public task response.
+under concurrent retries. Learners can leave up to three unfinished sessions open and
+resume an open session from the home screen. Task answers are private and are omitted
+from every public task response.
 
 Journals are unique per user/local date across all target languages. Saves append
 immutable revisions, with identical retries avoiding duplicate revisions. Media
@@ -259,34 +300,38 @@ Annotation offsets use zero-based Unicode code points with an exclusive end;
 JavaScript UTF-16 offsets must be converted for supplementary characters. Child rows
 cascade when their journal is deleted; referenced media/vocabulary remain protected.
 
-AI runs record feature, model/prompt/schema versions, pending/succeeded/failed status,
-optional nonnegative BIGINT token counts and latency, validation outcome, error code,
-and input/output references. Null metrics mean unknown. Composite foreign keys
-ensure linked sessions/journals belong to the run's user. Ownerless runs are system
-jobs and cannot reference a session or journal. Deleting a linked user/session/journal
-also deletes its runs.
-
-Trusted workers use `PostgresAiGenerationRunRepository(engine, user_id)` and
-`AiGenerationRunCompletion`. `create` starts a pending run with a stable UUID;
-matching retries return its current record. `finish` records succeeded or failed,
-with completion time defaulting to current UTC. Failure requires a nonblank error
-code. Concurrent completion serializes, identical retries succeed, and conflicting
-results are rejected. Identity/version fields and completed results are immutable.
-`get` and `list_runs` are owner-scoped; `user_id=None` means system runs only.
-Deduplicating run records does not provide a provider-job lease. Store storage
-identifiers in input/output references rather than raw prompts.
-
 Tables use UUID identities and timezone-aware timestamps. Migrations define foreign
 keys, checks, update triggers, RLS, and revoked browser-role grants. All access is
 through backend repositories; the frontend must not query these tables directly.
 
+### AI observability
+
+AI calls can be traced to Langfuse. Tracing is off by default and strictly
+best-effort: without keys the app runs a no-op tracer, and a tracing failure
+never affects a learner request or blocks the request path (export is
+asynchronous). Today exactly one operation is instrumented — I-Spy
+description evaluation (`ispy-description-evaluation`), recorded as a
+generation with provider/model dimensions, validation outcome, latency and
+error codes.
+
+Canonical variables (the Langfuse-native `LANGFUSE_*` names are accepted as
+aliases when the canonical one is unset): `AI_OBSERVABILITY_ENABLED`,
+`AI_OBSERVABILITY_BASE_URL`, `AI_OBSERVABILITY_PUBLIC_KEY`,
+`AI_OBSERVABILITY_SECRET_KEY`, `AI_OBSERVABILITY_ENVIRONMENT`, and
+`AI_OBSERVABILITY_CAPTURE_CONTENT`.
+
+Content capture is opt-in. With `AI_OBSERVABILITY_CAPTURE_CONTENT=false`
+(the default) no learner text or model output leaves the process: the
+client is constructed with a mask that redacts any input/output payload.
+Image bytes, base64, keys, signed URLs, raw learner text and full model
+responses are never traced by default; observations carry only scalar
+dimensions and caller-supplied metadata.
+
 ## Remaining integration work
 
-Authentication, real image analysis, AI generation and speech evaluation
+Real image analysis, AI generation and speech evaluation
 are not implemented. Uploaded images use validated storage uploads and deterministic
-placeholder objects. AI runs are populated only when backend workers call the
-repository; ordinary frontend use does not fabricate run records. Vocabulary
-"Move" is still local frontend state. Session learning credit comes from persisted
+placeholder objects. Vocabulary "Move" is still local frontend state. Session learning credit comes from persisted
 vocabulary encounters; analysis and skipped tasks award none. Daily vocabulary, home aggregation, and other unfinished
 routes return an explicit 501. Journal eligible-photo/learned-word recommendations
 and automatic annotations remain unpopulated. Creating tables does not implement

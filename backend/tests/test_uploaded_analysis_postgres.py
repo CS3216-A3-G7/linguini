@@ -64,9 +64,11 @@ def test_analysis_persistence_concurrency_and_review(database):
         accepted = [o["id"] for o in detail["sceneObjects"] if o["id"] != oid]
         saved = client.put(f"/api/v1/sessions/{sid}/review", json={"acceptedObjectIds": accepted})
         assert saved.status_code == 200, saved.text
-        retry = client.post(f"/api/v1/sessions/{sid}/analyze").json()
-        assert {o["id"] for o in retry["sceneObjects"]} == set(accepted)
-        assert retry["tasks"]
+        retry = client.post(f"/api/v1/sessions/{sid}/analyze")
+        assert retry.status_code == 409
+        persisted = client.get(f"/api/v1/sessions/{sid}").json()
+        assert {o["id"] for o in persisted["sceneObjects"]} == set(accepted)
+        assert persisted["tasks"]
         assert client.post(f"/api/v1/sessions/{sid}/abandon").status_code == 200
         assert client.post(f"/api/v1/sessions/{sid}/analyze").status_code == 409
         assert UUID(sid)

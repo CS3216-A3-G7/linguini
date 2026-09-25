@@ -6,7 +6,12 @@ import pytest
 
 from app.schemas.media import MediaAsset
 from app.schemas.scenes import PreloadedSceneDetail
-from app.services.media_urls import MediaUrlError, PrivateMediaUrls, public_media_url
+from app.services.media_urls import (
+    MediaUrlError,
+    PrivateMediaUrls,
+    SignedUrlCache,
+    public_media_url,
+)
 from app.services.scenes import SceneService
 
 BASE = "https://project.supabase.co/storage/v1/object/public/scenes"
@@ -83,16 +88,14 @@ def test_list_and_detail_use_current_media_key(private):
     )
     repository = MagicMock()
     repository.list_scenes.return_value = [scene]
-    media = MagicMock()
-    media.get_by_ids.return_value = {asset.id: asset.model_copy(update={"storage_key": "new.jpg"})}
     signer = MagicMock() if private else None
-    expected_url = BASE + "/new.jpg"
+    expected_url = BASE + "/old.jpg"
     if signer:
         expected_url = (
-            "https://project.supabase.co/storage/v1/object/sign/scenes/new.jpg?token=test"
+            "https://project.supabase.co/storage/v1/object/sign/scenes/old.jpg?token=test"
         )
-        signer.resolve.return_value = {"new.jpg": expected_url}
-    service = SceneService(repository, media, BASE, signer)
+        signer.resolve.return_value = {"old.jpg": expected_url}
+    service = SceneService(repository, BASE, signer)
     summary = service.list_scenes("es")[0]
     detail = service.get_scene("cafe", "es")
     assert summary.model_dump(by_alias=True)["imageUrl"] == expected_url
@@ -100,7 +103,7 @@ def test_list_and_detail_use_current_media_key(private):
     assert detail.items == scene.items
     assert scene.image_url is None
     if signer:
-        signer.resolve.assert_called_with(["new.jpg"])
+        signer.resolve.assert_called_with(["old.jpg"])
 
 
 def test_signing_batches_paths_and_keeps_credentials_on_server(monkeypatch):
@@ -138,6 +141,41 @@ def test_signing_batches_paths_and_keeps_credentials_on_server(monkeypatch):
     assert "server-secret" not in str(result)
 
 
+def test_signed_url_cache_serves_repeat_resolves(monkeypatch):
+    import httpx
+
+    calls = []
+
+    def post(url, **kwargs):
+        calls.append((url, kwargs))
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", url),
+            json=[
+                {
+                    "path": "preloaded/scenes/bedroom.jpg",
+                    "error": None,
+                    "signedURL": (
+                        "/object/sign/media-assets/preloaded/scenes/bedroom.jpg?token=test"
+                    ),
+                }
+            ],
+        )
+
+    monkeypatch.setattr(httpx, "post", post)
+    resolver = PrivateMediaUrls(
+        "https://project.supabase.co",
+        "media-assets",
+        "server-secret",
+        cache=SignedUrlCache(),
+    )
+    first = resolver.resolve(["preloaded/scenes/bedroom.jpg"])
+    second = resolver.resolve(["preloaded/scenes/bedroom.jpg"])
+    assert first == second
+    assert second["preloaded/scenes/bedroom.jpg"].endswith("bedroom.jpg?token=test")
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize("payload", [[], {}, [{"path": "photo.jpg", "error": "missing"}]])
 def test_signing_failure_does_not_fall_back_to_public_url(monkeypatch, payload):
     import httpx
@@ -160,3 +198,10 @@ def test_signing_failure_does_not_fall_back_to_public_url(monkeypatch, payload):
 def test_signing_requires_server_credentials():
     with pytest.raises(MediaUrlError, match="not configured"):
         PrivateMediaUrls("https://project.supabase.co", "media-assets", "").resolve(["photo.jpg"])
+
+
+def test_new_supabase_secret_is_not_sent_as_bearer():
+    resolver = PrivateMediaUrls(
+        "https://project.supabase.co", "media-assets", "sb_secret_test"
+    )
+    assert resolver._headers() == {"apikey": "sb_secret_test"}

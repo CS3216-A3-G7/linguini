@@ -2,13 +2,16 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui";
 import { BookIcon } from "../components/icons";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { ErrorState } from "../components/ErrorState";
 import { useAppState } from "../state/useAppState";
+import { useVocabularyQuery } from "../state/queries";
 
 export function Progress() {
   const navigate = useNavigate();
-  const { vocabulary, progress, vocabularyLoading, vocabularyError, progressLoading, progressError } = useAppState();
+  const { progress, progressLoading, progressError } = useAppState();
+  const { vocabulary, vocabularyLoading, vocabularyError } = useVocabularyQuery();
   if (vocabularyLoading || progressLoading) return <LoadingScreen label="Loading progress..." />;
-  if (vocabularyError || progressError || !progress) return <p role="alert">{vocabularyError ?? progressError ?? "Progress unavailable."} Reload to retry.</p>;
+  if (vocabularyError || progressError || !progress) return <ErrorState title="We couldn't load your progress" message={vocabularyError ?? progressError ?? "Your progress isn't available just now."} retry={() => window.location.reload()} />;
   const snapshot = { words: vocabulary.length, mastered: vocabulary.filter(item => item.status === "mastered").length,
     scenes: new Set(progress.scenarios.map(item => item.sceneId || item.mediaAssetId)).size };
 

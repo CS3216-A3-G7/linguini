@@ -18,10 +18,11 @@ from app.schemas.enums import (
 )
 
 
-class VocabularyIntroductionContent(ApiModel):
-    kind: Literal["vocabularyIntroduction"] = "vocabularyIntroduction"
-    title: NonEmptyText
-    vocabulary_item_id: UUID
+class VocabularyLearningWord(ApiModel):
+    learning_key: str | None = None
+    term_type: Literal["object", "attribute", "relationship"] = "object"
+    vocabulary_item_id: UUID | None = None
+    scene_object_id: UUID | None = None
     target_text: NonEmptyText
     translation: NonEmptyText
     part_of_speech: PartOfSpeech
@@ -32,14 +33,74 @@ class VocabularyIntroductionContent(ApiModel):
     example_sentence: str | None = None
 
 
-class PronunciationPracticeContent(ApiModel):
-    kind: Literal["pronunciationPractice"] = "pronunciationPractice"
-    vocabulary_item_id: UUID
+class VocabularyChoice(ApiModel):
+    option_id: NonEmptyText
+    label: NonEmptyText
+
+
+class VocabularyQuestion(ApiModel):
+    question_id: NonEmptyText
     prompt: NonEmptyText
-    target_text: NonEmptyText
-    phonetic_text: str | None = None
-    reference_audio_asset_id: UUID | None = None
-    allow_text_fallback: bool = True
+    options: Annotated[list[VocabularyChoice], Field(min_length=2)]
+    # Vocabulary recognition is a low-stakes learning interaction, so clients
+    # may evaluate its choices immediately without a network round trip.
+    correct_option_id: NonEmptyText | None = None
+
+
+class VocabularyIntroductionContent(ApiModel):
+    kind: Literal["vocabularyIntroduction"] = "vocabularyIntroduction"
+    title: NonEmptyText
+    words: list[VocabularyLearningWord] = Field(default_factory=list)
+    questions: list[VocabularyQuestion] = Field(default_factory=list)
+    allow_typing_practice: bool = True
+    # Kept temporarily so active sessions created before the grouped lesson remain readable.
+    vocabulary_item_id: UUID | None = None
+    target_text: str | None = None
+    translation: str | None = None
+    part_of_speech: PartOfSpeech | None = None
+    gender: str | None = None
+    example_sentence: str | None = None
+
+    @model_validator(mode="after")
+    def validate_words(self) -> VocabularyIntroductionContent:
+        if self.words and self.questions:
+            return self
+        legacy_fields = (
+            self.vocabulary_item_id,
+            self.target_text,
+            self.translation,
+            self.part_of_speech,
+        )
+        if all(legacy_fields):
+            return self
+        raise ValueError("vocabulary introduction requires grouped words or legacy word fields")
+
+
+class GrammarLessonQuestion(ApiModel):
+    question_id: NonEmptyText
+    prompt: NonEmptyText
+    interaction_type: Literal["multipleChoice", "sentenceBuilding"] = "multipleChoice"
+    options: list[VocabularyChoice] = Field(default_factory=list)
+    token_bank: list[NonEmptyText] = Field(default_factory=list)
+    translation: str | None = None
+
+    @model_validator(mode="after")
+    def validate_interaction(self) -> GrammarLessonQuestion:
+        if self.interaction_type == "multipleChoice" and len(self.options) < 2:
+            raise ValueError("multiple-choice questions require answer options")
+        if self.interaction_type == "sentenceBuilding" and not self.token_bank:
+            raise ValueError("sentence-building questions require a token bank")
+        if self.interaction_type == "sentenceBuilding" and self.options:
+            raise ValueError("sentence-building questions cannot have answer options")
+        return self
+
+
+class GrammarLessonContent(ApiModel):
+    kind: Literal["grammarLesson"] = "grammarLesson"
+    focus: NonEmptyText
+    title: NonEmptyText
+    explanation: NonEmptyText
+    questions: Annotated[list[GrammarLessonQuestion], Field(min_length=1)]
 
 
 class GrammarExplanationContent(ApiModel):
@@ -103,7 +164,7 @@ class ReflectionContent(ApiModel):
 
 type TaskPublicContent = Annotated[
     VocabularyIntroductionContent
-    | PronunciationPracticeContent
+    | GrammarLessonContent
     | GrammarExplanationContent
     | GrammarPracticeContent
     | SyntaxExplanationContent
@@ -123,6 +184,9 @@ class TaskAnswerKey(ApiModel):
     expected_token_order: list[NonEmptyText] = Field(default_factory=list)
     reference_text: str | None = None
     evaluation_notes: str | None = None
+    correct_option_ids: dict[str, str] = Field(default_factory=dict)
+    accepted_text_answers_by_vocabulary_id: dict[str, list[str]] = Field(default_factory=dict)
+    scene_description_context: JsonObject | None = None
 
 
 class SessionTask(EntityModel):
@@ -149,7 +213,10 @@ class SessionTask(EntityModel):
             raise ValueError("publicContent.kind must match task kind")
         if self.kind is TaskKind.ISPY_ROUND and self.phase is not TaskPhase.ISPY:
             raise ValueError("ispyRound tasks must belong to the ispy phase")
-        if self.kind is not TaskKind.ISPY_ROUND and self.phase is TaskPhase.ISPY:
+        if (
+            self.kind not in {TaskKind.ISPY_ROUND, TaskKind.REFLECTION}
+            and self.phase is TaskPhase.ISPY
+        ):
             raise ValueError("only ispyRound tasks may belong to the ispy phase")
         if self.status is TaskStatus.COMPLETED and self.completed_at is None:
             raise ValueError("completed tasks require completedAt")
@@ -234,11 +301,36 @@ class SubmitMultipleChoiceAttemptRequest(ApiModel):
     idempotency_key: Annotated[str, Field(min_length=8, max_length=200)] | None = None
 
 
+class SubmitVocabularyReviewAttemptRequest(ApiModel):
+    input_mode: Literal["vocabularyReview"] = "vocabularyReview"
+    answers: dict[str, NonEmptyText]
+    typed_answers: dict[str, str] = Field(default_factory=dict)
+    idempotency_key: Annotated[str, Field(min_length=8, max_length=200)] | None = None
+
+    @model_validator(mode="after")
+    def validate_answers(self) -> SubmitVocabularyReviewAttemptRequest:
+        if not self.answers:
+            raise ValueError("answers cannot be empty")
+        return self
+
+
+class CheckVocabularyAnswerRequest(ApiModel):
+    question_id: NonEmptyText
+    option_id: NonEmptyText
+
+
+class CheckVocabularyAnswerResponse(ApiModel):
+    question_id: NonEmptyText
+    is_correct: bool
+    correct_option_id: NonEmptyText
+
+
 type SubmitTaskAttemptRequest = Annotated[
     SubmitTextAttemptRequest
     | SubmitSpeechAttemptRequest
     | SubmitObjectSelectionAttemptRequest
-    | SubmitMultipleChoiceAttemptRequest,
+    | SubmitMultipleChoiceAttemptRequest
+    | SubmitVocabularyReviewAttemptRequest,
     Field(discriminator="input_mode"),
 ]
 

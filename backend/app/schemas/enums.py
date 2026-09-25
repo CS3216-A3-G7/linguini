@@ -1,5 +1,6 @@
 """Shared API and domain enum values."""
 
+from collections.abc import Mapping
 from enum import StrEnum
 
 
@@ -30,11 +31,34 @@ class MediaSource(StrEnum):
     GENERATED = "generated"
 
 
-class SceneObjectSelectionStatus(StrEnum):
-    SUGGESTED = "suggested"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
-    CORRECTED = "corrected"
+class SceneRelationType(StrEnum):
+    LEFT_OF = "left_of"
+    RIGHT_OF = "right_of"
+    ABOVE = "above"
+    BELOW = "below"
+    ON = "on"
+    UNDER = "under"
+    INSIDE = "inside"
+    IN_FRONT_OF = "in_front_of"
+    BEHIND = "behind"
+    NEXT_TO = "next_to"
+    NEAR = "near"
+
+
+SYMMETRIC_SCENE_RELATION_TYPES: frozenset[SceneRelationType] = frozenset(
+    {SceneRelationType.NEXT_TO, SceneRelationType.NEAR}
+)
+
+INVERSE_SCENE_RELATION_TYPES: Mapping[SceneRelationType, SceneRelationType] = {
+    SceneRelationType.LEFT_OF: SceneRelationType.RIGHT_OF,
+    SceneRelationType.RIGHT_OF: SceneRelationType.LEFT_OF,
+    SceneRelationType.ABOVE: SceneRelationType.BELOW,
+    SceneRelationType.BELOW: SceneRelationType.ABOVE,
+    SceneRelationType.ON: SceneRelationType.UNDER,
+    SceneRelationType.UNDER: SceneRelationType.ON,
+    SceneRelationType.IN_FRONT_OF: SceneRelationType.BEHIND,
+    SceneRelationType.BEHIND: SceneRelationType.IN_FRONT_OF,
+}
 
 
 class PartOfSpeech(StrEnum):
@@ -54,7 +78,6 @@ class PartOfSpeech(StrEnum):
 class VocabularyLearningStatus(StrEnum):
     NEW = "new"
     LEARNING = "learning"
-    FAMILIAR = "familiar"
     MASTERED = "mastered"
 
 
@@ -76,10 +99,20 @@ class SessionStatus(StrEnum):
     ANALYZING_SCENE = "analyzingScene"
     AWAITING_OBJECT_REVIEW = "awaitingObjectReview"
     GENERATING_TASKS = "generatingTasks"
+    READY = "ready"
     IN_PROGRESS = "inProgress"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
     FAILED = "failed"
+
+
+class SessionFailureCode(StrEnum):
+    IMAGE_UPLOAD_FAILED = "imageUploadFailed"
+    SCENE_ANALYSIS_FAILED = "sceneAnalysisFailed"
+    IMAGE_MODERATION_FAILED = "imageModerationFailed"
+    NO_VALID_OBJECTS = "noValidObjects"
+    VOCABULARY_MAPPING_FAILED = "vocabularyMappingFailed"
+    TASK_GENERATION_FAILED = "taskGenerationFailed"
 
 
 class TaskPhase(StrEnum):
@@ -89,7 +122,7 @@ class TaskPhase(StrEnum):
 
 class TaskKind(StrEnum):
     VOCABULARY_INTRODUCTION = "vocabularyIntroduction"
-    PRONUNCIATION_PRACTICE = "pronunciationPractice"
+    GRAMMAR_LESSON = "grammarLesson"
     GRAMMAR_EXPLANATION = "grammarExplanation"
     GRAMMAR_PRACTICE = "grammarPractice"
     SYNTAX_EXPLANATION = "syntaxExplanation"
@@ -110,6 +143,7 @@ class AttemptInputMode(StrEnum):
     TEXT = "text"
     OBJECT_SELECTION = "objectSelection"
     MULTIPLE_CHOICE = "multipleChoice"
+    VOCABULARY_REVIEW = "vocabularyReview"
 
 
 class ISpyInteractionMode(StrEnum):
@@ -150,19 +184,10 @@ class WordMatchMethod(StrEnum):
     USER_CONFIRMED = "userConfirmed"
 
 
-class AiFeature(StrEnum):
-    SCENE_ANALYSIS = "sceneAnalysis"
-    VOCABULARY_GENERATION = "vocabularyGeneration"
-    SESSION_PLAN_GENERATION = "sessionPlanGeneration"
-    CLUE_GENERATION = "clueGeneration"
-    ATTEMPT_EVALUATION = "attemptEvaluation"
-    SPEECH_TRANSCRIPTION = "speechTranscription"
-    PRONUNCIATION_EVALUATION = "pronunciationEvaluation"
-    JOURNAL_FEEDBACK = "journalFeedback"
-    JOURNAL_WORD_MATCHING = "journalWordMatching"
-
-
-class AiRunStatus(StrEnum):
-    PENDING = "pending"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
+class XpEventType(StrEnum):
+    TASK_COMPLETED = "taskCompleted"
+    ISPY_CORRECT = "ispyCorrect"
+    SESSION_COMPLETED = "sessionCompleted"
+    PERFECT_SESSION = "perfectSession"
+    JOURNAL_ENTRY = "journalEntry"
+    LEGACY_BACKFILL = "legacyBackfill"
