@@ -111,7 +111,7 @@ Free
 
 Do **not** choose "Paid (with a free trial or plan)" until billing works and a person can actually buy Plus. If the form has a status or notes field, write "Free. Paid plans coming later." The alternate first comment says the same thing. See must-fix 1 in [plan.md](plan.md#must-fix-before-launch-day-ranked).
 
-> **Open decision: pricing.** The preview draft says: select the truthful state of the *available* product at posting time; the website advertises Free/Plus, but a working Plus checkout and trial have not been verified. The landing page shows Plus at US$6.99/mo or $59.88/yr with a 7-day trial. The [business model](../business-model/README.md) proposes $7.99/mo or $49.99/yr with a 7-day trial, and Founding Plus at $34.99/yr for the first 300 paying members. None of these can be bought today. Do not advertise a trial or Plus features until checkout and entitlements work end to end.
+> **Open decision: pricing.** The preview draft says: select the truthful state of the *available* product at posting time; the website advertises Free/Plus, but a working Plus checkout and trial have not been verified. The landing page and the [business model](../business-model/README.md) show Plus at US$9.99/mo or $59.99/yr with a 7-day trial, and Founding Plus at $39.99/yr for the first 300 paying members. None of these can be bought today. Do not advertise a trial or Plus features until checkout and entitlements work end to end.
 
 ### Links
 

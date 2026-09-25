@@ -213,11 +213,11 @@ def plus_user_cost(pipeline: str) -> float:
 
 # --- Pricing options ---------------------------------------------------------------
 OPTIONS = {
-    "A · Current landing ($6.99 / $59.88)": (6.99, 59.88),
-    "B · Recommended ($7.99 / $49.99)": (7.99, 49.99),
-    "Founding Plus ($34.99/yr, capped cohort)": (None, 34.99),
+    "A · Before the model cost rise ($7.99 / $49.99)": (7.99, 49.99),
+    "B · Recommended ($9.99 / $59.99)": (9.99, 59.99),
+    "Founding Plus ($39.99/yr, capped cohort)": (None, 39.99),
 }
-RECOMMENDED = "B · Recommended ($7.99 / $49.99)"
+RECOMMENDED = "B · Recommended ($9.99 / $59.99)"
 ANNUAL_SHARE = 0.59  # RevenueCat SOSA 2026, education plan mix
 
 

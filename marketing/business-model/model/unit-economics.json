@@ -115,23 +115,23 @@
     }
   },
   "options": {
-    "A \u00b7 Current landing ($6.99 / $59.88)": {
-      "monthly": 6.99,
-      "annual": 59.88,
-      "net_web": 5.31,
-      "net_store": 4.94
-    },
-    "B \u00b7 Recommended ($7.99 / $49.99)": {
+    "A \u00b7 Before the model cost rise ($7.99 / $49.99)": {
       "monthly": 7.99,
       "annual": 49.99,
       "net_web": 5.24,
       "net_store": 4.87
     },
-    "Founding Plus ($34.99/yr, capped cohort)": {
+    "B \u00b7 Recommended ($9.99 / $59.99)": {
+      "monthly": 9.99,
+      "annual": 59.99,
+      "net_web": 6.49,
+      "net_store": 5.99
+    },
+    "Founding Plus ($39.99/yr, capped cohort)": {
       "monthly": null,
-      "annual": 34.99,
-      "net_web": 2.74,
-      "net_store": 2.48
+      "annual": 39.99,
+      "net_web": 3.14,
+      "net_store": 2.83
     }
   },
   "scenarios": {
@@ -140,34 +140,34 @@
         "mau": 300,
         "conversion": 0.023,
         "payers": 7,
-        "net_revenue": 36.16,
+        "net_revenue": 44.79,
         "free_ai_cost": 52.75,
         "plus_ai_cost": 7.09,
         "fixed": 52,
         "total_cost": 111.84,
-        "contribution": -75.68
+        "contribution": -67.05
       },
       "Launch year": {
         "mau": 5000,
         "conversion": 0.023,
         "payers": 115,
-        "net_revenue": 602.65,
+        "net_revenue": 746.55,
         "free_ai_cost": 879.15,
         "plus_ai_cost": 118.22,
         "fixed": 52,
         "total_cost": 1049.37,
-        "contribution": -446.72
+        "contribution": -302.82
       },
       "Traction": {
         "mau": 50000,
         "conversion": 0.04,
         "payers": 2000,
-        "net_revenue": 10480.81,
+        "net_revenue": 12983.47,
         "free_ai_cost": 8638.49,
         "plus_ai_cost": 2056.02,
         "fixed": 70,
         "total_cost": 10764.51,
-        "contribution": -283.7
+        "contribution": 2218.96
       }
     },
     "fallback": {
@@ -175,34 +175,34 @@
         "mau": 300,
         "conversion": 0.023,
         "payers": 7,
-        "net_revenue": 36.16,
+        "net_revenue": 44.79,
         "free_ai_cost": 47.44,
         "plus_ai_cost": 6.46,
         "fixed": 52,
         "total_cost": 105.9,
-        "contribution": -69.74
+        "contribution": -61.1
       },
       "Launch year": {
         "mau": 5000,
         "conversion": 0.023,
         "payers": 115,
-        "net_revenue": 602.65,
+        "net_revenue": 746.55,
         "free_ai_cost": 790.65,
         "plus_ai_cost": 107.63,
         "fixed": 52,
         "total_cost": 950.27,
-        "contribution": -347.63
+        "contribution": -203.72
       },
       "Traction": {
         "mau": 50000,
         "conversion": 0.04,
         "payers": 2000,
-        "net_revenue": 10480.81,
+        "net_revenue": 12983.47,
         "free_ai_cost": 7768.91,
         "plus_ai_cost": 1871.74,
         "fixed": 70,
         "total_cost": 9710.65,
-        "contribution": 770.16
+        "contribution": 3272.82
       }
     },
     "budget": {
@@ -210,49 +210,49 @@
         "mau": 300,
         "conversion": 0.023,
         "payers": 7,
-        "net_revenue": 36.16,
+        "net_revenue": 44.79,
         "free_ai_cost": 22.05,
         "plus_ai_cost": 3.49,
         "fixed": 52,
         "total_cost": 77.54,
-        "contribution": -41.38
+        "contribution": -32.75
       },
       "Launch year": {
         "mau": 5000,
         "conversion": 0.023,
         "payers": 115,
-        "net_revenue": 602.65,
+        "net_revenue": 746.55,
         "free_ai_cost": 367.42,
         "plus_ai_cost": 58.23,
         "fixed": 52,
         "total_cost": 477.65,
-        "contribution": 125.0
+        "contribution": 268.9
       },
       "Traction": {
         "mau": 50000,
         "conversion": 0.04,
         "payers": 2000,
-        "net_revenue": 10480.81,
+        "net_revenue": 12983.47,
         "free_ai_cost": 3610.25,
         "plus_ai_cost": 1012.75,
         "fixed": 70,
         "total_cost": 4693.0,
-        "contribution": 5787.81
+        "contribution": 8290.47
       }
     }
   },
   "breakeven_conversion": {
     "chosen": {
-      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0403,
-      "B \u00b7 Recommended ($7.99 / $49.99)": 0.041
+      "A \u00b7 Before the model cost rise ($7.99 / $49.99)": 0.041,
+      "B \u00b7 Recommended ($9.99 / $59.99)": 0.0319
     },
     "fallback": {
-      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0357,
-      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0362
+      "A \u00b7 Before the model cost rise ($7.99 / $49.99)": 0.0362,
+      "B \u00b7 Recommended ($9.99 / $59.99)": 0.0283
     },
     "budget": {
-      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0154,
-      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0156
+      "A \u00b7 Before the model cost rise ($7.99 / $49.99)": 0.0156,
+      "B \u00b7 Recommended ($9.99 / $59.99)": 0.0124
     }
   },
   "curated_session": 0.00172,

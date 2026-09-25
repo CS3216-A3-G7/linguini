@@ -64,8 +64,8 @@ const learnerCosts = {
 const streams = {
   columns: [{ label: "Stream" }, { label: "Price" }, { label: "When" }, { label: "Why" }],
   rows: [
-    ["Plus", "$49.99 a year or $7.99 a month", "At launch", "The core. Sold on the web, so no app store takes a cut."],
-    ["Founding Plus", "$34.99 a year, first 300 members", "Launch, until 300 members or 31 Dec 2026", "Early revenue from people who will tell us what to build. Each nets about $2.74 a month against $1.03 in AI."],
+    ["Plus", "$59.99 a year or $9.99 a month", "At launch", "The core. Sold on the web, so no app store takes a cut."],
+    ["Founding Plus", "$39.99 a year, first 300 members", "Launch, until 300 members or 31 Dec 2026", "Early revenue from people who will tell us what to build. Each nets about $3.14 a month against $1.03 in AI."],
     ["Family plan", "About $79.99 a year for up to 4", "Once retention is proven", "Every member uses AI, so we price per seat instead of copying Duolingo’s $119.99 for 6."],
     ["Classroom licences", "Not set", "Year two", "A teacher sets a daily scene and the class journals about it."],
     ["Printed journal", "Needs a print quote", "Once PDF export ships", "A one-off purchase that fits the idea of keeping the day."],
@@ -75,7 +75,7 @@ const streams = {
 const stages = {
   columns: [{ label: "Stage" }, { label: "The question" }, { label: "What we measure" }, { label: "Money coming in" }],
   rows: [
-    ["Now, in beta", "Does it stick?", "New learners who take a second photo lesson within a week", "None. The beta costs us about $75 a month, which we treat as research."],
+    ["Now, in beta", "Does it stick?", "New learners who take a second photo lesson within a week", "None. The beta costs us about $67 a month, which we treat as research."],
     ["Launch year", "Will people pay?", "300 Founding Plus members", "Plus and Founding Plus"],
     ["After that", "Does it scale?", "4% of monthly learners paying", "Plus, then family plans, classrooms and printed journals"],
   ],
@@ -86,9 +86,9 @@ export function BusinessModel() {
     <div className={`${s.body} ${s.document}`}>
       <InView as="p" className={story.lede}>
         Free gives every learner <mark>one photo lesson and one journal page a day</mark>. Plus is{" "}
-        <mark>$49.99 a year</mark> for anyone who wants more. Each photo lesson costs us about <mark>2¢ in AI</mark>, so
-        the free tier pays for itself once enough people upgrade: <mark>about 4% of learners</mark> on the models we chose,
-        or under 2% once cheaper models pass our tests.
+        <mark>$59.99 a year</mark> for anyone who wants more. Each photo lesson costs us about <mark>2¢ in AI</mark>, so
+        the free tier pays for itself once enough people upgrade: <mark>just over 3% of learners</mark> on the models we chose,
+        or about 1% once cheaper models pass our tests.
       </InView>
 
       <h2 id="at-a-glance">The model at a glance</h2>
@@ -117,7 +117,7 @@ export function BusinessModel() {
         and feedback on your speaking.
       </p>
       <p>
-        Founding is Plus for our first 300 members, at $34.99 a year for as long as they stay. We give up some margin on
+        Founding is Plus for our first 300 members, at $39.99 a year for as long as they stay. We give up some margin on
         them. In return we get early payers who tell us what to build, and in the first year that is worth more than the
         margin.
       </p>
@@ -125,14 +125,19 @@ export function BusinessModel() {
       <h2 id="price">How we set the price</h2>
       <p>
         There are three usual ways to price something: from what it costs you, from what competitors charge, and from
-        what it is worth to the customer. We checked $49.99 all three ways.
+        what it is worth to the customer. We checked $59.99 all three ways.
+      </p>
+      <p>
+        We first planned $49.99. Then the models that passed our tests turned out to cost more than the ones we started
+        with: a lesson went from about 1.2¢ to 2¢. At $49.99 the free tier would only pay for itself if more than 4% of
+        learners paid, nearly twice the category median. At $59.99 a year, or $9.99 a month, that falls to just over 3%.
       </p>
       <PriceStory />
 
       <h3>Against the competition</h3>
       <CompareApps />
       <p>
-        CapWords is cheaper, but it stops at flashcards. The course apps do more teaching and charge nearly twice as much. We sit
+        CapWords is cheaper, but it stops at flashcards. The course apps do more teaching and charge $84 a year or more. We sit
         between them, so our price does too. From Duolingo we took the shape of the free tier: keep it genuinely useful,
         limit how much you can do, and save the expensive AI for paid plans.
       </p>
@@ -156,7 +161,7 @@ export function BusinessModel() {
       </p>
       <DataTable {...learnerCosts} caption="AI and storage per learner per month, at OpenRouter prices. The cheapest alternatives are not ready yet: they score lower in our tests." />
       <p>
-        After Stripe’s fees, a Plus learner brings in about $5.24 a month. The typical payer is comfortably profitable,
+        After Stripe’s fees, a Plus learner brings in about $6.49 a month. The typical payer is comfortably profitable,
         and so is the heavy one. We only lose money on someone who uses all ten lessons every day.
         That is why Plus stops at ten a day instead of promising “unlimited”: unlimited means losing money on your most
         enthusiastic learners.
@@ -180,7 +185,7 @@ export function BusinessModel() {
       <h2 id="scale">Does the free tier pay for itself?</h2>
       <p>
         Every payer also carries the free learners: about 42 of them when 2.3% pay. On the models we chose, that only
-        pays off once about 4% of learners pay. The cheapest alternatives would break even at under 2%, but they make
+        pays off once just over 3% of learners pay. The cheapest alternatives would break even at about 1%, but they make
         worse lessons today, so we launch on the chosen models and work on bringing the cost down.<span className="no-print"> Drag the sliders to try other numbers.</span>
       </p>
       <BreakEven />

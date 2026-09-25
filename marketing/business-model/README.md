@@ -1,15 +1,15 @@
 # Linguini business model and pricing
 
-**Working draft, 24 September 2026.** This is a proposal for team review. Nothing here is live. Plus checkout, trials, pronunciation feedback, review mode and PDF export are not built yet (see [the launch kit's readiness audit](../product-hunt/plan.md#current-readiness-audit-24-september-2026)). Every price was checked on the date above and is linked under [Sources](#sources). The cost figures come from a reproducible model, [`model/cost_model.py`](model/cost_model.py), which uses the backend's actual AI call chain and the models the team chose in the [model comparison](https://github.com/CS3216-A3-G7/linguini/blob/main/MODEL_COMPARISON.md). Its token counts are the means measured in that comparison, on the app's own prompts and schemas. Production usage in Langfuse should confirm them once every feature is traced.
+**Working draft, 25 September 2026.** This is a proposal for team review. Nothing here is live. Plus checkout, trials, pronunciation feedback, review mode and PDF export are not built yet (see [the launch kit's readiness audit](../product-hunt/plan.md#current-readiness-audit-24-september-2026)). Every price was checked on the date above and is linked under [Sources](#sources). The cost figures come from a reproducible model, [`model/cost_model.py`](model/cost_model.py), which uses the backend's actual AI call chain and the models the team chose in the [model comparison](https://github.com/CS3216-A3-G7/linguini/blob/main/MODEL_COMPARISON.md). Its token counts are the means measured in that comparison, on the app's own prompts and schemas. Production usage in Langfuse should confirm them once every feature is traced.
 
 ![Proposed Free, Plus and Founding Plus tiers](media/export/pricing-tiers.png)
 
 ## Recommendation in brief
 
 1. **Freemium subscription, gated on AI cost rather than on learning.** Free covers **one own-photo lesson and one journal page a day**, plus unlimited replays of the curated scenes, which cost almost nothing to serve. Plus lifts those limits and adds the features that cost us money to run: more photo lessons, pronunciation feedback and multi-photo journals.
-2. **Plus: $7.99 a month or $49.99 a year** ($4.17 a month, 48% off), with a 7-day trial. That is a change from the landing page's $6.99 / $59.88. The annual price sits near the education-app median of $44.99, below Duolingo, Babbel and Speak, and above the photo-flashcard app CapWords, which does less.
-3. **Founding Plus: $34.99 a year for the first 300 paying members**, locked for as long as they stay subscribed. It includes the competitive I-Spy beta, a vote on the roadmap and a monthly call with the makers. This turns early payers into beta testers, as the team wants, without a lifetime deal whose AI costs would have no ceiling.
-4. **Bring the cost of a lesson down before opening the free tier widely.** With the models the team chose (all called through OpenRouter), one own-photo lesson costs about **$0.020 (2.0¢)**. At that cost, **4.1% of monthly users must pay just to cover AI**. The education-app median is 2.3%. Learning tasks are 51% of the cost and scene analysis 37%. The cheapest alternatives the app accepted would cost $0.008 a lesson and break even at 1.6% paid, but they score lower today. The first step is fixing the learning-task schema defect, so that GPT-4.1-mini, at about half the cost of GPT-5.4-mini, can pass.
+2. **Plus: $9.99 a month or $59.99 a year** ($5.00 a month, 50% off), with a 7-day trial. That is up from $7.99 / $49.99, because the models the team chose raised the cost of a lesson from 1.2¢ to 2.0¢ (see [Why the Plus price rose](#why-the-plus-price-rose)). The monthly price matches the education-app median of $9.99; the annual price sits a little above the $44.99 annual median, still below Duolingo, Babbel and Speak, and above the photo-flashcard app CapWords, which does less.
+3. **Founding Plus: $39.99 a year for the first 300 paying members**, locked for as long as they stay subscribed. It includes the competitive I-Spy beta, a vote on the roadmap and a monthly call with the makers. This turns early payers into beta testers, as the team wants, without a lifetime deal whose AI costs would have no ceiling.
+4. **Bring the cost of a lesson down before opening the free tier widely.** With the models the team chose (all called through OpenRouter), one own-photo lesson costs about **$0.020 (2.0¢)**. At that cost and the new price, **3.2% of monthly users must pay just to cover AI** (4.1% at the old $7.99 / $49.99). The education-app median is 2.3%. Learning tasks are 51% of the cost and scene analysis 37%. The cheapest alternatives the app accepted would cost $0.008 a lesson and break even at 1.2% paid, but they score lower today. The first step is fixing the learning-task schema defect, so that GPT-4.1-mini, at about half the cost of GPT-5.4-mini, can pass.
 5. **Success before revenue means retained learners.** Until the public launch, the headline metric is **weekly learners who finish two or more lessons**. Founding-member sign-ups are the demand signal. Revenue matters once conversion data exists.
 
 ## What “success” means at each stage
@@ -24,7 +24,7 @@
 
 | | **Free** | **Plus** | **Founding Plus** |
 | --- | --- | --- | --- |
-| Price | $0 | $7.99 a month, or $49.99 a year ($4.17 a month) | $34.99 a year, locked while subscribed; first 300 members |
+| Price | $0 | $9.99 a month, or $59.99 a year ($5.00 a month) | $39.99 a year, locked while subscribed; first 300 members |
 | Own-photo lessons | **1 a day** | Up to 10 a day (fair use) | As Plus |
 | Journal | **1 page a day, 1 photo** | 10 photos a page, AI feedback on your sentences | As Plus |
 | Curated scenes | Unlimited replays | Unlimited | Unlimited |
@@ -35,7 +35,7 @@
 
 The free limits the team chose (one photo lesson and one journal page a day) fit both the cost structure and the product. The daily photo is the habit, and the cap stops a free user from running up cost. Curated scenes are analysed once, offline, by `backend/app/scripts/precompute_preloaded_scenes`. Replaying one costs about $0.0017, for I-Spy guess feedback alone. That makes them a cheap way to keep free users practising after they reach the daily cap.
 
-**Why the Plus price changes.** The existing $59.88 a year is two to three times CapWords' annual price ($19.99–29.99) for a similar photo-first promise. It is also 33% above the education median. Most education subscribers choose annual plans (59%, per RevenueCat), and an annual subscriber cannot churn for a year. A bigger annual discount (48% rather than 28%) therefore steers buyers toward the plan we want them on. The net revenue model shows the switch costs almost nothing per payer: $5.24 against $5.31 a month on the web. Treat $49.99 against $59.88 as the first price test.
+<a id="why-the-plus-price-rose"></a>**Why the Plus price rose.** The earlier proposal of $7.99 / $49.99 was set when a lesson cost about 1.2¢. Moving to the models that passed the team's comparison (Claude Haiku 4.5 for scenes, GPT-5.4-mini for learning tasks) raised it to 2.0¢. At $49.99, net revenue per payer is $5.24 a month and the free tier only pays for itself above 4.1% paid conversion, nearly twice the education median, so even the traction scenario at 4% lost money. At $9.99 / $59.99, net revenue per payer rises to **$6.49 a month**, break-even falls to **3.2%**, and the 4% traction scenario turns from −$284 to +$2,219 a month. $59.99 is still about a third below Duolingo and Speak ($83.99) and half of Babbel. Most education subscribers choose annual plans (59%, per RevenueCat), and an annual subscriber cannot churn for a year, so a 50% annual discount steers buyers toward the plan we want them on. Treat $59.99 against $49.99 as the first price test once real conversion data exists.
 
 ## How Duolingo and others split free from paid
 
@@ -45,7 +45,7 @@ The free limits the team chose (one photo lesson and one journal page a day) fit
 | **CapWords** (photo vocabulary, Apple Design Award 2025) | A small number of free captures, then limited features | Pro: unlimited captures and full review, $4.99–5.99 a month or $19.99–29.99 a year | Our closest rival also gates on captures, so the market accepts a limit on photos. |
 | **Speak** (AI speaking tutor) | Limited free access (details vary by region) | Premium: $17.99 a month or $83.99 a year. Premium Plus: $39.99 a month or $164.99 a year. | Speaking feedback commands a premium, so pronunciation belongs in Plus. |
 | **Babbel** | Limited free lessons | $15.25 a month on a 3-month plan, $107.64 a year, $299 lifetime | Babbel can offer a lifetime deal because its lessons are static content. Ours generate AI costs every time, so we should not copy it. |
-| **Busuu / Memrise** | Free tier with limited features | Busuu Premium: $9.99 a month (one language), $13.99 (all). Memrise: $8.99 a month. | Monthly prices cluster at $8.99–13.99. Our $7.99 undercuts them. |
+| **Busuu / Memrise** | Free tier with limited features | Busuu Premium: $9.99 a month (one language), $13.99 (all). Memrise: $8.99 a month. | Monthly prices cluster at $8.99–13.99. Our $9.99 sits at the low end. |
 
 ## Competitor analysis and our advantage
 
@@ -62,14 +62,14 @@ The free limits the team chose (one photo lesson and one journal page a day) fit
 
 - **One loop from photo to practice to journal.** Each word is tied to a moment the learner actually lived and is reused in a sentence the same day. No competitor we checked combines photo capture, games and a journal.
 - **Social play is on the roadmap.** Competitive I-Spy on shared photos would bring network effects, which none of the photo-vocabulary apps have. Founding Plus members help shape it.
-- **Runs in the browser.** There is nothing to install, it works on a laptop in class, and there are no app-store fees. Web checkout nets about $5.24 a month per payer, against $4.87 through an app store.
+- **Runs in the browser.** There is nothing to install, it works on a laptop in class, and there are no app-store fees. Web checkout nets about $6.49 a month per payer, against $5.99 through an app store.
 - **Structural cost advantage on curated content.** Curated scenes are computed once, so the free tier can stay generous where it costs nothing.
 
 **Honest weaknesses.** CapWords has Apple's design awards and supports 9 languages; we have Spanish and French. Duolingo's free tier is large and polished. Photo analysis, speech grading and checkout are not in production yet. We have no app-store presence. The pricing argument depends on shipping the Plus features before we charge for them.
 
 ## Perceived value
 
-- **Against tutoring:** online Spanish tutors cost $20–40 an hour and French tutors $15–60 (italki, 2026). Plus at $4.17 a month costs less than 15 minutes with a typical $20–40-an-hour tutor. It is not a substitute for one; it is daily practice between lessons.
+- **Against tutoring:** online Spanish tutors cost $20–40 an hour and French tutors $15–60 (italki, 2026). Plus at $5.00 a month costs less than 15 minutes with a typical $20–40-an-hour tutor. It is not a substitute for one; it is daily practice between lessons.
 - **Against the category:** RevenueCat's 2026 education medians are **$9.99 a month and $44.99 a year**, with **2.3% of downloads converting to paid** by day 35 and 59% of subscriptions sold as annual plans. Education trial users produce 50.4% more 12-month revenue than people who buy without a trial. Half of education trials run 5–9 days, hence our 7-day trial.
 - **Ceiling:** Duolingo's paid subscribers are about 9% of its monthly users (12.7M of 140.6M). That is what a mature, much-loved product achieves; do not plan on it.
 
@@ -127,7 +127,7 @@ Other per-use costs: planned journal feedback on GPT-4o-mini is about $0.0006 a 
 | Plus, heavy (90) | $2.17 | $1.98 | $1.06 |
 | Plus at the 10-a-day ceiling (300) | $7.13 | $6.47 | $3.47 |
 
-Across the assumed mix, the average free user costs about $0.18 a month and the average Plus user $1.03 on the chosen models. Net revenue per payer is about **$5.24 a month** on the web. A typical Plus user is profitable under every set. A Plus user who hits the 10-a-day cap every day costs more than they pay under the chosen models. That is acceptable if rare, and the cap exists to bound it.
+Across the assumed mix, the average free user costs about $0.18 a month and the average Plus user $1.03 on the chosen models. Net revenue per payer is about **$6.49 a month** on the web. A typical Plus user is profitable under every set. A Plus user who hits the 10-a-day cap every day costs more than they pay under the chosen models. That is acceptable if rare, and the cap exists to bound it.
 
 ### How cost scales, and the break-even line
 
@@ -137,18 +137,18 @@ The risk is not the payers. It is **the free users each payer carries**. At 2.3%
 
 | Scenario (option B pricing) | Monthly users | Payers | Net revenue | AI cost (free + Plus) | Fixed | Monthly result |
 | --- | --- | --- | --- | --- | --- | --- |
-| Beta, chosen models | 300 | 7 | $36 | $60 | $52 | **−$76** |
-| Beta, cheapest alternatives | 300 | 7 | $36 | $26 | $52 | −$41 |
-| Launch year at 2.3%, chosen models | 5,000 | 115 | $603 | $997 | $52 | **−$447** |
-| Launch year at 2.3%, cheapest alternatives | 5,000 | 115 | $603 | $426 | $52 | **+$125** |
-| Traction at 4%, chosen models | 50,000 | 2,000 | $10,481 | $10,695 | $70 | −$284 |
-| Traction at 4%, first alternatives | 50,000 | 2,000 | $10,481 | $9,641 | $70 | +$770 |
-| Traction at 4%, cheapest alternatives | 50,000 | 2,000 | $10,481 | $4,623 | $70 | **+$5,788** |
+| Beta, chosen models | 300 | 7 | $45 | $60 | $52 | **−$67** |
+| Beta, cheapest alternatives | 300 | 7 | $45 | $26 | $52 | −$33 |
+| Launch year at 2.3%, chosen models | 5,000 | 115 | $747 | $997 | $52 | **−$303** |
+| Launch year at 2.3%, cheapest alternatives | 5,000 | 115 | $747 | $426 | $52 | **+$269** |
+| Traction at 4%, chosen models | 50,000 | 2,000 | $12,983 | $10,695 | $70 | **+$2,219** |
+| Traction at 4%, first alternatives | 50,000 | 2,000 | $12,983 | $9,641 | $70 | +$3,273 |
+| Traction at 4%, cheapest alternatives | 50,000 | 2,000 | $12,983 | $4,623 | $70 | **+$8,290** |
 
-The beta loses about $76 a month. That is affordable as a research cost and tells us the real usage. Even at 4% conversion, nearly twice the median, the chosen models lose money, because they break even at 4.1%. **Before a broad free launch, the team should do three things:**
+The beta loses about $67 a month. That is affordable as a research cost and tells us the real usage. At the new price the chosen models break even at 3.2%, so 4% conversion is profitable, but at the 2.3% median the launch year still loses about $300 a month. **Before a broad free launch, the team should do three things:**
 
 1. **Fix the learning-task schema defect so GPT-4.1-mini can pass.** Lessons are rejected when a model returns one question for a task that asks for two to four, because providers do not enforce the schema's minimum in strict mode. Either accept one question for that task type or state the count per task in the prompt. GPT-5.4-mini is the only model that passes today, and learning tasks are half the cost of a lesson. GPT-4.1-mini costs about half as much for that call.
-2. **Test the cheaper alternatives against the same evaluation.** The cheapest set breaks even at 1.6% paid, below the median, but scene analysis on GPT-4.1-mini scores 0.69 against 0.79 and its lessons are accepted 12% of the time. Re-run the comparison's photos, scenes and learner descriptions after the schema fix, and switch a call only if quality and acceptance stay within an agreed margin.
+2. **Test the cheaper alternatives against the same evaluation.** The cheapest set breaks even at 1.2% paid, well below the median, but scene analysis on GPT-4.1-mini scores 0.69 against 0.79 and its lessons are accepted 12% of the time. Re-run the comparison's photos, scenes and learner descriptions after the schema fix, and switch a call only if quality and acceptance stay within an agreed margin.
 3. **Enforce limits and track cost on the server.** Limit own-photo analysis per user per local day in the API (one for Free, ten for Plus), not only in the UI. Extend Langfuse tracing, which today covers only I-Spy guesses, to every AI feature with token counts. Alert when the average cost per lesson over 7 days exceeds $0.03.
 
 ## Revenue streams
@@ -156,7 +156,7 @@ The beta loses about $76 a month. That is affordable as a research cost and tell
 | Stream | When | Notes |
 | --- | --- | --- |
 | **Plus subscriptions**, monthly and annual | At launch, once checkout works end to end | Core revenue. Sell on the web first: no store fees, and the app is a web app. |
-| **Founding Plus** | From public launch; closes at 300 members or 31 Dec 2026, whichever comes first | Early revenue, committed testers and a demand signal. Nets $2.74 a month per member against about $1.03 in AI cost under the chosen models. |
+| **Founding Plus** | From public launch; closes at 300 members or 31 Dec 2026, whichever comes first | Early revenue, committed testers and a demand signal. Nets $3.14 a month per member against about $1.03 in AI cost under the chosen models. |
 | Family plan (for example $79.99 a year for up to 4) | After retention is proven | Duolingo's family plan is $119.99 for 6. Every member uses AI, so price per seat rather than copying Duolingo's generosity. |
 | Classroom licences | Year 2 | Teachers set a daily scene and students journal about it. Longer sales cycle, but the fit with teaching is natural. |
 | Printed journal photo book (one-off) | Once the PDF export ships | Fits the "keep the day" idea. Needs a print-on-demand vendor quote before we set a price. |
@@ -177,15 +177,15 @@ The beta loses about $76 a month. That is affordable as a research cost and tell
 
 The team wants early payers to become beta testers and help steer the product. Founding Plus does this on the following terms:
 
-- **Offer:** $34.99 a year, 30% below Plus. The price is locked for as long as the subscription renews, with no lifetime deal. Limited to 300 members, and the spots-remaining count shown must be real.
+- **Offer:** $39.99 a year, 33% below Plus. The price is locked for as long as the subscription renews, with no lifetime deal. Limited to 300 members, and the spots-remaining count shown must be real.
 - **What members get:** everything in Plus; an early-access channel for **competitive I-Spy** and other experiments; a vote each month on the roadmap (for example a GitHub Discussions poll or a simple voting board); a monthly 30-minute maker call; and their names in the credits if they opt in.
 - **What we ask:** one short survey after their first week and one feature test a month, all optional. Feedback goes to the team's product owner, who replies publicly with what changed.
 - **Fairness rule for competitive play:** paying buys early access and a vote, never an advantage in ranked I-Spy. Any rewards for Founding members are cosmetic, such as a badge or a pasta avatar.
 - **Opening condition:** Founding Plus opens only when Plus checkout, entitlements and cancellation work end to end, as the [launch go/no-go](../product-hunt/plan.md#go--no-go-at-t1) requires. Until then, promote the free beta and collect interest without taking payment.
 
-## Changes this implies for the landing page (not made in this branch)
+## Landing page status
 
-`landing/components/Pricing.tsx` lists Plus at $6.99 / $59.88 with "Unlimited photo sessions" and pronunciation feedback. When the team agrees on the pricing: update the prices and the "Save" badge (48%); replace "Unlimited" with "Up to 10 photo lessons a day"; show the free limits (one photo lesson and one journal page a day); and hide Plus features and the trial button until they work in production.
+The landing page (`landing/data/pricing.ts`) now shows $9.99 / $59.99, Founding Plus at $39.99 and a "Save 50%" badge, with the free limits and the 10-a-day Plus cap. Still to do: hide Plus features and the trial button until they work in production.
 
 ## Media kit
 
@@ -204,7 +204,7 @@ Every promotional asset is labelled as a proposed offer. Remove that label only 
 
 **Suggested post for the founding offer (use only once checkout works):**
 
-> We're opening 300 Founding Plus spots for Linguini, the app that turns a photo of your day into a Spanish or French lesson. $34.99 a year, locked for as long as you stay. You'll play competitive I-Spy before anyone else and vote on what we build next. Free stays free: one photo lesson and one journal page every day. [link]
+> We're opening 300 Founding Plus spots for Linguini, the app that turns a photo of your day into a Spanish or French lesson. $39.99 a year, locked for as long as you stay. You'll play competitive I-Spy before anyone else and vote on what we build next. Free stays free: one photo lesson and one journal page every day. [link]
 
 ## Assumptions to replace with real data
 
