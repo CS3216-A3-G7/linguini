@@ -79,12 +79,6 @@ export function ProductHuntListing() {
 
 /* ---------- The Product Hunt day on two clocks ---------- */
 
-const shifts = [
-  { from: 0, to: 10, label: "Everyone on", note: "Launch, first replies, owned posts", tone: "tomato" },
-  { from: 10, to: 17, label: "Night rota", note: "One responder and one engineer", tone: "teal" },
-  { from: 17, to: 24, label: "Morning push", note: "Singapore wakes up, second wave", tone: "pasta" },
-];
-
 const ticks = [0, 3, 6, 9, 12, 15, 18, 21, 24];
 const pad = (n: number) => String(n % 24).padStart(2, "0");
 
@@ -101,15 +95,11 @@ export function LaunchClock() {
         </div>
 
         <div className={l.band}>
-          {shifts.map(s => (
-            <div key={s.label} className={l.shift} data-tone={s.tone}
-              style={{ left: `${(s.from / 24) * 100}%`, width: `${((s.to - s.from) / 24) * 100}%` }}>
-              <b>{s.label}</b>
-              <span>{s.note}</span>
-            </div>
-          ))}
+          <div className={l.dayBar}>
+            <b>One Product Hunt day</b>
+          </div>
           <div className={l.usBand} style={{ left: `${(5 / 24) * 100}%`, width: `${(12 / 24) * 100}%` }}>
-            <span>US daytime</span>
+            <span>US daytime, our night</span>
           </div>
           <span className={l.sweep} aria-hidden="true" />
         </div>
@@ -122,8 +112,7 @@ export function LaunchClock() {
         </div>
       </div>
       <figcaption>
-        One Product Hunt day runs midnight to midnight in San Francisco. In Singapore that’s 3:01pm Saturday to 2:59pm
-        Sunday. The hours when most of the US is awake fall in our night, so we work in shifts.
+        Midnight to midnight in San Francisco is 3:01pm Saturday to 2:59pm Sunday in Singapore.
       </figcaption>
     </figure>
   );

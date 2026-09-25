@@ -183,7 +183,7 @@ Post this within the first minute of the launch. No request for upvotes.
 
 > Hi Product Hunt! We’re the team behind Linguini. We kept noticing that the words we wanted to learn were already in front of us: the café table, the view on a walk, the things on our desk. So we built a photo-led language-learning experience around those moments.
 >
-> Today you can try a full mini session on our site in Spanish or French. Pick a scene, explore its words, play I-Spy and sentence games, and see the moment become a journal page. The learner app is still being refined, so the mini session is the clearest way to see the idea in action today.
+> Today you can try a full mini session on our site in Spanish or French. Pick a scene, explore its words, play I-Spy and sentence games, and see the moment become a journal page. Then sign up and the app does the same with a photo you take: AI reads the picture, pins the words and builds the games.
 >
 > We’d love specific feedback: Which part helped you remember a word? What would make you come back tomorrow? If you try it, tell us which scene you picked and where you got stuck. We’re here to answer questions and learn from the comments.
 

@@ -141,7 +141,7 @@ T− counts are days before a Saturday 17 October launch. If the date changes, k
 
 ### Three weeks out (by 26 Sep)
 
-- [ ] Agree the promise: browser demo open to everyone, learner app in beta
+- [ ] Agree the promise: beta testers until 16 Oct, open to everyone on launch day
 - [ ] Point every landing-page button at the production app, then tap each one on a phone
 - [ ] Make every landing claim match the app today: photo analysis, speech, Plus trial
 - [ ] Track demo started, demo finished, sign-up, first lesson, second lesson
@@ -299,9 +299,11 @@ Sizes and rules checked 24 September 2026. Recheck each the week before; subredd
 - [ ] Discord: Refold Central (~37k), Language Learning Community (~34k), Language Cafe (~28k) — promo channels only
 - [ ] Indie Hackers — one Show IH post, framed as a request for feedback
 - [ ] NUS Hackers Friday Hacks — speaker slots until 13 Nov
-- [ ] Show HN — **only after real photo analysis ships**; no sign-up walls, no vote requests
+- [ ] r/French: no advertising, so ask the mods for one feedback post
+- [ ] HelloTalk: bans promotion, so share our own journal pages in Moments as learners
+- [ ] Show HN: live demo with no sign-up wall, no vote requests
 
-Not posting: r/French (no advertising), HelloTalk (bans promotion), Tandem (no public feed).
+Not posting: Tandem (no public feed).
 
 ### Creators (personal note, no ask to post)
 
@@ -312,7 +314,7 @@ Not posting: r/French (no advertising), HelloTalk (bans promotion), Tandem (no p
 
 Not asking: Steve Kaufmann (founded LingQ) and Ikenna (runs Fluyo), both competitors.
 
-### Newsletters (held until real photo analysis ships)
+### Newsletters (one short pitch each on launch day)
 
 - [ ] The Rundown AI — 2M+, "tool of the day"
 - [ ] TLDR AI — ~1.1M
@@ -354,7 +356,7 @@ Regenerate banners with `python3 marketing/media/banners.py`. The launch date is
 - [ ] D+3: talk to five people who came back and five who didn't
 - [ ] D+7: look at who did a second lesson; fix the biggest drop-off
 - [ ] D+14: publish what we learned, with the real numbers
-- [ ] Put the next launch on the calendar: real photo analysis
+- [ ] Put the next launch on the calendar: speaking feedback
 
 ## Retention and next announcement
 
@@ -362,7 +364,7 @@ The first week should help learners experience the **second** useful lesson. At 
 
 At **D+1**, fix broken onboarding or upload flows and reply to every substantive Product Hunt comment. At **D+3**, interview five activated and five stalled users, comparing what they expected with what the demo/app delivered. At **D+7**, review first lesson, second lesson, D7 retention, language and source cohorts; choose the largest drop-off to fix. At **D+14**, publish a small “what we learned / what changed” update with actual numbers and caveats, continue Product Page replies, and put the next product release on the calendar. Product Hunt recommends following up with users, using feedback and maintaining the Product Page after the launch day. [Post-launch guide](https://www.producthunt.com/launch/days-after-launch)
 
-Candidate next announcement, conditional on shipping: **real photo analysis with learner-approved vocabulary**. A later pronunciation release should only be promoted after speech evaluation is truly available. Product Hunt supports launching significant new iterations ("for significant product iterations"), not repeated copies of the same listing. [Launch guide](https://www.producthunt.com/launch)
+Candidate next announcement, conditional on shipping: **speaking feedback**, promoted only once speech evaluation is truly available. The learner app already reads your own photos with AI, so that is part of launch one. Product Hunt supports launching significant new iterations ("for significant product iterations"), not repeated copies of the same listing. [Launch guide](https://www.producthunt.com/launch)
 
 ## Product Hunt rules: what we verified (24 September 2026)
 

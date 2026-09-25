@@ -14,7 +14,7 @@ export const phases: Phase[] = [
     title: "Three weeks out",
     when: "by 26 Sep",
     items: [
-      { text: "Agree the promise: browser demo open to everyone, learner app in beta", owner: "Product" },
+      { text: "Agree the promise: beta testers until 16 Oct, open to everyone on launch day", owner: "Product" },
       { text: "Point every landing-page button at the production app, then tap each one on a phone", owner: "Eng" },
       { text: "Make every landing claim match the app today: photo analysis, speech, Plus trial", owner: "Product" },
       { text: "Track demo started, demo finished, sign-up, first lesson, second lesson", owner: "Eng" },
@@ -77,7 +77,7 @@ export const phases: Phase[] = [
       { text: "D+3: talk to five people who came back and five who didn’t", owner: "Product" },
       { text: "D+7: look at who did a second lesson; fix the biggest drop-off", owner: "Product" },
       { text: "D+14: publish what we learned, with the real numbers", owner: "Marketing" },
-      { text: "Put the next launch on the calendar: real photo analysis", owner: "Product" },
+      { text: "Put the next launch on the calendar: speaking feedback", owner: "Product" },
     ],
   },
 ];

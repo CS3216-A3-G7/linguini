@@ -982,55 +982,35 @@ button.action:hover {
 
 .band {
   position: relative;
-  height: 108px;
+  height: 88px;
   margin-left: 96px;
   margin-right: 18px;
 }
 
-.shift {
+.dayBar {
   position: absolute;
   top: 0;
-  height: 72px;
-  display: grid;
-  align-content: start;
-  gap: 2px;
-  padding: 10px 12px;
+  left: 0;
+  right: 0;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
   border-radius: 14px;
-  background: var(--tint);
-  box-shadow: inset 0 3px 0 var(--tone);
-  font-size: 12px;
-  line-height: 1.3;
-  overflow: hidden;
+  background: #fdeee8;
+  box-shadow: inset 0 3px 0 var(--tomato);
+  font-size: 14px;
   clip-path: inset(0 100% 0 0 round 14px);
-  transition: clip-path 0.9s var(--ease-out);
+  transition: clip-path 1.2s var(--ease-out);
 }
 
-.shift:nth-child(2) { transition-delay: 0.35s; }
-.shift:nth-child(3) { transition-delay: 0.7s; }
-
-.clock[data-inview] .shift {
+.clock[data-inview] .dayBar {
   clip-path: inset(0 0 0 0 round 14px);
 }
 
-.shift + .shift {
-  margin-left: 4px;
-}
-
-.shift b {
-  font-size: 14px;
-}
-
-.shift span {
-  color: var(--ink-muted);
-}
-
-.shift[data-tone="tomato"] { --tone: var(--tomato); --tint: #fdeee8; }
-.shift[data-tone="teal"] { --tone: var(--teal); --tint: #e6f3f1; }
-.shift[data-tone="pasta"] { --tone: var(--pasta); --tint: #fff4dc; }
-
 .usBand {
   position: absolute;
-  top: 80px;
+  top: 60px;
   height: 22px;
   display: flex;
   align-items: center;
@@ -1465,7 +1445,6 @@ button.action:hover {
 
   .band {
     margin-left: 0;
-    height: 150px;
   }
 
   .ticks {
@@ -1476,18 +1455,6 @@ button.action:hover {
     display: none;
   }
 
-  .shift {
-    height: 112px;
-    padding: 8px;
-  }
-
-  .shift span {
-    font-size: 11px;
-  }
-
-  .usBand {
-    top: 120px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1518,7 +1485,7 @@ button.action:hover {
     transform: none !important;
   }
 
-  .shift {
+  .dayBar {
     clip-path: none !important;
   }
 

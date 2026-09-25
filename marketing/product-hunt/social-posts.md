@@ -119,7 +119,7 @@ We put Linguini on Product Hunt today.
 
 It started as a CS3216 project with a simple bet: vocabulary lists are easy to forget, but the places you walk through every day are not. So Linguini starts with a photo, pins Spanish or French words onto it, and ends each lesson as a journal page.
 
-The browser demo is open to everyone. The full app is with a small group of beta testers while we finish real photo analysis.
+The browser demo needs no account, and the app turns a photo you take into a lesson, with AI finding the words in it.
 
 If you teach, learn or build things, I’d value one honest comment on the listing: which step would make you come back tomorrow? [PH_POST_URL]
 ```

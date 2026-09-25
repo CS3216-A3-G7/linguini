@@ -26,7 +26,7 @@ export const productHunt = {
   ],
   firstComment: [
     "Hi Product Hunt! We’re the team behind Linguini. We kept noticing that the words we wanted to learn were already in front of us: the café table, the view on a walk, the things on our desk. So we built a language app around those moments.",
-    "Today you can try a full mini session on our site in Spanish or French. Pick a scene, explore its words, play I-Spy and sentence games, and watch it become a journal page. The learner app is still in beta, so the mini session is the clearest way to see the idea today.",
+    "Today you can try a full mini session on our site in Spanish or French. Pick a scene, explore its words, play I-Spy and sentence games, and watch it become a journal page. Then sign up and the app does the same with a photo you take: AI reads the picture, pins the words and builds the games.",
     "We’d love specific feedback: which part helped a word stick, and what would bring you back tomorrow? Tell us which scene you picked and where you got stuck. We’re in the comments all day.",
   ],
 };
@@ -64,7 +64,7 @@ export const instagram = {
 export const linkedin = {
   author: "Madrid Lim",
   role: "Co-maker of Linguini · NUS Computing",
-  text: "We put Linguini on Product Hunt today.\n\nIt started as a CS3216 project with a simple bet: vocabulary lists are easy to forget, but the places you walk through every day are not. So Linguini starts with a photo, pins Spanish or French words onto it, and ends each lesson as a journal page.\n\nThe browser demo is open to everyone. The full app is with a small group of beta testers while we finish real photo analysis.\n\nIf you teach, learn or build things, I’d value one honest comment on the listing: which step would make you come back tomorrow?",
+  text: "We put Linguini on Product Hunt today.\n\nIt started as a CS3216 project with a simple bet: vocabulary lists are easy to forget, but the places you walk through every day are not. So Linguini starts with a photo, pins Spanish or French words onto it, and ends each lesson as a journal page.\n\nThe browser demo needs no account, and the app turns a photo you take into a lesson, with AI finding the words in it.\n\nIf you teach, learn or build things, I’d value one honest comment on the listing: which step would make you come back tomorrow?",
   image: { src: `${IMG}/linkedin-1584x396.jpg`, alt: "Your photo is the lesson. Launching on Product Hunt, Sat 17 Oct." },
 };
 
@@ -72,7 +72,7 @@ export const reddit = {
   sub: "r/Spanish",
   flair: "Weekly self-promotion thread",
   title: "We made a photo-based Spanish mini lesson. Does the photo actually help you remember?",
-  text: "Small student team here. The idea: learn words from a place you recognise (a street, a café), then use them in I-Spy and a short sentence before saving it as a journal page. There’s a free demo with sample scenes, no sign-up. We’re trying to work out if the photo helps recall or just looks nice. If you try one scene, what would you change?",
+  text: "Small student team here. The idea: learn words from a place you recognise (a street, a café), then use them in I-Spy and a short sentence before saving it as a journal page. There’s a free demo with ready-made scenes, no sign-up, and the app does the same with your own photos. We’re trying to work out if the photo helps recall or just looks nice. If you try one scene, what would you change?",
 };
 
 export const telegram = {
