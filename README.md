@@ -9,8 +9,9 @@ Linguini is a photo-led, speak-first language-learning app. You photograph a mom
 | [`frontend/`](frontend) | The learner web app | React 19, TypeScript, Vite | [frontend/README.md](frontend/README.md), [design.md](frontend/design.md) |
 | [`backend/`](backend) | API, persistence and AI features | FastAPI, SQLAlchemy, PostgreSQL/Supabase, Prisma migrations | [backend/README.md](backend/README.md) |
 | [`landing/`](landing) | Marketing site with an interactive demo session | Next.js 16 (App Router) | [landing/README.md](landing/README.md) |
+| [`marketing/`](marketing) | Product Hunt launch kit, launch videos, media kit and business model | Markdown, Python/Pillow, FFmpeg, Hyperframes | [marketing/README.md](marketing/README.md) |
 
-Each app manages its own dependencies and deploys on its own.
+Each app manages its own dependencies and deploys on its own. `marketing/` is not deployed; it holds source files and finished exports.
 
 ## Quick start
 
@@ -32,7 +33,7 @@ Windows/PowerShell setup, environment variables and API details are in the app R
 ## Contributing
 
 - Branch from `main` with a plain descriptive slug, e.g. `session-lifecycle`, and open one pull request per slice of work.
-- Commits and pull requests are attributed to the team member who requested the work.
+- Commits and pull requests are attributed to the team member who requested the work. AI agents must not add themselves as authors or co-authors, or add "Generated with" lines; the CI `attribution` job rejects pull requests that do.
 - Run the checks before opening a pull request:
 
   ```sh

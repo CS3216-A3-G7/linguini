@@ -1,6 +1,6 @@
 /**
  * Copy for the launch campaign post. The social posts here are the drafts we will publish;
- * launch/product-hunt.md holds the same text for pasting.
+ * marketing/product-hunt/social-posts.md holds the same text for pasting.
  */
 
 export const LAUNCH = {

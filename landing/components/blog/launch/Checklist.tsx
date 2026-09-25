@@ -6,7 +6,7 @@ import l from "./launch.module.css";
 type Item = { text: string; owner: string };
 type Phase = { title: string; when: string; items: Item[] };
 
-/** Same shape as launch/checklist.md. Keep the two in step. */
+/** Same shape as the checklist in marketing/product-hunt/plan.md. Keep the two in step. */
 export const phases: Phase[] = [
   {
     title: "Three weeks out",

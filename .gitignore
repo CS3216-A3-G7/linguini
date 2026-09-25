@@ -6,8 +6,10 @@ dist-ssr/
 # Tool caches
 .vite/
 __pycache__/
-launch/media/.venv/
-launch/media/.cache/
+.ruff_cache/
+.venv/
+marketing/media/.cache/
+.Rhistory
 
 # Logs
 logs/
@@ -46,3 +48,7 @@ coverage/
 *.njsproj
 *.sln
 *.sw?
+
+# Regenerated media intermediates
+marketing/media/export/teaser-frames/
+marketing/videos/launch-film/audio/preview_mix.wav
