@@ -55,6 +55,36 @@ diary of what you actually did.
 - Supabase authentication with a local `demo` auth mode for development.
 - Server-side content moderation and image validation on every upload.
 
+## Screenshots
+
+Captured from the running app (phone width) against the live database.
+
+| Home | Capture a scene | Learning tasks |
+| --- | --- | --- |
+| <img src="docs/screenshots/home.png" alt="Home screen with streak, XP and the next practice card" width="240" /> | <img src="docs/screenshots/practice.png" alt="Scene capture screen with camera, upload and ready scenes" width="240" /> | <img src="docs/screenshots/learn.png" alt="Learning tasks screen with the scene photo and its translations" width="240" /> |
+
+| Vocabulary | Journal | Progress |
+| --- | --- | --- |
+| <img src="docs/screenshots/vocabulary.png" alt="Vocabulary screen grouped by scene with playback buttons" width="240" /> | <img src="docs/screenshots/journal.png" alt="Monthly journal with photo entries" width="240" /> | <img src="docs/screenshots/progress.png" alt="Progress screen with words learned, mastered and scenes" width="240" /> |
+
+| Profile | I-Spy (**placeholder**) |
+| --- | --- |
+| <img src="docs/screenshots/profile.png" alt="Profile screen with learning setup and permissions" width="240" /> | <img src="docs/screenshots/ispy-placeholder.png" alt="Placeholder image for the I-Spy screenshot" width="240" /> |
+
+The I-Spy image is a **labelled placeholder**: that screen only unlocks once a session's
+learning tasks are finished, so it still needs a real capture.
+
+## Launch film
+
+<a href="landing/public/film/linguini-film-720p.mp4"><img src="landing/public/film/poster.jpg" alt="Launch film poster frame" width="560" /></a>
+
+Click the poster to play the 30-second film
+([720p](landing/public/film/linguini-film-720p.mp4),
+[1080p](landing/public/film/linguini-film-1080p.mp4)); GitHub plays the file in its own
+viewer. It is also embedded on the [landing page](https://linguini-landing.vercel.app),
+and the narrated cut and 50-second explainer live in
+[`landing/public/blog/`](landing/public/blog).
+
 ## Architecture
 
 ```mermaid
