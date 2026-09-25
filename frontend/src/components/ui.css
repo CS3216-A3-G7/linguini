@@ -868,12 +868,32 @@ p[role="alert"]::before { content: "!"; }
 
 @media (max-width: 520px) {
   .analysis-relation-row {
-    grid-template-columns: 30px minmax(0, 1fr) 36px;
+    grid-template-columns: 28px minmax(0, 1fr) 44px;
+    align-items: start;
     gap: var(--space-2);
+    padding: var(--space-3) 0;
+  }
+
+  .analysis-relation-row__marker,
+  .analysis-relation-row .analysis-word-row__remove {
+    margin-top: 2px;
   }
 
   .analysis-relation-row__flow {
-    gap: var(--space-1);
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .analysis-relation-row__flow > strong,
+  .analysis-relation-row__relation {
+    flex: none;
+    text-align: left;
+  }
+
+  .analysis-relation-row__flow .combobox--compact {
+    flex: none;
+    max-width: none;
   }
 }
 
@@ -3397,13 +3417,6 @@ p[role="alert"]::before { content: "!"; }
   flex: none;
   gap: var(--space-1);
   color: var(--ink-muted);
-}
-
-/* Exit-to-home sits directly under the task progress trail. */
-.learning-exit-row {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: calc(-1 * var(--space-3));
 }
 
 .learning-card {
