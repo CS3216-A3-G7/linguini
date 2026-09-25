@@ -27,7 +27,6 @@ export const metadata: Metadata = {
   applicationName: site.name,
   keywords: [...site.keywords],
   category: "education",
-  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     siteName: site.name,
@@ -47,6 +46,12 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true, "max-image-preview": "large" },
   },
   formatDetection: { telephone: false },
+  // Search Console and Bing Webmaster Tools ownership tags; each is emitted only when its env var is set.
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.BING_SITE_VERIFICATION } : undefined,
+  },
+  alternates: { canonical: "/", types: { "text/markdown": "/llms.txt" } },
 };
 
 export const viewport: Viewport = {
@@ -58,7 +63,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${baloo.variable} ${nunito.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${baloo.variable} ${nunito.variable}`} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
       </head>

@@ -87,10 +87,10 @@ export function PriceStory() {
       label="How we set the Plus price"
       graphic={Ruler}
       steps={[
-        <><strong>Cost sets the floor.</strong>A typical Plus learner costs us about $14 a year in AI, storage and card fees. Anything above that can also carry some free learners.</>,
-        <><strong>Competitors set the range.</strong>Photo-flashcard apps charge $20–30 a year. Duolingo, Speak and Babbel charge $84–168. We do more than a flashcard app and less than a full course.</>,
-        <><strong>Value sets the ceiling.</strong>An online tutor costs $15–60 an hour. A year of daily practice should cost less than one or two lessons.</>,
-        <><strong>So Plus is $49.99 a year.</strong>That is close to the $44.99 education-app median and below every course app. Our first 300 members lock in $34.99.</>,
+        <><strong>Cost sets the floor.</strong> A typical Plus learner costs us about $14 a year in AI, storage and card fees. Anything above that can also carry some free learners.</>,
+        <><strong>Competitors set the range.</strong> Photo-flashcard apps charge $20–30 a year. Duolingo, Speak and Babbel charge $84–168. We do more than a flashcard app and less than a full course.</>,
+        <><strong>Value sets the ceiling.</strong> An online tutor costs $15–60 an hour. A year of daily practice should cost less than one or two lessons.</>,
+        <><strong>So Plus is $49.99 a year.</strong> That is close to the $44.99 education-app median and below every course app. Our first 300 members lock in $34.99.</>,
       ]}
     />
   );

@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { photos } from "@/lib/photos";
+import { pageMetadata } from "@/lib/seo";
 import styles from "./credits.module.css";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Photo credits",
   description: "Where every photo on the Linguini site comes from: photographer, source repository, commit date and licence.",
-  alternates: { canonical: "/credits" },
-};
+  path: "/credits",
+});
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",

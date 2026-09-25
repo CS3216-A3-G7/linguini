@@ -54,6 +54,16 @@ export const posts: Post[] = [
     readMinutes: 6,
     cover: { kind: "photo", scene: "golden-gate-bridge", words: ["bridge", "sea", "tower"] },
   },
+  {
+    slug: "linguini-vs-duolingo",
+    title: "Linguini vs Duolingo, Babbel, Speak and CapWords",
+    summary:
+      "What each app teaches, what its free plan gives you and what a year costs, side by side. Plus the cases where Linguini is the wrong pick.",
+    category: "Insights",
+    date: "2026-09-20",
+    readMinutes: 4,
+    cover: { kind: "photo", scene: "desk-flatlay", words: ["laptop", "phone", "notebook"] },
+  },
 ];
 
 /** Old slugs that now live inside another post. */

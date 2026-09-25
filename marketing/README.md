@@ -9,6 +9,7 @@ Everything for launching and selling Linguini outside the app: the Product Hunt 
 | [`videos/promo-film/`](videos/promo-film/VIDEO.md) | 30-second launch film from real footage with a focus frame naming objects in Spanish and French, and an original piano score. Render: `out/linguini-launch.mp4` (+ 720p) |
 | [`videos/campaign/`](videos/campaign/scripts.md) | Human-voice campaign scripts (30, 20, 15 and 6 seconds), a [recording guide](videos/campaign/recording-guide.md) and music/SFX beds. Not filmed yet |
 | [`media/`](media/README.md) | Media kit: illustrated gallery, Product Hunt icon, social square, banners, the 50-second animated explainer (`export/explainer.mp4`, script in [explainer-script.md](media/explainer-script.md)) and the 18-second illustrated teaser |
+| [`landing-page/`](landing-page/milestone-landing-page.html) | Landing page milestone write-up: hero, features and pricing, SEO, Open Graph previews, GEO, team decisions and next steps. Open in a browser and paste into the Google Doc, like `business-model/milestone-business-model.html` |
 | [`business-model/`](business-model/README.md) | Pricing proposal (Free, Plus, Founding Plus), reproducible AI cost model and charts |
 
 ## Finished videos

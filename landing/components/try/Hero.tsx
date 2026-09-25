@@ -7,6 +7,7 @@ import { scenes, getScene } from "@/data/scenes";
 import type { Lang } from "@/data/types";
 import { appLinks } from "@/lib/site";
 import { ArrowRight } from "../icons";
+import { ProductHuntBadge } from "../ProductHuntBadge";
 import { LanguageToggle } from "./LanguageToggle";
 import { Session } from "./Session";
 import styles from "./hero.module.css";
@@ -145,6 +146,7 @@ export function Hero() {
               </p>
               <LanguageToggle value={lang} onChange={setLang} compact />
             </div>
+            <ProductHuntBadge />
           </div>
 
           <ul className={styles.ring} aria-label="Photos you can learn from">

@@ -1,3 +1,4 @@
+import { pricing } from "@/data/pricing";
 import { appLinks, site } from "@/lib/site";
 
 export type FaqItem = { q: string; a: string };
@@ -8,7 +9,7 @@ type JsonLdProps = {
 };
 
 /** Serialise for an inline <script>: `<` is escaped so the payload can never close the tag. */
-function serialize(data: unknown): string {
+export function serializeJsonLd(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c");
 }
 
@@ -24,6 +25,7 @@ export function JsonLd({ faq }: JsonLdProps) {
       "@id": orgId,
       name: site.name,
       url: `${site.url}/`,
+      sameAs: site.sameAs,
       logo: {
         "@type": "ImageObject",
         url: logoUrl,
@@ -51,24 +53,28 @@ export function JsonLd({ faq }: JsonLdProps) {
       operatingSystem: "Web",
       image: `${site.url}/opengraph-image`,
       publisher: { "@id": orgId },
+      inLanguage: ["es", "fr"],
+      featureList: [...pricing.free, ...pricing.plus],
       offers: [
         {
           "@type": "Offer",
           name: "Free",
+          description: pricing.free.join("; "),
           price: "0",
-          priceCurrency: "USD",
+          priceCurrency: pricing.currency,
           category: "free",
         },
         {
           "@type": "Offer",
           name: "Plus",
-          price: "7.99",
-          priceCurrency: "USD",
+          description: pricing.plus.join("; "),
+          price: String(pricing.plusMonthly),
+          priceCurrency: pricing.currency,
           category: "subscription",
           priceSpecification: {
             "@type": "UnitPriceSpecification",
-            price: "7.99",
-            priceCurrency: "USD",
+            price: String(pricing.plusMonthly),
+            priceCurrency: pricing.currency,
             unitCode: "MON",
             billingDuration: "P1M",
             referenceQuantity: {
@@ -81,13 +87,14 @@ export function JsonLd({ faq }: JsonLdProps) {
         {
           "@type": "Offer",
           name: "Plus (yearly)",
-          price: "49.99",
-          priceCurrency: "USD",
+          description: pricing.plus.join("; "),
+          price: String(pricing.plusYearly),
+          priceCurrency: pricing.currency,
           category: "subscription",
           priceSpecification: {
             "@type": "UnitPriceSpecification",
-            price: "49.99",
-            priceCurrency: "USD",
+            price: String(pricing.plusYearly),
+            priceCurrency: pricing.currency,
             unitCode: "ANN",
             billingDuration: "P1Y",
             referenceQuantity: {
@@ -117,7 +124,7 @@ export function JsonLd({ faq }: JsonLdProps) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: serialize({ "@context": "https://schema.org", "@graph": graph }) }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd({ "@context": "https://schema.org", "@graph": graph }) }}
     />
   );
 }

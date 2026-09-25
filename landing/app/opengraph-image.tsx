@@ -16,10 +16,10 @@ import {
   printPhotoArea,
 } from "@/lib/og";
 import { getPhoto, photos, type Photo } from "@/lib/photos";
+import { site } from "@/lib/site";
 
 export const runtime = "nodejs";
-export const alt =
-  "Linguini — Learn the language of your day. Real photos pinned like prints, one tagged “la mesa · the table”.";
+export const alt = site.ogImageAlt;
 export const size = OG_SIZE;
 export const contentType = "image/png";
 
