@@ -74,6 +74,36 @@
   box-shadow: none;
 }
 
+/* Inline text links: quiet controls that read as text, not as action buttons. */
+.text-link {
+  align-self: center;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--teal-dark);
+  font-family: inherit;
+  font-size: var(--text-small);
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.text-link--muted {
+  align-self: flex-start;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.text-link:hover:not(:disabled) {
+  color: var(--teal);
+}
+
+.text-link:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -1426,6 +1456,13 @@ p[role="alert"]::before { content: "!"; }
   font-size: var(--text-body);
   font-weight: 800;
   color: var(--teal-dark);
+}
+
+/* Target-language I-Spy opening shown above the learner's own clue. */
+.ispy-opening {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
 }
 
 .input,
@@ -2835,12 +2872,13 @@ p[role="alert"]::before { content: "!"; }
 
 /* Streak card */
 .home-streak {
+  --home-card-bg: #fde7de;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-5);
   border-radius: var(--radius-lg);
-  background: var(--paper);
+  background: var(--home-card-bg);
   box-shadow: var(--shadow-paper);
 }
 
@@ -2949,11 +2987,12 @@ p[role="alert"]::before { content: "!"; }
 }
 
 .home-featured {
+  --home-card-bg: var(--sage);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
   padding: 0;
-  background: var(--paper);
+  background: var(--home-card-bg);
   color: var(--ink);
 }
 
@@ -3037,7 +3076,7 @@ p[role="alert"]::before { content: "!"; }
   position: absolute;
   inset: 8px;
   border-radius: inherit;
-  background: var(--paper);
+  background: var(--home-card-bg, var(--paper));
   content: "";
 }
 
@@ -3069,6 +3108,7 @@ p[role="alert"]::before { content: "!"; }
 }
 
 .home-tile {
+  --home-card-bg: #fff1cc;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3077,7 +3117,7 @@ p[role="alert"]::before { content: "!"; }
   min-height: 104px;
   padding: var(--space-3) var(--space-2);
   border-radius: var(--radius-lg);
-  background: var(--paper);
+  background: var(--home-card-bg);
   box-shadow: var(--shadow-paper);
   color: var(--ink);
   font-size: var(--text-small);
@@ -3086,7 +3126,7 @@ p[role="alert"]::before { content: "!"; }
 }
 
 .home-tile:hover:not(:disabled) {
-  background: var(--paper);
+  background: #ffe9b0;
 }
 
 .home-tile svg {
@@ -3095,12 +3135,13 @@ p[role="alert"]::before { content: "!"; }
 
 /* "Words learnt each day" bar chart */
 .home-words {
+  --home-card-bg: var(--cream);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-5);
   border-radius: var(--radius-lg);
-  background: var(--paper);
+  background: var(--home-card-bg);
   box-shadow: var(--shadow-card);
 }
 
@@ -3356,6 +3397,13 @@ p[role="alert"]::before { content: "!"; }
   flex: none;
   gap: var(--space-1);
   color: var(--ink-muted);
+}
+
+/* Exit-to-home sits directly under the task progress trail. */
+.learning-exit-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: calc(-1 * var(--space-3));
 }
 
 .learning-card {

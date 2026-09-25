@@ -12,14 +12,14 @@ import { queryError, queryKeys } from "../lib/queryKeys";
 export function SessionSummary() {
   const navigate = useNavigate();
   const scene = useScene();
-  const { session, completionPending, completionError, retryCompletion } = useAppState();
+  const { session, completionError, retryCompletion } = useAppState();
   const { vocabulary } = useVocabularyQuery(); 
   const [startError] = useState<string | null>(null);
+  // Stats render from the in-flight numbers straight away; the completion
+  // mutation invalidates this key so final XP replaces them once it lands.
   const { data, error: queryErrorValue, isPending: loading } = useQuery({
     queryKey: queryKeys.sessionSummary(scene.sessionId!),
     queryFn: () => getPracticeSummary(scene.sessionId!),
-    // Summary XP is only final once the completion write lands.
-    enabled: !(completionPending && session?.session.id === scene.sessionId),
   });
   const error = queryError(queryErrorValue);
   const completed = session?.session.status === "completed";

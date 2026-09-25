@@ -10,6 +10,18 @@ export type OnboardingDraft = {
 
 const storageKey = "linguini-onboarding-draft";
 
+// Goals are multi-select in the UI but persist as one comma-joined
+// `learningGoal` string, which the backend already accepts.
+const goalSeparator = ", ";
+
+export function parseGoals(goal: string): string[] {
+  return goal.split(",").map(value => value.trim()).filter(Boolean);
+}
+
+export function joinGoals(goals: string[]): string {
+  return goals.join(goalSeparator);
+}
+
 export function readOnboardingDraft(): OnboardingDraft | null {
   try {
     // Email confirmation opens a new tab, so this must survive beyond one tab's session.

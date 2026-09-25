@@ -5,7 +5,7 @@ import { languages } from "../config/languages";
 import { useAppState } from "../state/useAppState";
 
 const defaultDraft: OnboardingDraft = {
-  name: "", languageCode: languages[0].code, goal: "Chat with neighbours", minutes: 10,
+  name: "", languageCode: languages[0].code, goal: "", minutes: 10,
   microphoneEnabled: false, cameraEnabled: false, avatar: "farfalle",
 };
 

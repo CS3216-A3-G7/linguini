@@ -63,6 +63,38 @@ def test_generated_ispy_clues_keep_the_answer_key_private():
     assert len(public["publicContent"]["options"]) == 2
 
 
+def test_ispy_clue_without_a_generated_translation_falls_back_to_the_clue():
+    session_id = uuid4()
+    words = [
+        VocabularyItem(language_code="es", lemma=text, display_text=text, part_of_speech="noun")
+        for text in ["taza", "mesa"]
+    ]
+    objects = [
+        SceneObject(session_id=session_id, label=label, vocabulary_item_id=word.id)
+        for label, word in zip(["cup", "table"], words, strict=True)
+    ]
+    result = ISpyClueResult.model_validate({"clues": [
+        {
+            "clue": "es roja y está a la izquierda",
+            "clueTranslation": "is red and on the left",
+            "answerObjectKey": str(objects[0].id),
+            "objectKeys": [str(objects[0].id)],
+            "relationshipKeys": [],
+        },
+        {
+            "clue": "está debajo de algo rojo",
+            "answerObjectKey": str(objects[1].id),
+            "objectKeys": [str(objects[1].id)],
+            "relationshipKeys": [],
+        },
+    ]})
+
+    tasks = build_ispy_clue_tasks(session_id, result, objects, words)
+
+    assert tasks[0].public_content.clue_translation == "is red and on the left"
+    assert tasks[1].public_content.clue_translation == "está debajo de algo rojo"
+
+
 def test_backend_selects_two_ispy_description_targets_without_storing_one_in_context():
     session_id = uuid4()
     words = [

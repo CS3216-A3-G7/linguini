@@ -61,10 +61,8 @@ export function PracticeAnalysis() {
       <TranslationPreview preview={session.translationPreview} scene={scene} />
       <section role="status" className="panel-note">
         {session.tasks.some(task => task.kind === "vocabularyIntroduction") ? <>
-          <h2>Your first task is ready</h2>
-          <p className="muted">Start learning your words now. The remaining tasks will finish in the background.</p>
           <Button block onClick={() => navigate(`${base}/learn/${session.tasks.find(task => task.kind === "vocabularyIntroduction")!.id}`)}>
-            Begin tasks <ArrowRightIcon />
+            Begin learning <ArrowRightIcon />
           </Button>
         </> : <>
           <h2>Preparing your first task...</h2>

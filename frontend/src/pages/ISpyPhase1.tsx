@@ -70,7 +70,7 @@ function ClueRound({ task, index, total, onNext }: { task: SessionTask; index: n
     <div className="card card--lifted stack-2">
       <div className="spread"><span className="label muted">Linguini says</span><IconButton label="Hear the clue" onClick={() => speak(`${opening} ${content.clue}`, scene.languageCode)}><SpeakerIcon /></IconButton></div>
       <h3>{opening} {content.clue}</h3>
-      {content.clueTranslation ? showTranslation ? <p className="small muted">{content.clueTranslation}</p> : <Button variant="quiet" onClick={() => setShowTranslation(true)}>Show translation</Button> : null}
+      {content.clueTranslation ? showTranslation ? <p className="small muted">{content.clueTranslation}</p> : <button type="button" className="text-link text-link--muted" onClick={() => setShowTranslation(true)}>See translation</button> : null}
     </div>
     <div className="choice-grid">{choiceOrder(content.options, task.id, option => option.optionId).map(option => {
       const state = picked !== option.optionId ? "" : result?.attempt?.isCorrect != null ? (result.attempt.isCorrect ? " choice--correct" : " choice--incorrect") : " choice--selected";

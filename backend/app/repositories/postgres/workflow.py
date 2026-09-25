@@ -1393,7 +1393,21 @@ class PostgresWorkflowRepository:
                             for question in task.public_content.questions
                         }
                         correct_count = sum(question_results.values())
-                        evaluation_details = {"questionResults": question_results}
+                        # Released only with the graded attempt so each question
+                        # can show its own correct answer.
+                        correct_answers = {
+                            question.question_id: expected
+                            for question in task.public_content.questions
+                            if (
+                                expected := task.answer_key.correct_option_ids.get(
+                                    question.question_id
+                                )
+                            )
+                        }
+                        evaluation_details = {
+                            "questionResults": question_results,
+                            "correctAnswers": correct_answers,
+                        }
                         feedback_message = (
                             f"{correct_count} of {len(question_results)} questions correct."
                         )
