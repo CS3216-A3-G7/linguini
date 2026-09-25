@@ -2,28 +2,20 @@
 
 <p align="center">
   <img src="frontend/public/linguini-logo.png" alt="Linguini logo" width="180" />
+  <img src="frontend/public/linguini-wordmark.png" alt="Linguini wordmark" width="360" />
 </p>
 
-<p align="center"><strong>Learn a language through the world around you.</strong></p>
-
-Linguini is a photo-led, speak-first language-learning app. You photograph a moment from your day, Linguini finds the words inside it, you practise them through word cards, I-Spy and short sentence tasks in Spanish or French, and the day ends up in your journal.
+<p align="center"><strong>Learn the language of your day</strong></p>
 
 ## Group members
 
-Please replace the placeholders below with the group’s final matriculation numbers, names, and contribution descriptions.
-
 | Matriculation number | Name | Contribution to the assignment |
 | --- | --- | --- |
-| `TBC` | `Member 1` | `Describe contributions here` |
-| `TBC` | `Member 2` | `Describe contributions here` |
-| `TBC` | `Member 3` | `Describe contributions here` |
+| `A0312075N` | `Ananya Jain` | `Idea, Branding, Frontend, UI/UX, AI Core Tech, Pitch` |
+| `A0286908L` | `Govindaraj Roshni Daksha` | `Backend API, Database, AI Core Tech` |
+| `TBC` | `Madrid Lim` | `Landing Page, Marketing, User Analytics, Database` |
+| `TBC` | `Shamit Gupta` | `AI Model Analysis, OpenRouter Integration` |
 
-## Application
-
-- **Application:** [Linguini](https://linguini-navy.vercel.app)
-- **Landing page:** [linguini-landing.vercel.app](https://linguini-landing.vercel.app)
-
-The application may require the configured backend and database services to be available for all features.
 
 ## Repository
 
