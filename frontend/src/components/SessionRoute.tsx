@@ -44,7 +44,7 @@ function SessionLoader({ id }: { id: string }) {
     staleTime: 0, gcTime: 0, retry: false, refetchOnMount: "always",
   });
   const error = queryError(queryErrorValue);
-  const copy = sessionLoadingCopy(location.pathname);
+  const copy = sessionLoadingCopy(location.pathname, session?.session.id === id ? session.session.status : undefined);
   const earlyReady = session?.session.id === id && ["generatingTasks", "ready", "inProgress"].includes(session.session.status)
     && session.tasks.some(task => task.kind === "vocabularyIntroduction");
   if (loading && !earlyReady && session?.session.id === id && session.session.status === "generatingTasks" && session.translationPreview) return <div className="stack analysis-page">
@@ -56,7 +56,7 @@ function SessionLoader({ id }: { id: string }) {
     <h1>{copy.title}</h1>
     <section className="analysis-loading" aria-live="polite" aria-busy="true">
       <AnalysisScan scene={preview} />
-      <div className="analysis-loading__copy"><h2>{copy.heading}</h2><p className="muted">This will only take a moment.</p></div>
+      <div className="analysis-loading__copy"><h2>{copy.heading}</h2><p className="muted">{copy.support ?? "This will only take a moment."}</p></div>
     </section>
   </div> : <LoadingScreen label={copy.heading} />;
   if ((!data && !earlyReady) || error) return <ErrorState title="We couldn't open this practice" message={error ?? "This practice isn't available right now."} retry={() => window.location.reload()} backTo="/practice" backLabel="Choose another image" />;
