@@ -18,6 +18,7 @@ from app.ai import (
 from app.ai.features.object_grounding import ObjectGroundingError
 from app.ai.features.scene_analysis import RoutedSceneAnalyzer
 from app.ai.instrumentation import TracedISpyGuessGenerator
+from app.ai.openrouter import OPENROUTER_BASE_URL
 from app.ai.registry import (
     build_image_moderator,
     build_ispy_clue_generator,
@@ -222,15 +223,19 @@ def get_ispy_guess_generator(settings: AiSettings, tracer: AITracer | None = Non
     config = settings.feature(AiFeature.ISPY_GUESS)
     if config.provider is AiProvider.NONE:
         return None
-    if config.provider is not AiProvider.OPENAI:
+    if config.provider not in (AiProvider.OPENAI, AiProvider.OPENROUTER):
         raise ValueError(f"Unsupported ISPY_GUESS_PROVIDER: {config.provider}")
     if not settings.is_configured(config):
         return None
     return TracedISpyGuessGenerator(
         OpenAIISpyGuessGenerator(
-            settings.openai_api_key,
+            settings.api_key_for(config.provider),
             config.model_name,
             timeout_seconds=config.timeout_seconds,
+            base_url=(
+                OPENROUTER_BASE_URL
+                if config.provider is AiProvider.OPENROUTER else None
+            ),
         ),
         tracer or NoOpAITracer(),
         provider=config.provider.value,

@@ -64,7 +64,7 @@ class GeminiTextClient(TextModelClient):
                 contents=[request.user_content],
                 config=types.GenerateContentConfig(
                     system_instruction=request.system_prompt,
-                    temperature=0,
+                    temperature=self._config.temperature,
                     response_mime_type="application/json",
                     response_json_schema=request.json_schema,
                     max_output_tokens=self._config.max_output_tokens,

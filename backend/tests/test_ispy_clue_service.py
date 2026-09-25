@@ -562,6 +562,8 @@ def test_gemini_without_a_model_yields_no_generator() -> None:
         env={
             "AI_GEMINI_API_KEY": "gem-key",
             "AI_ISPY_CLUE_PROVIDER": "gemini",
+            "AI_ISPY_CLUE_MODEL": "",
+            "GEMINI_ISPY_CLUE_MODEL": "",
         }
     )
     assert settings.ispy_clue.provider.value == "gemini"
