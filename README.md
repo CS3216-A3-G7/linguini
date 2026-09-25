@@ -64,13 +64,13 @@ Captured from the running app (phone width) against the live database.
 | --- | --- | --- |
 | <img src="docs/screenshots/home.png" alt="Home screen with streak, XP and the next practice card" width="240" /> | <img src="docs/screenshots/practice.png" alt="Scene capture screen with camera, upload and ready scenes" width="240" /> | <img src="docs/screenshots/learn.png" alt="Learning tasks screen with the scene photo and its translations" width="240" /> |
 
-| Vocabulary | Journal | Progress |
+| Vocabulary | Journal | Profile |
 | --- | --- | --- |
-| <img src="docs/screenshots/vocabulary.png" alt="Vocabulary screen grouped by the scenes the words came from" width="240" /> | <img src="docs/screenshots/journal.png" alt="Monthly journal with photo entries" width="240" /> | <img src="docs/screenshots/progress.png" alt="Progress screen with words learned, mastered and scenes" width="240" /> |
+| <img src="docs/screenshots/vocabulary.png" alt="Vocabulary screen grouped by the scenes the words came from" width="240" /> | <img src="docs/screenshots/journal.png" alt="Monthly journal with photo entries" width="240" /> | <img src="docs/screenshots/profile.png" alt="Profile screen with learning setup and permissions" width="240" /> |
 
-| I-Spy · Linguini's clues | I-Spy · your turn | Profile |
-| --- | --- | --- |
-| <img src="docs/screenshots/ispy-clues.png" alt="I-Spy phase one: a clue from Linguini and the objects to pick from" width="240" /> | <img src="docs/screenshots/ispy-your-turn.png" alt="I-Spy phase two: writing your own clue for a target word" width="240" /> | <img src="docs/screenshots/profile.png" alt="Profile screen with learning setup and permissions" width="240" /> |
+| I-Spy · Linguini's clues | I-Spy · your turn |
+| --- | --- |
+| <img src="docs/screenshots/ispy-clues.png" alt="I-Spy phase one: a clue from Linguini and the objects to pick from" width="240" /> | <img src="docs/screenshots/ispy-your-turn.png" alt="I-Spy phase two: writing your own clue for a target word" width="240" /> |
 
 ## Launch film
 
