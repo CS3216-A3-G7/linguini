@@ -78,6 +78,7 @@ class OpenAIVisionClient(VisionModelClient):
         image_data = base64.b64encode(request.image.data).decode("ascii")
         return {
             "model": self._config.model_name,
+            "temperature": self._config.temperature,
             "max_output_tokens": self._config.max_output_tokens,
             "input": [
                 {

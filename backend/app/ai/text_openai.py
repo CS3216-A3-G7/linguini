@@ -74,7 +74,7 @@ class OpenAITextClient(TextModelClient):
     def _request_body(self, request: TextModelRequest) -> dict[str, Any]:
         return {
             "model": self._config.model_name,
-            "temperature": 0,
+            "temperature": self._config.temperature,
             "max_output_tokens": self._config.max_output_tokens,
             "input": [
                 {

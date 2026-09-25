@@ -76,3 +76,25 @@ def test_rejects_an_alternative_that_repeats_the_guess(tmp_path):
     provider, _ = generator(tmp_path, data)
     with pytest.raises(ISpyGuessError):
         provider.guess(CONTEXT, "Es roja.")
+
+
+def test_a_base_url_points_the_same_adapter_at_openrouter(tmp_path: Path):
+    """OpenRouter speaks the same Responses API, so only the host changes."""
+    prompt = tmp_path / "i_spy_guess.txt"
+    prompt.write_text("Guess the object.", encoding="utf-8")
+
+    provider = OpenAIISpyGuessGenerator(
+        "test-key", "anthropic/claude-haiku-4.5",
+        prompt_path=prompt, base_url="https://openrouter.ai/api/v1",
+    )
+
+    assert str(provider.client.base_url).startswith("https://openrouter.ai/api/v1")
+
+
+def test_without_a_base_url_the_adapter_calls_openai(tmp_path: Path):
+    prompt = tmp_path / "i_spy_guess.txt"
+    prompt.write_text("Guess the object.", encoding="utf-8")
+
+    provider = OpenAIISpyGuessGenerator("test-key", "gpt-4o-mini", prompt_path=prompt)
+
+    assert "openai.com" in str(provider.client.base_url)
