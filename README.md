@@ -13,9 +13,9 @@
 
 | Matriculation number | Name | Contribution to the assignment |
 | --- | --- | --- |
-| `A0312075N` | `Ananya Jain` | `Idea, Branding, Frontend (UI/UX), AI Core Tech, Pitch` |
+| `A0312075N` | `Jain Ananya` | `Idea, Branding, Frontend (UI/UX), AI Core Tech, Pitch` |
 | `A0286908L` | `Govindaraj Roshni Daksha` | `Backend API, Database, AI Core Tech` |
-| `A0307648W` | `Madrid Lim` | `Landing Page, Marketing, User Analytics` |
+| `A0307648W` | `Madrid Lim` | `Landing Page, Marketing, User Analytics, Evaluation Dataset` |
 | `A0310636M` | `Shamit Gupta` | `AI Model Analysis, OpenRouter Integration` |
 
 
