@@ -174,7 +174,9 @@ _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
     ),
     AiFeature.SCENE_TRANSLATION: _LegacySpec(
         provider_var="TRANSLATION_PROVIDER",
-        provider_default="openrouter",
+        # Mistral Small (openrouter) scored marginally higher but is
+        # rate-limited upstream too often to be the default.
+        provider_default="openai",
         timeout_var="TRANSLATION_TIMEOUT_SECONDS",
         timeout_default="60",
         model_vars={

@@ -275,8 +275,8 @@ def test_empty_env_reproduces_the_measured_defaults():
     assert scene.timeout_seconds == 120
 
     translation = settings.scene_translation
-    assert translation.provider is AiProvider.OPENROUTER
-    assert translation.model_name == "mistralai/mistral-small-2603"
+    assert translation.provider is AiProvider.OPENAI
+    assert translation.model_name == "gpt-4o-mini"
     assert translation.timeout_seconds == 60
 
     learning = settings.learning_task
