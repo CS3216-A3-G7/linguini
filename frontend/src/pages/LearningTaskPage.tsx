@@ -70,8 +70,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose, onExit }: { 
   };
   return <div className="stack">
     <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
-    <ExitToHome onExit={onExit} />
-    <div className="learning-title-row"><h1>{taskTitle(task)}</h1></div>
+    <div className="learning-title-row"><h1>{taskTitle(task)}</h1><ExitToHome onExit={onExit} /></div>
     {card && content.kind === "vocabularyIntroduction" ? <div className="flashcard learning-card">
       <div className="spread"><span className="label muted">{card.wordClass}{card.gender ? " · " + card.gender : ""}</span>
         <IconButton label={"Hear " + card.word} onClick={() => speak(card.word, scene.languageCode)}><SpeakerIcon /></IconButton></div>
@@ -104,9 +103,7 @@ function LearningTaskContent({ task, index, total, onNext, onClose, onExit }: { 
 }
 
 function ExitToHome({ onExit }: { onExit: () => void }) {
-  return <div className="learning-exit-row">
-    <Button variant="quiet" className="learning-exit" onClick={onExit}><CloseIcon size={18} /> Exit</Button>
-  </div>;
+  return <Button variant="quiet" className="learning-exit" onClick={onExit}><CloseIcon size={18} /> Exit</Button>;
 }
 
 function BackToTasks({ onClose }: { onClose: () => void }) {
@@ -183,8 +180,7 @@ function VocabularyLearningFlow({ task, index, total, onNext, onClose, onExit }:
   };
   return <div className="stack vocabulary-flow">
     <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
-    <ExitToHome onExit={onExit} />
-    <div className="learning-title-row"><div><h1>{content.title}</h1>{!terminal && stage === "review" ? <p className="small muted" aria-live="polite">{page + 1} of {pageCount}</p> : null}</div></div>
+    <div className="learning-title-row"><div><h1>{content.title}</h1>{!terminal && stage === "review" ? <p className="small muted" aria-live="polite">{page + 1} of {pageCount}</p> : null}</div><ExitToHome onExit={onExit} /></div>
     {!terminal && stage === "review" ? <>
       <div className="vocabulary-learning-grid vocabulary-learning-grid--swipe" onTouchStart={handleCardTouchStart} onTouchEnd={handleCardTouchEnd}>{visibleWords.map(word => <VocabularyLearningCard key={word.learningKey ?? word.vocabularyItemId ?? word.targetText} word={word} languageCode={scene.languageCode} />)}</div>
       <div className="vocabulary-flow__actions">
@@ -256,8 +252,7 @@ function GrammarLessonFlow({ task, index, total, onNext, onClose, onExit }: { ta
   };
   return <div className="stack vocabulary-flow">
     <ProgressTrail value={index + 1} total={total} label={`Task ${index + 1} of ${total}`} />
-    <ExitToHome onExit={onExit} />
-    <div className="learning-title-row"><h1>{content.title}</h1></div>
+    <div className="learning-title-row"><h1>{content.title}</h1><ExitToHome onExit={onExit} /></div>
     <div className="panel-note">{content.explanation}</div>
     {content.questions.map((question, position) => <Card key={question.questionId} plain><div className="stack">
       <span className="label muted">Question {position + 1} of {content.questions.length}</span>
