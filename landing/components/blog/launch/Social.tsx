@@ -187,46 +187,9 @@ export function StoryPhone() {
   );
 }
 
-/* ---------- The other channels, one tab each ---------- */
+/* ---------- The other channels ---------- */
 
-const channels = ["LinkedIn", "Reddit", "Telegram"] as const;
-
-const panels = { LinkedIn: LinkedInPost, Reddit: RedditPost, Telegram: TelegramChat };
-
-export function ChannelTabs() {
-  const [tab, setTab] = useState<(typeof channels)[number]>("LinkedIn");
-  const printing = usePrinting();
-  if (printing) {
-    return (
-      <div className={l.tabsPrint}>
-        {channels.map(name => {
-          const Panel = panels[name];
-          return (
-            <div key={name} className={l.feedCol}>
-              <p className={l.label}>{name}</p>
-              <Panel />
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-  return (
-    <div className={l.tabs}>
-      <div role="tablist" aria-label="Channel" className={l.tabList}>
-        {channels.map(name => (
-          <button key={name} type="button" role="tab" aria-selected={tab === name} className={l.tab}
-            onClick={() => setTab(name)}>{name}</button>
-        ))}
-      </div>
-      <div role="tabpanel" className={l.tabPanel} key={tab}>
-        {tab === "LinkedIn" ? <LinkedInPost /> : tab === "Reddit" ? <RedditPost /> : <TelegramChat />}
-      </div>
-    </div>
-  );
-}
-
-function LinkedInPost() {
+export function LinkedInPost() {
   const [opened, setOpen] = useState(false);
   const printing = usePrinting();
   const open = opened || printing;
@@ -256,7 +219,7 @@ function LinkedInPost() {
   );
 }
 
-function RedditPost() {
+export function RedditPost() {
   const [vote, setVote] = useState(0);
   return (
     <article className={`${l.phoneCard} ${l.rd}`} aria-label="Draft Reddit comment">
@@ -278,7 +241,7 @@ function RedditPost() {
   );
 }
 
-function TelegramChat() {
+export function TelegramChat() {
   return (
     <div className={`${l.phoneCard} ${l.tg}`} aria-label="Draft Telegram message">
       <p className={l.tgHead}><b>{telegram.group}</b><span>group</span></p>

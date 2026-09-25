@@ -26,11 +26,11 @@ export const posts: Post[] = [
     slug: "launch-week",
     title: "How we’re launching Linguini",
     summary:
-      "Saturday 17 October, 3:01pm in Singapore. Our Product Hunt listing, every post we’ll publish, the banners, who we’re telling and the checklist, with the reasons behind each call.",
+      "Saturday 17 October, 3:01pm in Singapore. Our Product Hunt listing, every post we’ll publish, who we’re telling, the launch-day shifts and how we plan to keep the people who show up.",
     category: "Company",
     date: "2026-09-24",
-    readMinutes: 9,
-    cover: { kind: "image", src: "/blog/launch/blog-cover-1600x1000.jpg", alt: "Launch week: the Linguini gallery, Instagram post and X header laid out together" },
+    readMinutes: 10,
+    cover: { kind: "video", src: "/blog/launch/cover-loop.mp4", poster: "/blog/launch/cover-loop-poster.jpg" },
     pdf: "/blog/launch-week.pdf",
   },
   {
@@ -48,23 +48,18 @@ export const posts: Post[] = [
     slug: "why-we-teach-with-your-photos",
     title: "Why we teach with your photos",
     summary:
-      "A word sticks when it belongs to a moment you lived. The idea behind Linguini’s photo, play and journal loop.",
+      "A word sticks when it belongs to a moment you lived. The idea behind Linguini’s photo lessons, and what happens inside one, step by step and cent by cent.",
     category: "Insights",
     date: "2026-09-24",
-    readMinutes: 3,
+    readMinutes: 6,
     cover: { kind: "photo", scene: "golden-gate-bridge", words: ["bridge", "sea", "tower"] },
   },
-  {
-    slug: "inside-a-linguini-lesson",
-    title: "Inside a Linguini lesson",
-    summary:
-      "What happens between tapping the shutter and playing I-Spy: the five AI steps behind one photo lesson, and what each one costs.",
-    category: "Technical",
-    date: "2026-09-24",
-    readMinutes: 4,
-    cover: { kind: "photo", scene: "desk-flatlay", words: ["notebook", "laptop", "plant"] },
-  },
 ];
+
+/** Old slugs that now live inside another post. */
+export const movedPosts: Record<string, string> = {
+  "inside-a-linguini-lesson": "why-we-teach-with-your-photos",
+};
 
 export function getPost(slug: string): Post | undefined {
   return posts.find(post => post.slug === slug);

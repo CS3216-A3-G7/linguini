@@ -1,7 +1,6 @@
 import type { ComponentType } from "react";
 import { BusinessModel } from "./posts/BusinessModel";
 import { LaunchCampaign } from "./posts/LaunchCampaign";
-import { LessonPipeline } from "./posts/LessonPipeline";
 import { PhotoLessons } from "./posts/PhotoLessons";
 
 /** Body component for each post slug in data/posts.ts. */
@@ -9,5 +8,4 @@ export const postBodies: Record<string, ComponentType> = {
   "launch-week": LaunchCampaign,
   "linguini-business-model": BusinessModel,
   "why-we-teach-with-your-photos": PhotoLessons,
-  "inside-a-linguini-lesson": LessonPipeline,
 };

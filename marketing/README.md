@@ -22,6 +22,8 @@ Everything for launching and selling Linguini outside the app: the Product Hunt 
 
 Which one becomes the Product Hunt listing video is an open decision in the [launch kit](product-hunt/README.md#team-decision-checklist).
 
+Where each one plays on the landing site: the promo film is the home-page film (`landing/public/film/`), the narrated launch film is in the blog post "Why we teach with your photos" (`landing/public/blog/photos/`), and the explainer is in the launch post (`landing/public/blog/launch/`). All three start muted with a "Sound on" button. The launch post's card cover is a silent loop rendered by `media/launch_cover.py`.
+
 ## Rebuilding
 
 Each folder documents its own pipeline. In short:
