@@ -27,8 +27,6 @@ const kit = [
 export function LaunchCampaign() {
   return (
     <div className={s.body}>
-      <p className={story.status}>Draft plan · nothing posted yet · checked 25 September 2026</p>
-
       <InView as="p" className={story.lede}>
         A launch is one day. Keeping the people who show up takes <mark>the two weeks after</mark>, so that’s where most
         of this plan goes. Here it is in the order it happens.
