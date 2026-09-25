@@ -135,7 +135,6 @@ export function Home() {
         <img src="/linguini-logo.png" width={64} height={64} alt="" />
         <div>
           <h1>{greeting()}, {learner.name || "friend"}!</h1>
-          <p>Small moments lead to big conversations.</p>
         </div>
       </header>
 
@@ -169,12 +168,9 @@ export function Home() {
           <Card className="home-featured home-featured--resume">
             <div className="home-featured__image">
               <MediaImage assetId={resume.session.sceneMediaAssetId} title={resume.title} />
-              <span className="home-featured__pill">Featured plan</span>
             </div>
             <div className="home-featured__body">
-              {learner.language ? <p className="home-featured__eyebrow">{learner.language}</p> : null}
               <h3>{resume.title}</h3>
-              <p className="home-featured__description">{resume.session.sessionSummary ?? "Pick up where you left off."}</p>
               {resume.progress.totalTaskCount > 0 ? <TaskProgressRing completed={resume.progress.completedTaskCount} total={resume.progress.totalTaskCount} /> : null}
               {continueError ? <p role="alert">{continueError}</p> : null}
               <Button block onClick={() => void continuePractice()}>

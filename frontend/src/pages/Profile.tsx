@@ -82,8 +82,18 @@ export function Profile() {
       <aside className="profile-ai-note">
         <strong>How AI helps</strong>
         <p>
-          Linguini suggests objects, vocabulary, and practice prompts from your scenes. You
-          always review the suggestions and decide what to keep, change, or remove.
+          Linguini uses AI in a few specific places: it detects the objects in your scene
+          photos, translates that vocabulary into your learning language, and writes the
+          I-Spy clues and practice tasks from the words you keep. Every suggestion is yours
+          to review — you decide what to keep, change, or remove before a lesson starts.
+        </p>
+      </aside>
+
+      <aside className="profile-ai-note">
+        <strong>Your privacy</strong>
+        <p>
+          Your photos are stored securely and are only used to generate your own lessons.
+          They are never shared with other learners and never used to train AI models.
         </p>
       </aside>
 
