@@ -28,7 +28,6 @@ export function SessionSummary() {
   )).slice(0, 3);
   
   return <div className="stack">
-    <p className="small muted">{completed ? "Session and XP saved." : "XP is saved after each action."}</p>
     {session?.session.status === "inProgress" ? <Button onClick={() => navigate(sessionDestination(session).path)}>Continue unfinished practice</Button> : null}
     <div className="center-text stack-2" style={{ alignItems: "center" }}>
       <img className="mascot" src="/linguini-logo.png" width={120} height={120} alt="Linguini mascot" /><h1>{completed ? "Good job!" : "Your session"}</h1><Noodle className="noodle-divider summary__noodle" />

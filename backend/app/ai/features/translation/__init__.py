@@ -19,6 +19,7 @@ __all__ = [
     "TranslatedTerm",
     "TranslationTerm",
     "build_scene_translation_schema",
+    "normalize_object_articles",
     "validate_translation_terms",
 ]
 
@@ -33,6 +34,7 @@ _IMPORTS = {
     "SceneTranslationService": "app.ai.features.translation.service",
     "build_scene_translation_schema": "app.ai.features.translation.service",
     "SceneTranslationError": "app.ai.features.translation.validation",
+    "normalize_object_articles": "app.ai.features.translation.validation",
     "validate_translation_terms": "app.ai.features.translation.validation",
 }
 

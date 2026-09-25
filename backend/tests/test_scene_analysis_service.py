@@ -300,7 +300,7 @@ def test_request_uses_shared_v2_contract() -> None:
     analyzer(client).analyze(session(), asset(), {}, None)
 
     sent = client.requests[0]
-    assert sent.prompt_version == "scene-analysis.v3"
+    assert sent.prompt_version == "scene-analysis.v4"
     assert sent.system_prompt == SCENE_ANALYSIS_SYSTEM_PROMPT
     assert sent.user_instruction == SCENE_ANALYSIS_USER_INSTRUCTION
     assert sent.json_schema_name == "scene_analysis_v2"

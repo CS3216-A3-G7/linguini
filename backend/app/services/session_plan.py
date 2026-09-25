@@ -1,5 +1,6 @@
 """Deterministic placeholder plans. No image recognition or AI generation."""
 
+import re
 from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import func, select, update
@@ -182,8 +183,18 @@ def _display_source(value):
 def _with_article(text, translated_term):
     if not translated_term or not translated_term.article:
         return text
-    separator = "" if translated_term.article.endswith("'") else " "
-    return f"{translated_term.article}{separator}{text}"
+    article = translated_term.article
+    separator = "" if article.endswith(("'", "’")) else " "
+    # Legacy rows may already carry the article inside display_text; adding it
+    # again produced doubled articles such as "el el camino".
+    already_present = (
+        re.match(rf"{re.escape(article)}\s", text, re.IGNORECASE)
+        if separator
+        else re.match(rf"{re.escape(article[:-1])}['’]", text, re.IGNORECASE)
+    )
+    if already_present:
+        return text
+    return f"{article}{separator}{text}"
 
 
 def build_grammar_lessons(session_id, result):

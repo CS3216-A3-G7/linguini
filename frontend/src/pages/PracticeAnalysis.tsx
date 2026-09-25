@@ -93,6 +93,7 @@ export function PracticeAnalysis() {
   const placementLabel = pending?.label ?? movingItem?.translation ?? null;
   const relationObjects = [...kept.map(item => ({ id: item.id, label: item.translation })), ...added];
   const selectedIds = new Set(relationObjects.map(item => item.id));
+  const attributeCount = [...selectedIds].reduce((sum, id) => sum + Object.values(attributes[id] ?? {}).filter(Boolean).length, 0);
   const activeAttributeObjectId = selectedIds.has(attributeObjectId) ? attributeObjectId : relationObjects[0]?.id ?? "";
   const visibleRelations = relations.filter(row => selectedIds.has(row.subjectSceneObjectId) && selectedIds.has(row.referenceSceneObjectId));
   const addRelation = () => {
@@ -164,7 +165,6 @@ export function PracticeAnalysis() {
     </div>
     <div className="analysis-layout">
       <div className="analysis-stage-column">
-        {session.analysisMode === "placeholder" ? <p className="small muted">These are sample suggestions. Keep what matches your photo and add anything missing.</p> : null}
         <div ref={photoRef} className={`analysis-photo-stage${placementLabel ? " analysis-photo-stage--placing" : ""}`}>
           {placementLabel ? <div className="analysis-placement-prompt" role="status">
             <span>Tap the centre of <strong>{placementLabel}</strong></span>
@@ -177,7 +177,7 @@ export function PracticeAnalysis() {
           {(["objects", "attributes", "relations"] as const).map(value => <button key={value} type="button" role="tab"
             aria-selected={panel === value} className={panel === value ? "is-active" : ""} onClick={() => setPanel(value)}>
             {value[0].toUpperCase() + value.slice(1)}
-            <span>{value === "objects" ? kept.length + added.length : value === "attributes" ? Object.values(attributes).reduce((sum, row) => sum + Object.values(row).filter(Boolean).length, 0) : visibleRelations.length}</span>
+            <span>{value === "objects" ? kept.length + added.length : value === "attributes" ? attributeCount : visibleRelations.length}</span>
           </button>)}
         </div>
       </div>

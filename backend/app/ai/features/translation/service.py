@@ -27,6 +27,7 @@ from app.ai.features.translation.schemas import (
 )
 from app.ai.features.translation.validation import (
     SceneTranslationError,
+    normalize_object_articles,
     validate_translation_terms,
 )
 from app.ai.model_errors import ProviderError
@@ -120,8 +121,10 @@ class SceneTranslationService:
                 latency_ms += (time.perf_counter() - call_start) * 1000
 
                 try:
-                    result = SceneTranslationResult.model_validate_json(
-                        response.output_text
+                    result = normalize_object_articles(
+                        SceneTranslationResult.model_validate_json(
+                            response.output_text
+                        )
                     )
                     validate_translation_terms(parsed_payload, result)
                 except (ValueError, SceneTranslationError) as error:

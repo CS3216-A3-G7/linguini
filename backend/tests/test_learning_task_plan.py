@@ -1,11 +1,13 @@
 from uuid import uuid4
 
+from app.ai.features.translation.schemas import TranslatedTerm
 from app.schemas.ispy_clues import ISpyClueResult
 from app.schemas.learning_tasks import LearningTaskResult
 from app.schemas.media import SceneObject
 from app.schemas.tasks import SessionTaskPublic
 from app.schemas.vocabulary import VocabularyItem
 from app.services.session_plan import (
+    _with_article,
     build_grammar_lessons,
     build_ispy_clue_tasks,
     build_ispy_description_tasks,
@@ -113,3 +115,24 @@ def test_backend_selects_two_ispy_description_targets_without_storing_one_in_con
     assert all(task.phase == "ispy" for task in tasks)
     assert all(task.answer_key.scene_description_context == context for task in tasks)
     assert "selectedTargetObjectKey" not in str(tasks[0].answer_key.scene_description_context)
+
+
+def test_with_article_does_not_double_an_article_bearing_display_text():
+    term = TranslatedTerm(key="o1", source="road", translation="camino", article="el")
+
+    # Legacy rows already store the article inside display_text.
+    assert _with_article("el camino", term) == "el camino"
+    assert _with_article("El camino", term) == "El camino"
+    # Article-free text still gets the article prepended once.
+    assert _with_article("camino", term) == "el camino"
+    # A noun that merely starts with the same letters is untouched here —
+    # "el camino" and "elche" only collapse on a real word boundary.
+    assert _with_article("elche", term) == "el elche"
+
+
+def test_with_article_handles_apostrophe_articles():
+    term = TranslatedTerm(key="o1", source="tree", translation="arbre", article="l'")
+
+    assert _with_article("l'arbre", term) == "l'arbre"
+    assert _with_article("l’arbre", term) == "l’arbre"
+    assert _with_article("arbre", term) == "l'arbre"

@@ -18,8 +18,10 @@ from app.ai.features.translation import (
     SCENE_TRANSLATION_SYSTEM_PROMPT,
     SceneTranslationError,
     SceneTranslationRequest,
+    SceneTranslationResult,
     SceneTranslationService,
     build_scene_translation_schema,
+    normalize_object_articles,
 )
 from app.ai.model_errors import ProviderError, ProviderErrorCode
 from app.ai.observability import NoOpAITracer
@@ -276,6 +278,119 @@ def test_unparseable_model_output_is_rejected() -> None:
         service(
             FakeTextClient(["not json"]), cfg=config(max_retries=0)
         ).translate(PAYLOAD)
+
+
+# --- Inlined-article normalization ---
+
+
+def test_normalize_object_articles_strips_matching_article() -> None:
+    result = SceneTranslationResult.model_validate(VALID_RESULT)
+    result = result.model_copy(update={
+        "objects": [
+            result.objects[0].model_copy(
+                update={"translation": "la silla", "article": "la"}
+            ),
+            *result.objects[1:],
+        ]
+    })
+
+    normalized = normalize_object_articles(result)
+
+    assert normalized.objects[0].translation == "silla"
+    assert normalized.objects[0].article == "la"
+
+
+def test_normalize_object_articles_sets_missing_article() -> None:
+    result = SceneTranslationResult.model_validate(VALID_RESULT)
+    result = result.model_copy(update={
+        "objects": [
+            result.objects[0].model_copy(
+                update={"translation": "l'arbre", "article": None}
+            ),
+            *result.objects[1:],
+        ]
+    })
+
+    normalized = normalize_object_articles(result)
+
+    assert normalized.objects[0].translation == "arbre"
+    assert normalized.objects[0].article == "l'"
+
+
+def test_normalize_object_articles_handles_curly_apostrophe() -> None:
+    result = SceneTranslationResult.model_validate(VALID_RESULT)
+    result = result.model_copy(update={
+        "objects": [
+            result.objects[0].model_copy(
+                update={"translation": "l’arbre", "article": None}
+            ),
+            *result.objects[1:],
+        ]
+    })
+
+    normalized = normalize_object_articles(result)
+
+    assert normalized.objects[0].translation == "arbre"
+    assert normalized.objects[0].article == "l’"
+
+
+def test_normalize_object_articles_leaves_article_like_nouns_untouched() -> None:
+    result = SceneTranslationResult.model_validate(VALID_RESULT)
+    result = result.model_copy(update={
+        "objects": [
+            result.objects[0].model_copy(
+                update={"translation": "lavabo", "article": "el"}
+            ),
+            result.objects[1].model_copy(
+                update={"translation": "lesson", "article": "la"}
+            ),
+        ]
+    })
+
+    normalized = normalize_object_articles(result)
+
+    assert [row.translation for row in normalized.objects] == ["lavabo", "lesson"]
+
+
+def test_normalize_object_articles_leaves_non_object_terms_untouched() -> None:
+    result = SceneTranslationResult.model_validate(VALID_RESULT)
+    result = result.model_copy(update={
+        "attributes": [
+            result.attributes[0].model_copy(update={"translation": "el rojo"})
+        ],
+        "relationships": [
+            result.relationships[0].model_copy(update={"translation": "la junto a"})
+        ],
+    })
+
+    normalized = normalize_object_articles(result)
+
+    assert normalized.attributes[0].translation == "el rojo"
+    assert normalized.relationships[0].translation == "la junto a"
+
+
+def test_inlined_article_output_is_normalized_before_validation() -> None:
+    output = json.loads(VALID_OUTPUT)
+    output["objects"][0]["translation"] = "la silla"
+    client = FakeTextClient([json.dumps(output)])
+
+    result = service(client).translate(PAYLOAD)
+
+    assert result.objects[0].translation == "silla"
+    assert result.objects[0].article == "la"
+    assert len(client.requests) == 1
+
+
+def test_inlined_article_recovers_missing_article() -> None:
+    output = json.loads(VALID_OUTPUT)
+    output["objects"][0]["translation"] = "la silla"
+    output["objects"][0]["article"] = None
+    client = FakeTextClient([json.dumps(output)])
+
+    result = service(client).translate(PAYLOAD)
+
+    assert result.objects[0].translation == "silla"
+    assert result.objects[0].article == "la"
 
 
 # --- Payload bounds ---

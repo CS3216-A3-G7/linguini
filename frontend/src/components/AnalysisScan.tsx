@@ -6,7 +6,6 @@ export function AnalysisScan({ scene }: { scene: Scene }) {
   return (
     <div className="analysis-scan" aria-hidden="true">
       <ScenePhoto scene={scene} items={[]} />
-      <span className="analysis-scan__wash" />
       <span className="analysis-scan__noodle" />
     </div>
   );
