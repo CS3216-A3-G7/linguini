@@ -22,7 +22,7 @@ export function PracticeSelect() {
   const [selected, setSelected] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingAsset, setPendingAsset] = useState<string | null>(null);
+  const [dismissedSessionId, setDismissedSessionId] = useState<string | null>(null);
   const busy = useRef(false);
   const dialogRef = useRef<HTMLElement>(null);
   const dialogTitleId = useId();
@@ -35,7 +35,8 @@ export function PracticeSelect() {
     enabled: !!activeProfileId,
   });
   const activeSession = activeProfileId ? activeCheck.data ?? null : null;
-  const activeCheckLoading = !!activeProfileId && activeCheck.isPending;
+  const activeSessionId = activeSession?.session.id ?? null;
+  const resumeDialogOpen = activeSessionId !== null && dismissedSessionId !== activeSessionId;
   const activeCheckError = queryError(activeCheck.error);
   const activeFetch = useCallback(() => queryClient.fetchQuery({
     queryKey: queryKeys.activeSession(activeProfileId ?? ""),
@@ -44,14 +45,14 @@ export function PracticeSelect() {
   }), [queryClient, activeProfileId]);
   const interactionDisabled = selected || starting || !!activeCheckError || !activeProfile;
   useEffect(() => {
-    if (!pendingAsset) return;
+    if (!resumeDialogOpen) return;
     dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !starting) setPendingAsset(null);
+      if (event.key === "Escape" && !starting) setDismissedSessionId(activeSessionId);
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [pendingAsset, starting]);
+  }, [activeSessionId, resumeDialogOpen, starting]);
   const start = async (asset: string) => {
     if (busy.current || !activeProfile || activeCheckError) return;
     busy.current = true; setSelected(true); setStarting(true); setError(null);
@@ -71,28 +72,12 @@ export function PracticeSelect() {
       navigate(sessionDestination(fresh).path);
     } catch (reason) { setError(friendlyError(reason)); }
   };
-  const chooseAsset = (asset: string) => {
-    if (activeSession) {
-      setPendingAsset(asset);
-      return;
-    }
-    void start(asset);
-  };
+  const chooseAsset = (asset: string) => void start(asset);
   return <div className="stack practice-select">
     <h1>Capture a scene</h1>
     {notice ? <p role="alert">{notice}</p> : null}
     <p className="muted">Take a photo of the world around you, or start from a ready scene.</p>
-    {activeCheckLoading ? <p role="status">Checking your current practice...</p> : null}
     {activeCheckError ? <p role="alert">{activeCheckError} Reload to resume an open practice.</p> : null}
-    {activeSession ? <div className="practice-select__active" role="status">
-      <div>
-        <strong>Continue an open practice</strong>
-        <p className="small muted">You can also start another photo below.</p>
-      </div>
-      <Button variant="secondary" onClick={() => void continueActive()}>
-        Continue practice
-      </Button>
-    </div> : null}
     <div className="dashed-capture">
       <span style={{ color: "var(--teal-dark)" }}><CameraIcon size={44} /></span>
       <ImageUpload compact disabled={interactionDisabled} cameraEnabled={learner.cameraOn}
@@ -110,13 +95,14 @@ export function PracticeSelect() {
         <span className="small items-center justify-center" style={{ fontWeight: 700 }}>{scene.title}</span>
       </button>)}
     </div>
-    {pendingAsset ? <div className="help-modal__backdrop" onMouseDown={() => !starting && setPendingAsset(null)}>
+    {resumeDialogOpen && activeSession ? <div className="help-modal__backdrop" onMouseDown={() => !starting && setDismissedSessionId(activeSessionId)}>
       <section ref={dialogRef} className="help-modal leave-session__dialog" role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} onMouseDown={event => event.stopPropagation()}>
-        <h2 id={dialogTitleId}>Keep this practice open?</h2>
-        <p>You already have a practice in progress. You can keep it and start this photo too. You can have up to three open practices.</p>
+        <h2 id={dialogTitleId}>Continue your practice?</h2>
+        <p>You have a practice waiting for you. Continue where you left off, or choose a new photo.</p>
         <div className="leave-session__actions">
-          <Button block disabled={starting} onClick={() => { setPendingAsset(null); void continueActive(); }}>Continue practice</Button>
-          <Button variant="secondary" block disabled={starting} onClick={() => { const asset = pendingAsset; setPendingAsset(null); if (asset) void start(asset); }}>Start another photo</Button>
+           <Button variant="secondary" block disabled={starting} onClick={() => setDismissedSessionId(activeSessionId)}>Begin New Practice</Button>
+      
+          <Button block disabled={starting} onClick={() => void continueActive()}>Continue Practice</Button>
         </div>
       </section>
     </div> : null}

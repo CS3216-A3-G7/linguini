@@ -111,7 +111,7 @@ export function Welcome() {
       </section>
 
       <div className="welcome-actions">
-        <Button block onClick={() => navigate("/onboarding")}>
+        <Button block onClick={() => navigate("/login?mode=signup")}>
           Get started <ChevronRightIcon size={20} />
         </Button>
         <Button variant="quiet" onClick={() => navigate("/login")}>

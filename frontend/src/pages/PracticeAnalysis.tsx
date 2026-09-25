@@ -9,6 +9,7 @@ import { LeaveSession } from "../components/LeaveSession";
 import { useScene } from "../state/useScene";
 import { useAppState } from "../state/useAppState";
 import { sessionDestination } from "../lib/sessionRoute";
+import { humanizeTerm } from "../lib/termLabel";
 import type { PracticeReview } from "../lib/api";
 import type { LanguageItem } from "../data/types";
 
@@ -23,7 +24,7 @@ type AnalysisPanel = "objects" | "attributes" | "relations";
 
 function relationLabel(relation: string) {
   return RELATION_OPTIONS.find(([value]) => value === relation)?.[1]
-    ?? relation.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ");
+    ?? humanizeTerm(relation);
 }
 
 export function PracticeAnalysis() {
@@ -60,10 +61,8 @@ export function PracticeAnalysis() {
       <TranslationPreview preview={session.translationPreview} scene={scene} />
       <section role="status" className="panel-note">
         {session.tasks.some(task => task.kind === "vocabularyIntroduction") ? <>
-          <h2>Your first task is ready</h2>
-          <p className="muted">Start learning your words now. The remaining tasks will finish in the background.</p>
           <Button block onClick={() => navigate(`${base}/learn/${session.tasks.find(task => task.kind === "vocabularyIntroduction")!.id}`)}>
-            Begin tasks <ArrowRightIcon />
+            Begin learning <ArrowRightIcon />
           </Button>
         </> : <>
           <h2>Preparing your first task...</h2>

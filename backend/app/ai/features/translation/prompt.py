@@ -1,14 +1,14 @@
 # ruff: noqa: E501 — prompt text is user-approved and must stay verbatim.
 """Versioned prompt for scene translation.
 
-``scene-translation.v3`` asks a text model for a structured JSON translation
+``scene-translation.v4`` asks a text model for a structured JSON translation
 of confirmed scene vocabulary. The ``SceneTranslationResult`` schema in
 ``app/ai/features/translation/schemas.py`` is the runtime contract; keep both
 in sync when bumping the version. Both providers use this exact prompt and
 schema.
 """
 
-SCENE_TRANSLATION_PROMPT_VERSION = "scene-translation.v3"
+SCENE_TRANSLATION_PROMPT_VERSION = "scene-translation.v4"
 SCENE_TRANSLATION_SCHEMA_VERSION = "scene-translation-result.v2"
 
 SCENE_TRANSLATION_SYSTEM_PROMPT = """Translate the supplied English scene vocabulary into the requested target language.
@@ -23,8 +23,11 @@ Rules:
 4. For each object, keep `translation` as the bare singular noun and return its correct
    definite article in `article` (for example: Spanish `la`/`el`; French `la`/`le`/`l'`).
 5. For each object, return grammatical gender as `masculine` or `feminine` when applicable.
-   Also return `phoneticText`: the IPA pronunciation of the bare translated noun,
-   enclosed in slashes (without the article). Provide it for every object.
+   Also return `phoneticText`: an approximate English-sound respelling of the
+   bare translated noun (without the article) — a readable pronunciation guide
+   spelled with English letters, with the stressed syllable in caps, for example
+   `MEH-sah` for "mesa". This is not IPA and must not be enclosed in slashes.
+   Provide it for every object.
    For attributes and relationships, phoneticText may be null.
 6. Attributes and relationships must have `article` and `gender` set to null.
    Their `translation` must still contain the translated adjective or relationship phrase.

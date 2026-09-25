@@ -58,6 +58,7 @@ export type VocabRecord = {
   wordClass: WordClass;
   gender: Gender;
   status: VocabStatus;
+  firstLearnedAt: string | null;
   topic: string;
   sceneId: string;
   example: string;
@@ -82,4 +83,14 @@ export type LeaderboardRow = {
   name: string;
   xp: number;
   isYou?: boolean;
+};
+
+export type StreakDay = {
+  date: string;
+  active: boolean;
+};
+
+export type Streak = {
+  current: number;
+  days: StreakDay[];
 };

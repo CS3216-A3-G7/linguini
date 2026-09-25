@@ -2,7 +2,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell, FocusShell } from "./components/AppShell";
 import { Home } from "./pages/Home";
 import { Welcome } from "./pages/Welcome";
-import { Onboarding, PreAccountOnboarding } from "./pages/Onboarding";
+import { Onboarding } from "./pages/Onboarding";
 import { Login } from "./pages/Login";
 import { PracticeSelect } from "./pages/PracticeSelect";
 import { PracticeAnalysis } from "./pages/PracticeAnalysis";
@@ -26,8 +26,10 @@ import { useAuth } from "./state/Auth";
 import { LoadingScreen } from "./components/LoadingScreen";
 
 function RequireAuth() {
+ 
   const { session, loading } = useAuth();
   const location = useLocation();
+  if (import.meta.env.DEV) return <Outlet />;
   if (loading) return <LoadingScreen label="Checking your account…" />;
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <Outlet />;
@@ -40,7 +42,7 @@ function AuthenticatedApp() {
 function OnboardingRoute() {
   const { session, loading } = useAuth();
   if (loading) return <LoadingScreen label="Preparing onboarding…" />;
-  if (!session) return <PreAccountOnboarding />;
+  if (!session) return <Navigate to="/login?mode=signup" replace />;
   return <AppStateProvider><Onboarding /></AppStateProvider>;
 }
 

@@ -171,10 +171,10 @@ def test_happy_path_returns_translation() -> None:
 
 def test_translation_preserves_phonetic_pronunciation() -> None:
     output = json.loads(VALID_OUTPUT)
-    output["objects"][0]["phoneticText"] = "/ˈsiʝa/"
+    output["objects"][0]["phoneticText"] = "SEE-yah"
     client = FakeTextClient([json.dumps(output)])
     result = service(client).translate(PAYLOAD)
-    assert result.objects[0].phonetic_text == "/ˈsiʝa/"
+    assert result.objects[0].phonetic_text == "SEE-yah"
 
 
 def test_request_uses_versioned_contract() -> None:

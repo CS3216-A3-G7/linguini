@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui";
 import { isSupabaseConfigured, supabase } from "../lib/supabase.ts";
-import { readOnboardingDraft } from "../lib/onboardingDraft";
 import { useAuth } from "../state/Auth";
 
 function authenticationMessage(message: string) {
@@ -33,13 +32,11 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const destination = readOnboardingDraft()
-    ? "/onboarding"
-    : (location.state as { from?: string } | null)?.from ?? "/home";
+  const requestedPath = (location.state as { from?: string } | null)?.from;
 
   useEffect(() => {
-    if (session && !loading) navigate(destination, { replace: true });
-  }, [destination, loading, navigate, session]);
+    if (session && !loading) navigate("/onboarding", { replace: true, state: { from: requestedPath } });
+  }, [loading, navigate, requestedPath, session]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,8 +56,12 @@ export function Login() {
         setError(authenticationMessage(response.error.message));
         return;
       }
-      if (mode === "signup" && !response.data.session) {
-        setMessage("Check your email to confirm your account, then sign in here.");
+      if (mode === "signup") {
+        if (response.data.session) {
+          navigate("/onboarding", { replace: true, state: { from: requestedPath } });
+          return;
+        }
+        setMessage("Check your email to confirm your account. When you sign in, we’ll take you straight to setup.");
       }
     } catch {
       setError("We couldn't connect right now. Please check your connection and try again.");

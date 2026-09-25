@@ -107,7 +107,7 @@ function JournalMonths({ journal }: { journal: JournalEntry[] }) {
             >
               <JournalPhotoMosaic photos={entry.photos} title={entry.title} />
               <span className="journal-card__body">
-                <span className="journal-card__title">{entry.title}</span>
+                <h2>{entry.title}</h2>
                 {entry.body.trim() ? <span className="journal-card__excerpt">{entry.body}</span> : null}
                 <span className="journal-card__footer">
                   <span className="journal-card__date">{formatDate(entry.date)}</span>

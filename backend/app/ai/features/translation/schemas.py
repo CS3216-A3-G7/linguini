@@ -41,8 +41,9 @@ class TranslatedTerm(ApiModel):
     gender: Annotated[str, Field(pattern="^(masculine|feminine)$")] | None = None
     phonetic_text: Annotated[str, Field(min_length=1, max_length=300)] | None = Field(
         default=None,
-        description=("IPA pronunciation of the translated word, enclosed in slashes. "
-                     "Supply for every object."),
+        description=("Approximate English-sound respelling of the translated word "
+                     "(not IPA, no slashes); the stressed syllable in caps, "
+                     "e.g. \"MEH-sah\". Supply for every object."),
     )
 
 

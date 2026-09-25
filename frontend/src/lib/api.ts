@@ -1,5 +1,5 @@
 import { GENDER_ARTICLES } from "../data/types.ts";
-import type { Gender, LeaderboardRow, ScenarioProgress, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
+import type { Gender, LeaderboardRow, ScenarioProgress, Streak, VocabRecord, VocabularyScene, VocabStatus, WordClass } from "../data/types";
 import type { Scene, SceneSummary } from "../data/types";
 import type { JournalEntry } from "../data/types";
 import { getAccessToken } from "./supabase.ts";
@@ -169,6 +169,7 @@ export interface ProgressResponse {
   xp: number;
   scenarios: ScenarioProgress[];
   leaderboard: LeaderboardRow[];
+  streak: Streak;
 }
 
 interface DailyVocabularyItem {
@@ -181,7 +182,7 @@ interface DailyVocabularyItem {
     phoneticText?: string | null;
   };
   translation: { translatedText: string } | null;
-  progress: { status: VocabStatus } | null;
+  progress: { status: VocabStatus; firstLearnedAt?: string | null } | null;
   sceneId: string | null;
   topic: string | null;
   scenes?: VocabularyScene[];
@@ -234,6 +235,7 @@ export async function getVocabulary(signal?: AbortSignal): Promise<VocabRecord[]
     wordClass: item.vocabulary.partOfSpeech,
     gender: item.vocabulary.gender != null && GENDER_ARTICLES.has(item.vocabulary.gender) ? item.vocabulary.gender as Gender : null,
     status: item.progress?.status ?? "new",
+    firstLearnedAt: item.progress?.firstLearnedAt ?? null,
     topic: item.topic ?? "Uncategorised",
     sceneId: item.sceneId ?? "",
     scenes: item.scenes ?? [],
@@ -374,7 +376,7 @@ export interface GrammarLessonQuestion {
 export type TaskAnswer = { inputMode: "text"; text: string } | { inputMode: "multipleChoice"; optionId: string } | { inputMode: "objectSelection"; sceneObjectId: string } | { inputMode: "vocabularyReview"; answers: Record<string, string>; typedAnswers: Record<string, string> };
 export interface TaskActionResult {
   task: SessionTask; nextTaskId: string | null; sessionProgress: SessionProgress;
-  attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null; evaluationDetails?: { questionResults?: Record<string, boolean>; guessedObjectKey?: string | null; ambiguous?: boolean } | null } | null;
+  attempt: { id: string; isCorrect: boolean | null; feedback: { message?: string } | null; evaluationDetails?: { questionResults?: Record<string, boolean>; correctAnswers?: Record<string, string>; guessedObjectKey?: string | null; ambiguous?: boolean } | null } | null;
 }
 export const analyzePractice = (id: string) => write<PracticeDetail>(`/api/v1/sessions/${id}/analyze`, "POST", {});
 export interface PracticeReview {

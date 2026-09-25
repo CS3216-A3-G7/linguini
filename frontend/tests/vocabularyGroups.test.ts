@@ -6,7 +6,7 @@ import type { VocabRecord } from "../src/data/types.ts";
 const photo = (id: string) => ({ mediaAssetId: id, title: "Your photo", sceneId: null });
 const word = (id: string, photos: string[]): VocabRecord => ({
   id, word: id, translation: id, wordClass: "noun", gender: null,
-  status: "learning", topic: "Uncategorised", sceneId: "", example: "",
+  status: "learning", firstLearnedAt: null, topic: "Uncategorised", sceneId: "", example: "",
   scenes: photos.map(photo),
 });
 

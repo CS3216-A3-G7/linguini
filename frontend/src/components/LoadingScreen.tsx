@@ -40,12 +40,9 @@ export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
   return createPortal(
     <div className="loading-screen">
       <div className="loading-screen__status" role="status" aria-live="polite" aria-atomic="true" tabIndex={-1} ref={status}>
-        <div className="loading-screen__fork" aria-hidden="true">
-          <span className="loading-screen__fork-strand" />
-          <span className="loading-screen__fork-head" />
-          <span className="loading-screen__fork-handle" />
+        <div className="loading-fork" aria-hidden="true">
+          <img src="/loading/fork-spaghetti.png" alt="" />
         </div>
-        <span className="loading-screen__eyebrow">One twirl at a time</span>
         <span className="loading-screen__label">{label}</span>
       </div>
     </div>,

@@ -147,13 +147,13 @@ export function JournalForm({ entry, date, photoOptions, wordSuggestions, onSave
                   </div>
                 ) : null}
               </>
-            ) : <p className="small muted">No photos from completed sessions on this day — add one from your camera or gallery above.</p>}
+            ) : <p className="small muted">No photos from completed sessions on this day. Add from your camera or gallery above.</p>}
           </section>
 
           <section className="journal-editor__panel">
             <h2 className="journal-editor__panel-title">Words from today</h2>
             <div className="chip-row">
-              {!wordSuggestions.length ? <p className="small muted">No translated words were added from your photos on this day yet.</p> : null}
+              {!wordSuggestions.length ? <p className="small muted">No translated words were added from your photos today</p> : null}
               {wordSuggestions.map((word) => (
                 <button
                   key={word}

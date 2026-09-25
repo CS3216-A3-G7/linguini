@@ -7,7 +7,7 @@ import { useAuth } from "../state/Auth";
 export function Profile() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { learner, user, activeProfile, progress, progressLoading, progressError, profileError, profileSaving, setLanguage, saveLanguageProfile, saveUser } = useAppState();
+  const { learner, user, activeProfile, progressLoading, progressError, profileError, profileSaving, setLanguage, saveLanguageProfile, saveUser } = useAppState();
 
   return (
     <div className="stack profile-page">
@@ -22,7 +22,6 @@ export function Profile() {
         <button type="button" className="profile-identity__details profile-name-link" onClick={() => navigate("/profile/edit")} aria-label="Change profile name and avatar">
           <h2>{learner.name}</h2>
           <span>{user ? `Joined ${new Date(user.createdAt).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}` : ""}</span>
-          <strong className="profile-identity__xp">{progressLoading || progressError ? "--" : progress?.xp ?? 0} XP</strong>
           <ChevronRightIcon size={20} />
         </button>
       </section>
@@ -69,13 +68,7 @@ export function Profile() {
       <section className="profile-section">
         <h2>Permissions</h2>
         <Card plain className="profile-settings-card">
-          <label className="profile-setting">
-            <span>
-              <strong>Microphone</strong>
-              <small>Used for pronunciation practice</small>
-            </span>
-            <input type="checkbox" disabled={profileSaving} checked={learner.micOn} onChange={event => void saveUser({ microphoneEnabled: event.target.checked })} />
-          </label>
+          
           <label className="profile-setting" >
             <span>
               <strong>Camera</strong>
