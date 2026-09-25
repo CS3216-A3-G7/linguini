@@ -3248,6 +3248,35 @@ p[role="alert"]::before { content: "!"; }
   .home-featured--resume .home-featured__image .scene-image {
     aspect-ratio: auto;
   }
+
+  /* The photo sets the card height: keep the action on the bottom edge and let
+     the progress ring settle in the space between it and the title. */
+  .home-featured--resume .home-featured__body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .home-featured--resume .home-featured__body .home-task-progress {
+    margin-block: auto;
+    align-self: center;
+  }
+
+  .home-featured--resume .home-task-progress__ring {
+    width: 144px;
+    height: 144px;
+  }
+
+  .home-featured--resume .home-task-progress__ring::before {
+    inset: 12px;
+  }
+
+  .home-featured--resume .home-task-progress__ring strong {
+    font-size: 32px;
+  }
+
+  .home-featured--resume .home-task-progress__caption {
+    font-size: var(--text-body);
+  }
 }
 
 @media (max-width: 480px) {
