@@ -131,8 +131,8 @@ export function BusinessModelCanvas() {
         </Block>
         <Block area="revenue" tone="money" title="Revenue streams" index={8}>
           <div className={s.stats}>
-            <Stat value="$59.99" label="Plus a year, or $9.99/mo" />
-            <Stat value="$39.99" label="Founding Plus, first 300" />
+            <Stat value="$49.99" label="Plus a year, or $7.99/mo" />
+            <Stat value="$34.99" label="Founding Plus, first 300" />
             <Stat value="Later" label="family, classroom, print" />
           </div>
         </Block>

@@ -67,11 +67,11 @@ function Ruler({ step }: { step: number }) {
           <span className={s.markLabel} data-pos="below" style={{ left: pct(50) }}>1–2 hours with a tutor</span>
         </div>
 
-        <span className={s.priceLine} data-off={step < 3 || undefined} style={{ left: `calc(var(--lw) + (100% - var(--lw)) * ${59.99 / MAX})` }}>
-          <span className={s.priceTag}>Plus $59.99</span>
+        <span className={s.priceLine} data-off={step < 3 || undefined} style={{ left: `calc(var(--lw) + (100% - var(--lw)) * ${49.99 / MAX})` }}>
+          <span className={s.priceTag}>Plus $49.99</span>
         </span>
-        <span className={s.priceLine} data-kind="founding" data-off={step < 3 || undefined} style={{ left: `calc(var(--lw) + (100% - var(--lw)) * ${39.99 / MAX})`, transitionDelay: "250ms" }}>
-          <span className={s.priceTag}>Founding $39.99</span>
+        <span className={s.priceLine} data-kind="founding" data-off={step < 3 || undefined} style={{ left: `calc(var(--lw) + (100% - var(--lw)) * ${34.99 / MAX})`, transitionDelay: "250ms" }}>
+          <span className={s.priceTag}>Founding $34.99</span>
         </span>
       </div>
       <div className={s.axis}>
@@ -90,7 +90,7 @@ export function PriceStory() {
         <><strong>Cost sets the floor.</strong> A typical Plus learner costs us about $15 a year in AI, storage and card fees. Anything above that can also carry some free learners.</>,
         <><strong>Competitors set the range.</strong> Photo-flashcard apps charge $20–30 a year. Duolingo, Speak and Babbel charge $84–168. We do more than a flashcard app and less than a full course.</>,
         <><strong>Value sets the ceiling.</strong> An online tutor costs $15–60 an hour. A year of daily practice should cost less than one or two lessons.</>,
-        <><strong>So Plus is $59.99 a year.</strong> The models that passed our tests cost more, so we sit a little above the $44.99 education-app median, still well below every course app. Our first 300 members lock in $39.99.</>,
+        <><strong>So Plus is $49.99 a year.</strong> That is close to the $44.99 education-app median and below every course app. Our first 300 members lock in $34.99.</>,
       ]}
     />
   );

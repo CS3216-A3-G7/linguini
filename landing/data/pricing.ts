@@ -1,9 +1,9 @@
 /** Plans and prices. Read by the pricing section, the SoftwareApplication JSON-LD and /llms.txt. */
 export const pricing = {
   currency: "USD",
-  plusMonthly: 9.99,
-  plusYearly: 59.99,
-  foundingYearly: 39.99,
+  plusMonthly: 7.99,
+  plusYearly: 49.99,
+  foundingYearly: 34.99,
   foundingSeats: 300,
   trialDays: 7,
   free: [

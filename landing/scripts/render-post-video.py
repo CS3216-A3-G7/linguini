@@ -126,8 +126,8 @@ def scene_photo(t):
     return c
 
 
-TIERS = [("Free", "$0", "1 photo lesson a day", SAGE, INK), ("Plus", "$59.99", "a year · or $9.99 a month", TEAL_DEEP, PAPER),
-         ("Founding Plus", "$39.99", "a year · first 300", CREAM, INK)]
+TIERS = [("Free", "$0", "1 photo lesson a day", SAGE, INK), ("Plus", "$49.99", "a year · or $7.99 a month", TEAL_DEEP, PAPER),
+         ("Founding Plus", "$34.99", "a year · first 300", CREAM, INK)]
 
 
 def scene_tiers(t):

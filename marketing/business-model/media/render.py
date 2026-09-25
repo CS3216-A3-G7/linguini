@@ -87,14 +87,14 @@ def pricing_tiers():
             "Word cards, I-Spy, sentences",
             "Streaks and XP",
         ], MARK_B),
-        ("Plus", "$5.00", "/mo billed $59.99 yearly · or $9.99 monthly", "#FFF2D6", [
+        ("Plus", "$4.17", "/mo billed $49.99 yearly · or $7.99 monthly", "#FFF2D6", [
             "Up to 10 photo lessons a day",
             "Pronunciation feedback",
             "Review words that haven’t stuck",
             "10 photos per journal page",
             "Journal PDF keepsake",
         ], TOMATO),
-        ("Founding Plus", "$39.99", "/yr, locked while you stay · first 300", PAPER, [
+        ("Founding Plus", "$34.99", "/yr, locked while you stay · first 300", PAPER, [
             "Everything in Plus",
             "Beta of competitive I-Spy",
             "Vote on what we build next",
@@ -134,7 +134,7 @@ def founding_square():
     rr(d, (78, 190, 380, 232), 18, SAGE)
     txt(d, (98, 197), "FOUNDING PLUS · 300 SPOTS", 21, TEAL_DARK)
     txt(d, (74, 258), "Help build the\nlanguage game\nof your day.", 80, INK, True, spacing=0)
-    txt(d, (80, 560), wrap("$39.99 a year, locked for as long as you stay. Play competitive I-Spy first and vote on what ships next.", 520, 27), 27, MUTED, spacing=9)
+    txt(d, (80, 560), wrap("$34.99 a year, locked for as long as you stay. Play competitive I-Spy first and vote on what ships next.", 520, 27), 27, MUTED, spacing=9)
     shadow_card(c, (632, 470, 1004, 862), 28)
     paste_cover(c, PHOTO / "cafe-interior.jpg", (648, 486, 988, 752), 16)
     d = ImageDraw.Draw(c)
@@ -168,7 +168,7 @@ def founding_story():
         txt(d, (x + 35, y + 9), label, 26, INK)
     txt(d, (110, 1230), "Paris rooftops · 3 words · French", 30, INK, True)
     y = 1400
-    for line in ("$39.99/yr, locked while you stay", "First into competitive I-Spy", "Vote on what we build next"):
+    for line in ("$34.99/yr, locked while you stay", "First into competitive I-Spy", "Vote on what we build next"):
         check(d, 92, y + 8, MARK_B)
         txt(d, (130, y), line, 36, INK)
         y += 70
@@ -203,9 +203,9 @@ def hbar(d, x0, y, length, thickness, color):
 def chart_competitors():
     rows = [
         ("CapWords Premium (photo vocab)", 19.99, 29.99, False),
-        ("Linguini Founding Plus (proposed)", 39.99, None, True),
-        ("Linguini Plus (before cost rise)", 49.99, None, True),
-        ("Linguini Plus (proposed)", 59.99, None, True),
+        ("Linguini Founding Plus (proposed)", 34.99, None, True),
+        ("Linguini Plus (proposed)", 49.99, None, True),
+        ("Linguini Plus (current landing)", 59.88, None, True),
         ("Speak Premium", 83.99, None, False),
         ("Super Duolingo", 83.99, 95.99, False),
         ("Babbel (12 months)", 107.64, None, False),
@@ -290,7 +290,7 @@ def chart_session_cost():
 
 def chart_breakeven():
     be = MODEL["breakeven_conversion"]
-    key = "B · Recommended ($9.99 / $59.99)"
+    key = "B · Recommended ($7.99 / $49.99)"
     rows = [
         ("Chosen models", be["chosen"][key]),
         ("First alternatives", be["fallback"][key]),

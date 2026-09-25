@@ -55,8 +55,8 @@ export const learnerCost: Record<Pipeline, { free: number; plus: number; casual:
   budget: { free: 0.075, plus: 0.506, casual: 0.07, cap: 0.27, typical: 0.37 },
 };
 
-/** Net monthly revenue per payer after Stripe fees, 59% annual ($59.99) and 41% monthly ($9.99). */
-export const NET_ARPU = 6.4917;
+/** Net monthly revenue per payer after Stripe fees, 59% annual ($49.99) and 41% monthly ($7.99). */
+export const NET_ARPU = 5.2404;
 
 export function fixedCost(monthlyUsers: number): number {
   return monthlyUsers > 10_000 ? 70 : 52;

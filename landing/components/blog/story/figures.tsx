@@ -11,8 +11,8 @@ const n = (value: string, unit?: string) => <span className={s.big}>{value}{unit
 type Plan = "free" | "plus" | "founding";
 const plans: { id: Plan; name: string; price: string; per: string }[] = [
   { id: "free", name: "Free", price: "$0", per: "forever" },
-  { id: "plus", name: "Plus", price: "$59.99", per: "a year · or $9.99/mo" },
-  { id: "founding", name: "Founding", price: "$39.99", per: "a year · first 300" },
+  { id: "plus", name: "Plus", price: "$49.99", per: "a year · or $7.99/mo" },
+  { id: "founding", name: "Founding", price: "$34.99", per: "a year · first 300" },
 ];
 
 const rows: { label: string; cells: Record<Plan, ReactNode> }[] = [
