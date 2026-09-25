@@ -20,6 +20,10 @@ class AiMode(StrEnum):
 class AiProvider(StrEnum):
     OPENAI = "openai"
     GEMINI = "gemini"
+    # OpenRouter fronts many vendors (Anthropic, Qwen, DeepSeek, Meta,
+    # Mistral) behind an OpenAI-compatible API, so the OpenAI adapters serve
+    # it with a different base URL and key.
+    OPENROUTER = "openrouter"
     NONE = "none"
 
 
@@ -95,6 +99,7 @@ class AiSettings(BaseModel):
     mode: AiMode
     openai_api_key: str = ""
     gemini_api_key: str = ""
+    openrouter_api_key: str = ""
     general_api_key: str = ""
     observability: ObservabilitySettings = ObservabilitySettings()
     object_grounding: ObjectGroundingSettings = ObjectGroundingSettings()
@@ -110,6 +115,8 @@ class AiSettings(BaseModel):
             return self.openai_api_key
         if provider is AiProvider.GEMINI:
             return self.gemini_api_key
+        if provider is AiProvider.OPENROUTER:
+            return self.openrouter_api_key
         return ""
 
     def is_configured(self, config: FeatureModelConfig) -> bool:
@@ -151,64 +158,83 @@ class _LegacySpec:
 _LEGACY_SPECS: dict[AiFeature, _LegacySpec] = {
     AiFeature.SCENE_ANALYSIS: _LegacySpec(
         provider_var="SCENE_ANALYSIS_PROVIDER",
-        provider_default="gemini",
+        provider_default="openrouter",
         timeout_var="SCENE_ANALYSIS_TIMEOUT_SECONDS",
         timeout_default="120",
         model_vars={
             AiProvider.OPENAI: "OPENAI_SCENE_MODEL",
             AiProvider.GEMINI: "GEMINI_SCENE_MODEL",
+            AiProvider.OPENROUTER: "OPENROUTER_SCENE_MODEL",
         },
-        model_defaults={AiProvider.OPENAI: "gpt-4o", AiProvider.GEMINI: ""},
+        model_defaults={
+            AiProvider.OPENAI: "gpt-4o",
+            AiProvider.GEMINI: "",
+            AiProvider.OPENROUTER: "anthropic/claude-haiku-4.5",
+        },
     ),
     AiFeature.SCENE_TRANSLATION: _LegacySpec(
         provider_var="TRANSLATION_PROVIDER",
-        provider_default="gemini",
+        provider_default="openrouter",
         timeout_var="TRANSLATION_TIMEOUT_SECONDS",
         timeout_default="60",
         model_vars={
             AiProvider.OPENAI: "OPENAI_TRANSLATION_MODEL",
             AiProvider.GEMINI: "GEMINI_TRANSLATION_MODEL",
+            AiProvider.OPENROUTER: "OPENROUTER_TRANSLATION_MODEL",
         },
         model_defaults={
             AiProvider.OPENAI: "gpt-4o-mini",
             AiProvider.GEMINI: "gemini-3.5-flash-lite",
+            # Mistral Small scored marginally higher but is served only by
+            # Mistral and rate-limited upstream too often to be the default.
+            AiProvider.OPENROUTER: "openai/gpt-4o-mini",
         },
     ),
     AiFeature.LEARNING_TASK: _LegacySpec(
         provider_var="LEARNING_TASK_PROVIDER",
-        provider_default="openai",
+        provider_default="openrouter",
         timeout_var="LEARNING_TASK_TIMEOUT_SECONDS",
         timeout_default="60",
         model_vars={
             AiProvider.OPENAI: "OPENAI_LEARNING_TASK_MODEL",
             AiProvider.GEMINI: "GEMINI_LEARNING_TASK_MODEL",
+            AiProvider.OPENROUTER: "OPENROUTER_LEARNING_TASK_MODEL",
         },
         model_defaults={
-            AiProvider.OPENAI: "gpt-4o-mini",
+            AiProvider.OPENAI: "gpt-5.4-mini",
             AiProvider.GEMINI: "gemini-3.5-flash-lite",
+            AiProvider.OPENROUTER: "openai/gpt-5.4-mini",
         },
     ),
     AiFeature.ISPY_CLUE: _LegacySpec(
         provider_var="ISPY_CLUE_PROVIDER",
-        provider_default="openai",
+        provider_default="openrouter",
         timeout_var="ISPY_CLUE_TIMEOUT_SECONDS",
         timeout_default="60",
         model_vars={
             AiProvider.OPENAI: "OPENAI_ISPY_CLUE_MODEL",
             AiProvider.GEMINI: "GEMINI_ISPY_CLUE_MODEL",
+            AiProvider.OPENROUTER: "OPENROUTER_ISPY_CLUE_MODEL",
         },
         model_defaults={
             AiProvider.OPENAI: "gpt-4o-mini",
-            AiProvider.GEMINI: "",
+            AiProvider.GEMINI: "gemini-3.1-flash-lite",
+            AiProvider.OPENROUTER: "google/gemini-3.1-flash-lite",
         },
     ),
     AiFeature.ISPY_GUESS: _LegacySpec(
         provider_var="ISPY_GUESS_PROVIDER",
-        provider_default="openai",
+        provider_default="openrouter",
         timeout_var="ISPY_GUESS_TIMEOUT_SECONDS",
         timeout_default="60",
-        model_vars={AiProvider.OPENAI: "OPENAI_ISPY_GUESS_MODEL"},
-        model_defaults={AiProvider.OPENAI: "gpt-4o-mini"},
+        model_vars={
+            AiProvider.OPENAI: "OPENAI_ISPY_GUESS_MODEL",
+            AiProvider.OPENROUTER: "OPENROUTER_ISPY_GUESS_MODEL",
+        },
+        model_defaults={
+            AiProvider.OPENAI: "gpt-4.1-mini",
+            AiProvider.OPENROUTER: "openai/gpt-4.1-mini",
+        },
     ),
 }
 
@@ -517,6 +543,9 @@ def load_ai_settings(env: Mapping[str, str] | None = None) -> AiSettings:
         or "",
         gemini_api_key=_read(env, "AI_GEMINI_API_KEY")
         or _read(env, "GEMINI_API_KEY")
+        or "",
+        openrouter_api_key=_read(env, "AI_OPENROUTER_API_KEY")
+        or _read(env, "OPENROUTER_API_KEY")
         or "",
         general_api_key=_read(env, "AI_API_KEY") or "",
         observability=_parse_observability(env),
