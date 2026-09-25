@@ -4,9 +4,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { postBodies } from "@/components/blog/postBodies";
 import { ArrowLeft, ArrowRight, Book, Download, Sparkle } from "@/components/icons";
+import { serializeJsonLd } from "@/components/JsonLd";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { formatPostDate, getPost, posts } from "@/data/posts";
+import { pageMetadata } from "@/lib/seo";
 import { appLinks, site } from "@/lib/site";
 import styles from "./post.module.css";
 
@@ -21,18 +23,13 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = getPost((await params).slug);
   if (!post) return {};
-  return {
+  return pageMetadata({
     title: post.title,
     description: post.summary,
-    alternates: { canonical: `/blog/${post.slug}` },
-    openGraph: {
-      type: "article",
-      title: post.title,
-      description: post.summary,
-      url: `/blog/${post.slug}`,
-      publishedTime: post.date,
-    },
-  };
+    path: `/blog/${post.slug}`,
+    article: { publishedTime: post.date, section: post.category },
+    ownImage: true,
+  });
 }
 
 export default async function PostPage({ params }: Props) {
@@ -41,14 +38,24 @@ export default async function PostPage({ params }: Props) {
   const Body = postBodies[slug];
   if (!post || !Body) notFound();
 
+  const url = `${site.url}/blog/${post.slug}`;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
+    "@id": `${url}#article`,
     headline: post.title,
     description: post.summary,
     datePublished: post.date,
-    url: `${site.url}/blog/${post.slug}`,
-    publisher: { "@type": "Organization", name: site.name, url: site.url },
+    dateModified: post.date,
+    articleSection: post.category,
+    inLanguage: "en",
+    timeRequired: `PT${post.readMinutes}M`,
+    url,
+    mainEntityOfPage: url,
+    image: `${url}/opengraph-image`,
+    author: { "@id": `${site.url}/#organization` },
+    publisher: { "@id": `${site.url}/#organization` },
+    isPartOf: { "@id": `${site.url}/#website` },
   };
 
   return (
@@ -111,7 +118,7 @@ export default async function PostPage({ params }: Props) {
         </article>
       </main>
       <div className="no-print"><SiteFooter /></div>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     </>
   );
 }

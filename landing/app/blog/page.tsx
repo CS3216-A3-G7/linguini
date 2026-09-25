@@ -5,13 +5,14 @@ import { ArrowRight } from "@/components/icons";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { formatPostDate, posts } from "@/data/posts";
+import { pageMetadata } from "@/lib/seo";
 import styles from "./blog.module.css";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Blog",
   description: "Notes from the Linguini team on learning from photos, how lessons are built, and how we price the app.",
-  alternates: { canonical: "/blog" },
-};
+  path: "/blog",
+});
 
 export default function BlogPage() {
   const [featured, ...rest] = posts;
@@ -37,7 +38,7 @@ export default function BlogPage() {
         </section>
 
         <ul className={styles.cards}>
-          {rest.map(post => (
+          {rest.slice(0, 2).map(post => (
             <li key={post.slug}>
               <Link href={`/blog/${post.slug}`} className={styles.card}>
                 <PostCover post={post} sizes="(min-width: 720px) 560px, 100vw" />

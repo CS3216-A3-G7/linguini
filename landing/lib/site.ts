@@ -14,16 +14,30 @@ function resolveSiteUrl(): string {
   return "http://localhost:3000";
 }
 
+/** Set after launch day; the badge and `sameAs` link stay hidden until then. */
+const productHunt = {
+  url: process.env.NEXT_PUBLIC_PRODUCT_HUNT_URL ?? "",
+  postId: process.env.NEXT_PUBLIC_PRODUCT_HUNT_POST_ID ?? "",
+};
+
+const repoUrl = "https://github.com/CS3216-A3-G7/linguini";
+
 export const site = {
   name: "Linguini",
   url: resolveSiteUrl().replace(/\/$/, ""),
+  repoUrl,
+  productHunt,
+  /** Official profiles, for Organization `sameAs`. Add social accounts here once they exist. */
+  sameAs: [repoUrl, productHunt.url].filter(Boolean),
   appUrl: resolveAppUrl().replace(/\/$/, ""),
   title: "Linguini — Learn a language from the photos you take",
   shortTitle: "Linguini",
   description:
-    "Snap a café, a street, a sunset. Linguini finds the words inside your photo, turns them into bite-size games in Spanish or French, and saves the day to your journal. Free to start.",
+    "Snap a café, a street, a sunset. Linguini finds the words in your photo and turns them into bite-size Spanish or French games and a journal page. Free to start.",
   tagline: "Learn the language of your day.",
   locale: "en_US",
+  ogImageAlt:
+    "Linguini — Learn the language of your day. Real photos pinned like prints, one tagged “la mesa · the table”.",
   keywords: [
     "language learning app",
     "learn Spanish with photos",

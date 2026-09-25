@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { languagePages } from "@/data/languages";
 import { posts } from "@/data/posts";
 import { site } from "@/lib/site";
 
@@ -11,6 +12,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1,
     },
+    ...languagePages.map(page => ({
+      url: `${site.url}/learn/${page.slug}`,
+      lastModified,
+      changeFrequency: "monthly" as const,
+      priority: 0.8,
+    })),
     {
       url: `${site.url}/blog`,
       lastModified,

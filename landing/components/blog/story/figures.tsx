@@ -1,5 +1,5 @@
-import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
+import { competitors } from "@/data/competitors";
 import { Check } from "../../icons";
 import { InView } from "./InView";
 import s from "./story.module.css";
@@ -59,13 +59,7 @@ export function PlanMatrix() {
   );
 }
 
-const apps = [
-  { name: "Linguini", plan: "Plus", free: "1 photo lesson a day", price: 49.99, label: "$49.99", photos: true, journal: true, ours: true },
-  { name: "CapWords", plan: "Premium", free: "A few captures", price: 29.99, label: "$19.99–29.99", photos: true, journal: false },
-  { name: "Speak", plan: "Premium", free: "Short taster", price: 83.99, label: "$83.99", photos: false, journal: false },
-  { name: "Duolingo", plan: "Super", free: "About 2–3 lessons a day", price: 95.99, label: "$84–96", photos: false, journal: false },
-  { name: "Babbel", plan: "12 months", free: "Short taster", price: 107.64, label: "$107.64", photos: false, journal: false },
-];
+const apps = competitors;
 
 /** Annual price bars with the two things only Linguini combines. */
 export function CompareApps() {
@@ -130,39 +124,12 @@ export function ModelMap() {
           {chosen.why}
         </p>
       </InView>
-      <figcaption>Hover or tap a model to see why we passed on it.</figcaption>
-    </figure>
-  );
-}
-
-const stages = [
-  { stage: "Now · beta", title: "Proof it sticks", metric: "A second lesson within a week", earn: "Earning nothing yet", pasta: "/pasta/farfalle.png", x: 12, y: 78 },
-  { stage: "Launch year", title: "Proof people pay", metric: "300 Founding Plus members", earn: "Plus and Founding Plus", pasta: "/pasta/penne.png", x: 50, y: 50 },
-  { stage: "After that", title: "Proof it scales", metric: "4% of learners paying", earn: "Adds family, classroom and print", pasta: "/pasta/fusilli.png", x: 88, y: 20 },
-];
-
-/** A path drawn through three milestones, each with the one number that says it worked. */
-export function Roadmap() {
-  return (
-    <figure className={s.figure}>
-      <InView className={s.journey}>
-        <svg className={s.path} viewBox="0 0 1000 160" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0,150 C80,140 90,125 120,125 S330,112 500,80 S760,40 880,32 S960,20 1000,10" pathLength={1} />
-        </svg>
-        <ol className={s.stops}>
-          {stages.map((stop, i) => (
-            <li key={stop.title} style={{ "--x": `${stop.x}%`, "--y": stop.y, "--i": i } as CSSProperties}>
-              <span className={s.pin}>
-                <Image src={stop.pasta} alt="" width={48} height={48} />
-              </span>
-              <span className={s.stage}>{stop.stage}</span>
-              <b className={s.stopTitle}>{stop.title}</b>
-              <span className={s.metric}>{stop.metric}</span>
-              <span className={s.earn}>{stop.earn}</span>
-            </li>
-          ))}
-        </ol>
-      </InView>
+      <ul className={s.reasons}>
+        {options.map(option => (
+          <li key={option.name}><b>{option.name}{option.chosen ? " (chosen)" : ""}.</b> {option.why}</li>
+        ))}
+      </ul>
+      <figcaption className="no-print">Hover or tap a model to see why we passed on it.</figcaption>
     </figure>
   );
 }

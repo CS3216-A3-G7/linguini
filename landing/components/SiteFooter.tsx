@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { appLinks } from "@/lib/site";
+import { appLinks, site } from "@/lib/site";
 import styles from "./SiteFooter.module.css";
 
 export function SiteFooter() {
@@ -17,6 +17,8 @@ export function SiteFooter() {
           <Link href="/#features">Features</Link>
           <Link href="/#journal">Journal</Link>
           <Link href="/#pricing">Pricing</Link>
+          <Link href="/learn/spanish">Learn Spanish</Link>
+          <Link href="/learn/french">Learn French</Link>
         </nav>
         <nav aria-label="Account" className={styles.col}>
           <h2 className={styles.heading}>Account</h2>
@@ -27,8 +29,9 @@ export function SiteFooter() {
           <h2 className={styles.heading}>About</h2>
           <Link href="/#faq">FAQ</Link>
           <Link href="/blog">Blog</Link>
+          <Link href="/blog/linguini-vs-duolingo">Compare apps</Link>
           <Link href="/credits">Photo credits</Link>
-          <a href="https://github.com/CS3216-A3-G7/linguini">GitHub</a>
+          <a href={site.repoUrl}>GitHub</a>
         </nav>
       </div>
       <div className={`container ${styles.base}`}>
