@@ -230,41 +230,12 @@
   gap: 6px;
 }
 
-.railButtons {
-  display: flex;
-  flex-shrink: 0;
-  gap: 8px;
-}
-
-.railButtons button {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--ink);
-  color: var(--paper);
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.2s var(--ease-out);
-}
-
-.railButtons button:hover:not(:disabled) {
-  transform: scale(1.06);
-}
-
-.railButtons button:disabled {
-  opacity: 0.25;
-  cursor: default;
-}
-
 .rail {
   display: flex;
   align-items: flex-start;
   gap: 22px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
   scroll-padding-inline: 4px;
   padding: 6px 4px 22px;
   scrollbar-width: thin;
@@ -289,16 +260,11 @@
   border-radius: var(--radius-md);
 }
 
-.rail[data-auto] {
-  scroll-snap-type: none;
-}
-
 .slide {
   flex: 0 0 min(340px, 82vw);
   display: grid;
   align-content: start;
   gap: 28px;
-  scroll-snap-align: start;
 }
 
 .draft {
@@ -975,10 +941,6 @@
 
   .curve svg {
     clip-path: none !important;
-  }
-
-  .railButtons {
-    display: none;
   }
 
   /* On paper the rail becomes a grid so every draft prints. */
