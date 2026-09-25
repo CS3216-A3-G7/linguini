@@ -23,8 +23,8 @@
 Most language apps teach a fixed syllabus of words you may never use. Linguini starts
 from a photo of your own day: take or upload a picture, and the app finds the objects in
 it, teaches the words for them in your target language, and then quizzes you on the
-scene by voice. The day ends as a journal entry, so your vocabulary history doubles as a
-diary of what you actually did.
+scene by having you describe it. The day ends as a journal entry, so your vocabulary
+history doubles as a diary of what you actually did.
 
 ## How a session works
 
@@ -36,18 +36,19 @@ diary of what you actually did.
 3. **Analysis & review** — the backend detects candidate objects in the image and saves
    them as a resumable draft. You confirm, remove or add objects before the lesson is
    built, so you control what you are taught.
-4. **Learn** — word cards for each confirmed object: translation, article and gender,
-   pronunciation (speech synthesis) and example usage.
-5. **I-Spy** — two-way speaking practice. Phase 1: Linguini names a word and you tap it in
-   the photo. Phase 2: you say what you see and the app checks you.
+4. **Learn** — word cards for each confirmed object: translation, article and gender, and
+   example usage.
+5. **I-Spy** — two-way description practice. Phase 1: Linguini describes an object and you
+   pick it out of the scene. Phase 2: you write your own clue for a target word and
+   Linguini guesses what you meant.
 6. **Summary & journal** — XP, new and reviewed words and streaks are persisted, and the
    session is written into your journal, which supports revisions and photo attachments.
 
 ## Features
 
 - Photo-led lessons from your own camera roll, plus curated preloaded scenes.
-- Speak-first practice with pronunciation playback and spoken answer checking, and a mic
-  test so audio problems surface before a session.
+- Description-led practice in both directions: comprehend Linguini's clues, then write
+  your own and have them checked.
 - Vocabulary list with per-word progress, encounters and spaced review signals.
 - Journal with daily entries, edits and image attachments.
 - Progress dashboard: XP, streaks, words learned per language.
@@ -65,14 +66,11 @@ Captured from the running app (phone width) against the live database.
 
 | Vocabulary | Journal | Progress |
 | --- | --- | --- |
-| <img src="docs/screenshots/vocabulary.png" alt="Vocabulary screen grouped by scene with playback buttons" width="240" /> | <img src="docs/screenshots/journal.png" alt="Monthly journal with photo entries" width="240" /> | <img src="docs/screenshots/progress.png" alt="Progress screen with words learned, mastered and scenes" width="240" /> |
+| <img src="docs/screenshots/vocabulary.png" alt="Vocabulary screen grouped by the scenes the words came from" width="240" /> | <img src="docs/screenshots/journal.png" alt="Monthly journal with photo entries" width="240" /> | <img src="docs/screenshots/progress.png" alt="Progress screen with words learned, mastered and scenes" width="240" /> |
 
-| Profile | I-Spy (**placeholder**) |
-| --- | --- |
-| <img src="docs/screenshots/profile.png" alt="Profile screen with learning setup and permissions" width="240" /> | <img src="docs/screenshots/ispy-placeholder.png" alt="Placeholder image for the I-Spy screenshot" width="240" /> |
-
-The I-Spy image is a **labelled placeholder**: that screen only unlocks once a session's
-learning tasks are finished, so it still needs a real capture.
+| I-Spy · Linguini's clues | I-Spy · your turn | Profile |
+| --- | --- | --- |
+| <img src="docs/screenshots/ispy-clues.png" alt="I-Spy phase one: a clue from Linguini and the objects to pick from" width="240" /> | <img src="docs/screenshots/ispy-your-turn.png" alt="I-Spy phase two: writing your own clue for a target word" width="240" /> | <img src="docs/screenshots/profile.png" alt="Profile screen with learning setup and permissions" width="240" /> |
 
 ## Launch film
 
