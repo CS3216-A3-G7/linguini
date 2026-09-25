@@ -1,4 +1,4 @@
-import type { PracticeDetail } from "./api";
+import type { PracticeDetail, SessionStatus } from "./api";
 import { practiceStages, taskDone } from "./practiceTasks.ts";
 
 export interface SessionDestination {
@@ -60,6 +60,8 @@ export function isSessionRouteAllowed(detail: PracticeDetail, pathname: string):
 export interface SessionLoadingCopy {
   title: string;
   heading: string;
+  /** Supporting line under the heading, when the default doesn't fit the step. */
+  support?: string;
   scan: boolean;
 }
 
@@ -78,7 +80,15 @@ export function isPreTaskStep(pathname: string): boolean {
   return step === "analysis" || step === "mic-test";
 }
 
-export function sessionLoadingCopy(pathname: string): SessionLoadingCopy {
+const translatingCopy: SessionLoadingCopy = {
+  title: "Scene analysis",
+  heading: "Translating your scene...",
+  support: "Turning your confirmed words into your learning language.",
+  scan: true,
+};
+
+export function sessionLoadingCopy(pathname: string, status?: SessionStatus): SessionLoadingCopy {
   const step = pathname.split("/practice/sessions/")[1]?.split("/").slice(1)[0] ?? null;
+  if (step === "analysis" && status === "generatingTasks") return translatingCopy;
   return (step && loadingCopy[step]) || { title: "Practice", heading: "Loading your practice...", scan: false };
 }

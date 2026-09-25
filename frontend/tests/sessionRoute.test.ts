@@ -130,9 +130,23 @@ test("loading copy matches the destination segment", () => {
     { title: "Learning", heading: "Loading your words...", scan: false },
   );
   assert.deepEqual(sessionLoadingCopy(base), { title: "Practice", heading: "Loading your practice...", scan: false });
+  assert.deepEqual(sessionLoadingCopy(`${base}/analysis`, "awaitingObjectReview"), { title: "Scene analysis", heading: "Finding objects in your image...", scan: true });
   assert.deepEqual(sessionLoadingCopy("/home"), { title: "Practice", heading: "Loading your practice...", scan: false });
   for (const path of [`${base}/mic-test`, `${base}/learn`, `${base}/ispy-1`, `${base}/ispy-2`, `${base}/summary`, base, "/home"]) {
     assert.equal(sessionLoadingCopy(path).scan, false);
+  }
+});
+
+test("analysis loading copy switches to translating while tasks generate", () => {
+  const base = "/practice/sessions/s1";
+  assert.deepEqual(sessionLoadingCopy(`${base}/analysis`, "generatingTasks"), {
+    title: "Scene analysis",
+    heading: "Translating your scene...",
+    support: "Turning your confirmed words into your learning language.",
+    scan: true,
+  });
+  for (const step of ["mic-test", "learn", "ispy-1", "ispy-2", "summary"]) {
+    assert.deepEqual(sessionLoadingCopy(`${base}/${step}`, "generatingTasks"), sessionLoadingCopy(`${base}/${step}`), step);
   }
 });
 
