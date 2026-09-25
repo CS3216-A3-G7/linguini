@@ -68,6 +68,13 @@ export const Speaker = (p: IconProps) => (
   </Icon>
 );
 
+export const SpeakerOff = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z" />
+    <path d="m16 9.5 5 5M21 9.5l-5 5" />
+  </Icon>
+);
+
 export const Mic = (p: IconProps) => (
   <Icon {...p}>
     <rect x="9" y="3" width="6" height="11" rx="3" />
