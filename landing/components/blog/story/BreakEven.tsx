@@ -9,9 +9,10 @@ const USER_STOPS = [300, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000];
 const MAX_C = 0.08;
 const H = 280, T = 20, B = 30, L = 56, R = 110;
 
-const lines: { id: Pipeline; label: string; color: string }[] = [
-  { id: "optimised", label: "Cheaper models", color: "#00968F" },
-  { id: "list", label: "Current models", color: "#b9ad95" },
+const PRIMARY: Pipeline = "chosen";
+const lines: { id: Pipeline; label: string; color: string; ink: string }[] = [
+  { id: "budget", label: "Cheapest models", color: "#00968F", ink: "var(--teal-dark)" },
+  { id: "chosen", label: "Chosen models", color: "#EF5B32", ink: "var(--tomato-ink)" },
 ];
 
 function niceStep(span: number) {
@@ -25,7 +26,7 @@ function signed(value: number) {
   return `${value > 0 ? "+" : "−"}${usd(Math.abs(value))}`;
 }
 
-/** Monthly result as the share of paying learners grows, for today's and the cheaper models. */
+/** Monthly result as the share of paying learners grows, for the chosen models and the cheapest alternatives. */
 export function BreakEven() {
   const [userIndex, setUserIndex] = useState(3);
   const [conversion, setConversion] = useState(0.023);
@@ -36,19 +37,19 @@ export function BreakEven() {
   const ids = { users: useId(), conversion: useId() };
 
   const users = USER_STOPS[userIndex];
-  const planShown = useTween(monthlyResult(users, conversion, "optimised").result);
-  const todayShown = useTween(monthlyResult(users, conversion, "list").result);
+  const planShown = useTween(monthlyResult(users, conversion, "chosen").result);
+  const budgetShown = useTween(monthlyResult(users, conversion, "budget").result);
 
   // Straight lines, so two ends per line are enough; tweening them animates the chart.
-  const optimisedStart = useTween(monthlyResult(users, 0, "optimised").result);
-  const optimisedEnd = useTween(monthlyResult(users, MAX_C, "optimised").result);
-  const listStart = useTween(monthlyResult(users, 0, "list").result);
-  const listEnd = useTween(monthlyResult(users, MAX_C, "list").result);
+  const chosenStart = useTween(monthlyResult(users, 0, "chosen").result);
+  const chosenEnd = useTween(monthlyResult(users, MAX_C, "chosen").result);
+  const budgetStart = useTween(monthlyResult(users, 0, "budget").result);
+  const budgetEnd = useTween(monthlyResult(users, MAX_C, "budget").result);
   const ends: Record<string, [number, number]> = {
-    optimised: [optimisedStart, optimisedEnd],
-    list: [listStart, listEnd],
+    chosen: [chosenStart, chosenEnd],
+    budget: [budgetStart, budgetEnd],
   };
-  const all = [optimisedStart, optimisedEnd, listStart, listEnd, 0];
+  const all = [chosenStart, chosenEnd, budgetStart, budgetEnd, 0];
   const step = niceStep(Math.max(...all) - Math.min(...all) || 1);
   const yMin = Math.floor(Math.min(...all) / step) * step;
   const yMax = Math.ceil(Math.max(...all) / step) * step;
@@ -70,8 +71,8 @@ export function BreakEven() {
       <p className={s.verdict} aria-live="polite">
         With <b>{users.toLocaleString("en-US")}</b> learners and <b>{(conversion * 100).toFixed(1)}%</b> paying, Linguini makes{" "}
         <span className={s.bigResult} data-sign={planShown >= 0 ? "pos" : "neg"}>{signed(planShown)}</span> a month on the
-        cheaper models.
-        <small>On our current models, at 2027 prices, it would be {signed(todayShown)}.</small>
+        chosen models.
+        <small>On the cheapest alternatives, once they pass our evaluation, it would be {signed(budgetShown)}.</small>
       </p>
 
       <div ref={chartRef} className={s.lineChart} data-inview={inView || undefined}>
@@ -95,15 +96,15 @@ export function BreakEven() {
                 d={`M${x(0)},${y(at(line.id, 0))} L${x(MAX_C)},${y(at(line.id, MAX_C))}`}
                 fill="none"
                 stroke={line.color}
-                strokeWidth={line.id === "optimised" ? 3.5 : 2.5}
+                strokeWidth={line.id === PRIMARY ? 3.5 : 2.5}
                 strokeLinecap="round"
-                style={{ transitionDelay: line.id === "optimised" ? "0.4s" : "0s" }}
+                style={{ transitionDelay: line.id === PRIMARY ? "0.4s" : "0s" }}
               />
               <text
                 x={x(MAX_C) + 10}
                 y={y(at(line.id, MAX_C)) + 4}
                 className={s.strong}
-                style={{ fill: line.id === "optimised" ? "var(--teal-dark)" : "var(--ink-muted)" }}
+                style={{ fill: line.ink }}
               >
                 {line.label}
               </text>
@@ -119,8 +120,8 @@ export function BreakEven() {
             ) : null;
           })}
           <line x1={x(conversion)} x2={x(conversion)} y1={T} y2={H - B} stroke="#263238" strokeDasharray="3 4" />
-          <g className={s.mover} style={{ transform: `translate(${x(conversion)}px, ${y(at("optimised", conversion))}px)` }}>
-            <circle r={8} fill="#EF5B32" stroke="var(--paper)" strokeWidth={3} />
+          <g className={s.mover} style={{ transform: `translate(${x(conversion)}px, ${y(at(PRIMARY, conversion))}px)` }}>
+            <circle r={8} fill="#263238" stroke="var(--paper)" strokeWidth={3} />
           </g>
           {hover != null ? (
             <line x1={x(hover)} x2={x(hover)} y1={T} y2={H - B} stroke="#263238" strokeOpacity={0.25} pointerEvents="none" />
@@ -128,8 +129,8 @@ export function BreakEven() {
           <rect x={L} y={T} width={Math.max(0, width - L - R)} height={H - T - B} fill="transparent" />
         </svg>
         {hover != null ? (
-          <div className={s.tip} style={{ left: x(hover), top: y(at("optimised", hover)) }}>
-            {(hover * 100).toFixed(1)}% pay · {signed(at("optimised", hover))}
+          <div className={s.tip} style={{ left: x(hover), top: y(at(PRIMARY, hover)) }}>
+            {(hover * 100).toFixed(1)}% pay · {signed(at(PRIMARY, hover))}
           </div>
         ) : null}
       </div>

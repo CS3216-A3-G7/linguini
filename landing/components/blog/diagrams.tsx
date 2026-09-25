@@ -67,8 +67,8 @@ export function BusinessModelCanvas() {
       <InView className={s.canvas}>
         <Block area="partners" tone="make" title="Key partners" index={0}>
           <Chips items={[
-            { icon: <Sparkle size={i} />, label: "Google Gemini" },
-            { icon: <Sparkle size={i} />, label: "OpenAI" },
+            { icon: <Sparkle size={i} />, label: "OpenRouter" },
+            { icon: <Sparkle size={i} />, label: "Anthropic · OpenAI · Google" },
             { icon: <Database size={i} />, label: "Supabase" },
             { icon: <Cloud size={i} />, label: "Vercel · Render" },
             { icon: <Card size={i} />, label: "Stripe" },
@@ -124,7 +124,7 @@ export function BusinessModelCanvas() {
         </Block>
         <Block area="costs" tone="money" title="Cost structure" index={7}>
           <div className={s.stats}>
-            <Stat value="1.9¢" label="AI per photo lesson (2027)" />
+            <Stat value="2¢" label="AI per photo lesson" />
             <Stat value="$52–70" label="hosting a month" />
             <Stat value="3.4% + 50¢" label="per card payment" />
           </div>

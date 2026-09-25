@@ -157,7 +157,8 @@
   opacity: 0;
 }
 
-.video[data-layout="stack"] .bar:not([data-lead]) .track {
+/* Only the first row keeps its track, so later rows never paint over earlier segments. */
+.video[data-layout="stack"] .bar:not(:first-child) .track {
   background: transparent;
 }
 
@@ -167,7 +168,7 @@
   border-radius: 0;
 }
 
-.video[data-layout="stack"] .bar[data-lead] .fill {
+.video[data-layout="stack"] .bar:first-child .fill {
   border-radius: 8px 0 0 8px;
 }
 
@@ -186,7 +187,7 @@
   left: 0;
   right: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
   padding: 0 !important;
@@ -356,7 +357,7 @@
   }
 
   .shares {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px 12px;
   }
 

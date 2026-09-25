@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { lessonSteps, type Pipeline } from "../interactive/data";
+import { lessonSteps, pipelineLabels, type Pipeline } from "../interactive/data";
 import { useInView, useTween } from "./hooks";
 import s from "./video.module.css";
 
@@ -14,17 +14,27 @@ type Scene = {
   badge?: string;
 };
 
+const billed = lessonSteps.filter(step => step.id !== "moderation");
+const totalFor = (pipeline: Pipeline) => billed.reduce((sum, step) => sum + step.cost[pipeline], 0);
+const cents = (value: number) => `${(value * 100).toFixed(1).replace(/\.0$/, "")}¢`;
+const change = (pipeline: Pipeline) => {
+  const pct = Math.round((totalFor(pipeline) / totalFor("chosen") - 1) * 100);
+  return `${pct < 0 ? "−" : "+"}${Math.abs(pct)}%`;
+};
+const tasks = billed.find(step => step.id === "tasks")!;
+const tasksShare = Math.round((tasks.cost.chosen / totalFor("chosen")) * 100);
+
 const scenes: Scene[] = [
-  { pipeline: "promo", layout: "bars", label: "Today’s prices", caption: "Every photo lesson makes five AI calls. Today they add up to about 1.2¢." },
-  { pipeline: "promo", layout: "stack", label: "Today’s prices", caption: "Reading the photo is the big one: more than half of every lesson." },
-  { pipeline: "list", layout: "bars", label: "From 1 January 2027", caption: "Gemini 3.7 Flash’s launch discount ends in January, and the lesson nearly doubles.", badge: "+58%" },
-  { pipeline: "optimised", layout: "stack", label: "Cheaper models, being tested", caption: "A lighter vision model and smaller text models bring it down to half a cent.", badge: "−75%" },
+  { pipeline: "chosen", layout: "bars", label: pipelineLabels.chosen, caption: `Every photo lesson makes five AI calls. With the chosen models they add up to about ${cents(totalFor("chosen"))}.` },
+  { pipeline: "chosen", layout: "stack", label: pipelineLabels.chosen, caption: `The lesson generator is the big one: ${tasksShare}% of every lesson.` },
+  { pipeline: "fallback", layout: "bars", label: pipelineLabels.fallback, caption: `If a provider fails, its first alternative takes over. Together they cost about the same, ${cents(totalFor("fallback"))}.`, badge: change("fallback") },
+  { pipeline: "budget", layout: "stack", label: pipelineLabels.budget, caption: `The cheapest models the app still accepted cost ${cents(totalFor("budget"))}, but they do worse until they pass our evaluation.`, badge: change("budget") },
 ];
 
 const SCENE_MS = 4200;
-const billed = lessonSteps.filter(step => step.id !== "moderation");
-const MAX = Math.max(...billed.map(step => step.cost.list));
-const TOTAL_MAX = billed.reduce((sum, step) => sum + step.cost.list, 0);
+const pipelines: Pipeline[] = ["chosen", "fallback", "budget"];
+const MAX = Math.max(...billed.flatMap(step => pipelines.map(p => step.cost[p])));
+const TOTAL_MAX = Math.max(...pipelines.map(totalFor));
 const REDUCED = "(prefers-reduced-motion: reduce)";
 
 function subscribeReduced(onChange: () => void) {
@@ -64,8 +74,10 @@ export function CostVideo() {
   }, []);
 
   const scene = scenes[index];
-  const teal = scene.pipeline === "optimised";
-  const total = billed.reduce((sum, step) => sum + step.cost[scene.pipeline], 0);
+  const teal = scene.pipeline === "budget";
+  const total = totalFor(scene.pipeline);
+  // The biggest call keeps its label when the bars merge into one.
+  const lead = billed.reduce((top, step) => (step.cost[scene.pipeline] > top.cost[scene.pipeline] ? step : top)).id;
   const shownTotal = useTween(total, 1100);
 
   function toggle() {
@@ -107,7 +119,7 @@ export function CostVideo() {
                 key={step.id}
                 className={s.bar}
                 style={style}
-                data-lead={i === 0 || undefined}
+                data-lead={step.id === lead || undefined}
               >
                 <span className={s.name}>{step.name}<small>{step.model[scene.pipeline]}</small></span>
                 <span className={s.value}><Value value={cost} /></span>
@@ -119,7 +131,7 @@ export function CostVideo() {
 
         <ul className={s.shares} aria-hidden={scene.layout !== "stack"}>
           {billed.map((step, i) => (
-            <li key={step.id} data-lead={i === 0 || undefined} style={{ "--i": i } as CSSProperties}>
+            <li key={step.id} data-lead={step.id === lead || undefined} style={{ "--i": i } as CSSProperties}>
               <b>{Math.round((step.cost[scene.pipeline] / total) * 100)}%</b>
               <span>{step.name}</span>
             </li>

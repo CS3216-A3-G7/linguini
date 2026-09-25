@@ -25,8 +25,10 @@ TOMATO, TEAL, TEAL_DEEP, PASTA, SAGE, LINE = "#EF5B32", "#00968F", "#184F4E", "#
 
 # Words and marker positions from landing/data/scenes.ts (hillside-street).
 WORDS = [("el coche", 47, 62), ("la casa", 58, 33), ("la flor", 18, 66), ("la calle", 50, 86)]
-COSTS = [("Scene analysis", 0.0139, 0.0024), ("Translation", 0.0017, 0.0002), ("Learning tasks", 0.0018, 0.0012),
-         ("I-Spy", 0.0014, 0.0010)]
+# Expected cost per call (chosen models, then the cheapest alternatives), from
+# marketing/business-model/model/unit-economics.json ("breakdown").
+COSTS = [("Scene analysis", 0.00736, 0.00229), ("Translation", 0.00025, 0.00025), ("Learning tasks", 0.01024, 0.00454),
+         ("I-Spy clues", 0.00046, 0.00022), ("I-Spy guesses", 0.00172, 0.00063)]
 
 
 def font(size, display=False):
@@ -171,19 +173,19 @@ def scene_costs(t):
     shrink = window(t, 2.2, 1.0)
     d.text((80, 150), "AI cost of one photo lesson", font=font(52, True), fill=INK)
     x0, x1, top = 360, 1040, 280
-    scale = (x1 - x0) / 0.014
+    scale = (x1 - x0) / 0.011
     total = 0.0
     for i, (name, now, cheap, *_) in enumerate(COSTS):
         grow = window(t, 0.3 + i * 0.22, 0.6)
         value = (now + (cheap - now) * shrink) * grow
         total += value
-        y = top + i * 82
+        y = top + i * 66
         d.text((x0 - 24, y + 4), name, font=font(26), fill=INK, anchor="ra")
         d.rounded_rectangle((x0, y + 6, x1, y + 34), 8, fill="#ECE5D6")
         if value > 0:
             d.rounded_rectangle((x0, y + 6, x0 + max(10, value * scale), y + 34), 8, fill=TOMATO if shrink < 0.5 else TEAL)
         d.text((x0 + max(10, value * scale) + 16, y + 2), f"${value:.4f}", font=font(26), fill=INK)
-    label = "Current models" if shrink < 0.5 else "Cheaper pipeline, being tested"
+    label = "Chosen models, via OpenRouter" if shrink < 0.5 else "Cheapest alternatives, still being tested"
     d.text((80, 640), label, font=font(28), fill=MUTED)
     d.text((80, 676), f"${total:.3f} per lesson", font=font(56, True), fill=TOMATO if shrink < 0.5 else TEAL_DEEP)
     c.alpha_composite(MASCOT, (W - 200, H - 190))

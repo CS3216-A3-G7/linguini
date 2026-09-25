@@ -37,8 +37,8 @@ function Ruler({ step }: { step: number }) {
         <div className={s.row} data-state={stateFor("cost", step)}>
           <span className={s.rowLabel}>Cost</span>
           <span className={s.rowTrack} />
-          <span className={s.range} data-soft style={{ left: 0, width: pct(14.4) }} />
-          <span className={s.markLabel} data-pos="below" data-align="start" style={{ left: 0 }}>≈ $14 AI + fees</span>
+          <span className={s.range} data-soft style={{ left: 0, width: pct(14.5) }} />
+          <span className={s.markLabel} data-pos="below" data-align="start" style={{ left: 0 }}>≈ $15 AI + fees</span>
         </div>
 
         <div className={s.row} data-state={stateFor("competition", step)}>
@@ -87,7 +87,7 @@ export function PriceStory() {
       label="How we set the Plus price"
       graphic={Ruler}
       steps={[
-        <><strong>Cost sets the floor.</strong> A typical Plus learner costs us about $14 a year in AI, storage and card fees. Anything above that can also carry some free learners.</>,
+        <><strong>Cost sets the floor.</strong> A typical Plus learner costs us about $15 a year in AI, storage and card fees. Anything above that can also carry some free learners.</>,
         <><strong>Competitors set the range.</strong> Photo-flashcard apps charge $20–30 a year. Duolingo, Speak and Babbel charge $84–168. We do more than a flashcard app and less than a full course.</>,
         <><strong>Value sets the ceiling.</strong> An online tutor costs $15–60 an hour. A year of daily practice should cost less than one or two lessons.</>,
         <><strong>So Plus is $49.99 a year.</strong> That is close to the $44.99 education-app median and below every course app. Our first 300 members lock in $34.99.</>,
