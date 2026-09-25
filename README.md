@@ -1,6 +1,21 @@
 # Linguini
 
-Linguini is a photo-led, speak-first language-learning app. You photograph a moment from your day, Linguini finds the words inside it, you practise them through word cards, I-Spy and short sentence tasks in Spanish or French, and the day ends up in your journal.
+<p align="center">
+  <img src="frontend/public/linguini-logo.png" alt="Linguini logo" width="180" />
+  <img src="frontend/public/linguini-wordmark.png" alt="Linguini wordmark" width="360" />
+</p>
+
+<p align="center"><strong>Learn the language of your day</strong></p>
+
+## Group members
+
+| Matriculation number | Name | Contribution to the assignment |
+| --- | --- | --- |
+| `A0312075N` | `Ananya Jain` | `Idea, Branding, Frontend (UI/UX), AI Core Tech, Pitch` |
+| `A0286908L` | `Govindaraj Roshni Daksha` | `Backend API, Database, AI Core Tech` |
+| `A0307648W` | `Madrid Lim` | `Landing Page, Marketing, User Analytics` |
+| `A0310636M` | `Shamit Gupta` | `AI Model Analysis, OpenRouter Integration` |
+
 
 ## Repository
 
@@ -29,6 +44,19 @@ cd landing && npm ci && npm run dev
 ```
 
 Windows/PowerShell setup, environment variables and API details are in the app READMEs.
+
+## Significant resources
+
+- [React documentation](https://react.dev/learn) — component-based UI development.
+- [Vite documentation](https://vite.dev/guide/) — frontend development and production builds.
+- [FastAPI documentation](https://fastapi.tiangolo.com/) — backend API design and interactive API documentation.
+- [PostgreSQL documentation](https://www.postgresql.org/docs/) — relational data modelling and database behaviour.
+- [Supabase documentation](https://supabase.com/docs) — managed PostgreSQL, authentication, storage, and database services.
+- [Google People + AI Guidebook](https://pair.withgoogle.com/guidebook/patterns) — human-centred AI interaction patterns, including user control, system status, and error recovery.
+- [Microsoft HAX Toolkit](https://www.microsoft.com/en-us/haxtoolkit/ai-guidelines/) — evidence-based guidelines for human–AI interaction and correcting AI output.
+- [Impeccable](https://impeccable.style/) — design guidance used during interface refinement to improve hierarchy, spacing, typography, and consistency.
+- [OpenAI prompt engineering guidance](https://platform.openai.com/docs/guides/prompt-engineering) — prompt structure, clear instructions, and output constraints.
+- [Google Gemini API documentation](https://ai.google.dev/gemini-api/docs) — multimodal model integration and structured AI responses.
 
 ## Contributing
 
