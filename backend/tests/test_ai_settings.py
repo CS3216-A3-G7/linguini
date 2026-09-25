@@ -105,6 +105,7 @@ def test_real_mode_requires_openai_key_for_openai_moderation():
             "AI_MODE": "real",
             "AI_GEMINI_API_KEY": "gem-key",
             "AI_OPENAI_API_KEY": "sk-openai",
+            "AI_OPENROUTER_API_KEY": "sk-or",
             "AI_SCENE_ANALYSIS_PROVIDER": "gemini",
             "AI_SCENE_ANALYSIS_MODEL": "m",
             "AI_SCENE_TRANSLATION_PROVIDER": "gemini",
@@ -275,24 +276,24 @@ def test_empty_env_reproduces_the_measured_defaults():
     assert scene.timeout_seconds == 120
 
     translation = settings.scene_translation
-    assert translation.provider is AiProvider.OPENAI
-    assert translation.model_name == "gpt-4o-mini"
+    assert translation.provider is AiProvider.OPENROUTER
+    assert translation.model_name == "openai/gpt-4o-mini"
     assert translation.timeout_seconds == 60
 
     learning = settings.learning_task
-    assert learning.provider is AiProvider.OPENAI
-    assert learning.model_name == "gpt-5.4-mini"
+    assert learning.provider is AiProvider.OPENROUTER
+    assert learning.model_name == "openai/gpt-5.4-mini"
     assert learning.timeout_seconds == 60
     assert learning.max_retries == 1
 
     clue = settings.ispy_clue
-    assert clue.provider is AiProvider.GEMINI
-    assert clue.model_name == "gemini-3.1-flash-lite"
+    assert clue.provider is AiProvider.OPENROUTER
+    assert clue.model_name == "google/gemini-3.1-flash-lite"
     assert clue.max_retries == 1
 
     guess = settings.ispy_guess
-    assert guess.provider is AiProvider.OPENAI
-    assert guess.model_name == "gpt-4.1-mini"
+    assert guess.provider is AiProvider.OPENROUTER
+    assert guess.model_name == "openai/gpt-4.1-mini"
     assert guess.max_retries == 0
 
     for config in (clue, guess):
