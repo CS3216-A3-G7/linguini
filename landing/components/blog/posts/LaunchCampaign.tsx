@@ -105,7 +105,7 @@ export function LaunchCampaign() {
       <h2 id="posts">What we’ll post</h2>
       <p>
         One draft per channel. Each went back and forth between the four of us until we all agreed, and they all go out
-        together at 3:10pm. The rail moves on its own; hover to stop it.
+        together at 3:10pm.
       </p>
       <DraftRail />
       <p>

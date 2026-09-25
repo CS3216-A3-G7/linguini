@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight } from "@/components/icons";
+import { ArrowRight } from "@/components/icons";
 import { useInView } from "../story/hooks";
 import { Img } from "./Img";
 import { type Brand, Logo } from "./Logos";
@@ -100,18 +100,17 @@ const slides: { wide?: boolean; drafts: Draft[] }[] = [
     drafts: [
       { brand: "linkedin", label: "LinkedIn", note: "From one of us, not the brand. People reply to people.", body: <LinkedInPost /> },
       { brand: "reddit", label: "Reddit", note: "A question in the weekly thread, not an announcement.", body: <RedditPost /> },
-      { brand: "telegram", label: "Telegram", note: "Lowercase, because that’s how we text each other.", body: <TelegramChat /> },
     ],
   },
+  { drafts: [{ brand: "telegram", label: "Telegram", note: "Lowercase, because that’s how we text each other.", body: <TelegramChat /> }] },
 ];
 
 const DRIFT_PX_PER_S = 28;
-const RESUME_AFTER_MS = 4000;
+const RESUME_AFTER_MS = 2500;
 
 export function DraftRail() {
   const railRef = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ start: true, end: false });
-  const [auto, setAuto] = useState(false);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -129,12 +128,11 @@ export function DraftRail() {
     };
   }, []);
 
-  // Drift back and forth while on screen. Any touch, wheel, hover or focus hands control to the reader.
+  // Drift back and forth while on screen, hover included. Only a swipe, wheel or drag pauses it briefly.
   useEffect(() => {
     const rail = railRef.current;
     if (!rail || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let visible = false;
-    let hovered = false;
     let pausedUntil = 0;
     let dir = 1;
     let pos = rail.scrollLeft;
@@ -144,9 +142,7 @@ export function DraftRail() {
     const tick = (now: number) => {
       const dt = last ? Math.min(64, now - last) : 16;
       last = now;
-      const running = visible && !hovered && now > pausedUntil && !rail.contains(document.activeElement);
-      setAuto(running);
-      if (running) {
+      if (visible && now > pausedUntil) {
         const max = rail.scrollWidth - rail.clientWidth;
         if (Math.abs(rail.scrollLeft - pos) > 2) pos = rail.scrollLeft;
         pos += dir * DRIFT_PX_PER_S * (dt / 1000);
@@ -158,15 +154,11 @@ export function DraftRail() {
     };
 
     const hold = () => { pausedUntil = performance.now() + RESUME_AFTER_MS; };
-    const enter = () => { hovered = true; };
-    const leave = () => { hovered = false; hold(); };
     const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { threshold: 0.3 });
     observer.observe(rail);
     rail.addEventListener("wheel", hold, { passive: true });
     rail.addEventListener("touchstart", hold, { passive: true });
     rail.addEventListener("pointerdown", hold);
-    rail.addEventListener("mouseenter", enter);
-    rail.addEventListener("mouseleave", leave);
     frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame);
@@ -174,17 +166,8 @@ export function DraftRail() {
       rail.removeEventListener("wheel", hold);
       rail.removeEventListener("touchstart", hold);
       rail.removeEventListener("pointerdown", hold);
-      rail.removeEventListener("mouseenter", enter);
-      rail.removeEventListener("mouseleave", leave);
     };
   }, []);
-
-  const nudge = (dir: 1 | -1) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    rail.scrollBy({ left: dir * rail.clientWidth * 0.8, behavior: reduced ? "auto" : "smooth" });
-  };
 
   const all = slides.flatMap(s => s.drafts);
 
@@ -193,15 +176,10 @@ export function DraftRail() {
       <div className={p.railBar}>
         <p className={p.railHint}>
           <span className={p.railLogos} aria-hidden="true">{all.map(d => <Logo key={d.label} brand={d.brand} size={16} />)}</span>
-          {all.length} drafts. Hover to stop, or use the arrows.
+          {all.length} drafts, drifting sideways. Swipe or scroll to look closer.
         </p>
-        <div className={p.railButtons}>
-          <button type="button" onClick={() => nudge(-1)} disabled={edge.start} aria-label="Previous drafts"><ArrowLeft size={18} /></button>
-          <button type="button" onClick={() => nudge(1)} disabled={edge.end} aria-label="More drafts"><ArrowRight size={18} /></button>
-        </div>
       </div>
-      <div ref={railRef} className={p.rail} data-start={edge.start || undefined} data-end={edge.end || undefined}
-        data-auto={auto || undefined}>
+      <div ref={railRef} className={p.rail} data-start={edge.start || undefined} data-end={edge.end || undefined}>
         {slides.map((slide, i) => (
           <div key={i} className={p.slide} data-wide={slide.wide || undefined} data-stack={slide.drafts.length > 1 || undefined}>
             {slide.drafts.map(d => (
