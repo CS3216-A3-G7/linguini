@@ -58,32 +58,18 @@ diary of what you actually did.
 ## Architecture
 
 ```mermaid
-flowchart LR
-  subgraph client["Client (Vercel)"]
-    app["frontend/<br/>React 19 SPA<br/>pages, state, speech"]
-    site["landing/<br/>Next.js 16 site<br/>demo, SEO, blog"]
-  end
+flowchart TD
+  app["frontend/ — React 19 SPA"]
+  api["backend/ — FastAPI, /api/v1"]
+  sb["Supabase — PostgreSQL, Storage, Auth"]
+  ai["AI models via OpenRouter"]
 
-  subgraph api["backend/ &nbsp; FastAPI (uvicorn)"]
-    routers["/api/v1 routers"] --> services["services"] --> repos["repositories"]
-  end
-
-  subgraph supabase["Supabase"]
-    db[("PostgreSQL")]
-    storage[["Storage<br/>media-assets"]]
-    auth{{"Auth<br/>JWT / JWKS"}}
-  end
-
-  ai["AI models<br/>via OpenRouter"]
-
-  app -- "REST + bearer token" --> routers
-  app -- "sign in" --> auth
-  repos --> db
-  services --> storage
-  services --> ai
-  routers -. "verify token" .-> auth
-  site -. "no API dependency" .-> app
+  app --> api
+  api --> sb
+  api --> ai
 ```
+
+`landing/` is a separate Next.js site and does not call the API.
 
 - API JSON is camelCase; Python attributes are snake_case. The API prefix is `/api/v1`.
 - PostgreSQL is required: there is no in-memory or JSON fallback, and missing database
