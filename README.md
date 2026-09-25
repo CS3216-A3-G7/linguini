@@ -76,14 +76,22 @@ learning tasks are finished, so it still needs a real capture.
 
 ## Launch film
 
-<a href="landing/public/film/linguini-film-720p.mp4"><img src="landing/public/film/poster.jpg" alt="Launch film poster frame" width="560" /></a>
+<a href="landing/public/film/linguini-film-1080p.mp4"><img src="docs/media/launch-film-preview.webp" alt="Looping silent preview of the Linguini launch film" width="640" /></a>
 
-Click the poster to play the 30-second film
-([720p](landing/public/film/linguini-film-720p.mp4),
-[1080p](landing/public/film/linguini-film-1080p.mp4)); GitHub plays the file in its own
-viewer. It is also embedded on the [landing page](https://linguini-landing.vercel.app),
-and the narrated cut and 50-second explainer live in
-[`landing/public/blog/`](landing/public/blog).
+The looping clip above is a silent animated WebP that plays on its own; click it for the
+full 30-second film with sound
+([1080p](landing/public/film/linguini-film-1080p.mp4),
+[720p](landing/public/film/linguini-film-720p.mp4)). It is also embedded on the
+[landing page](https://linguini-landing.vercel.app), and the narrated cut and 50-second
+explainer live in [`landing/public/blog/`](landing/public/blog).
+
+Regenerate the preview after re-cutting the film:
+
+```sh
+ffmpeg -i landing/public/film/linguini-film-720p.mp4 \
+  -vf "fps=10,scale=640:-2" -loop 0 -c:v libwebp_anim -quality 60 -an \
+  docs/media/launch-film-preview.webp
+```
 
 ## Architecture
 
