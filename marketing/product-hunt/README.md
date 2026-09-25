@@ -11,6 +11,7 @@
 | [plan.md](plan.md) | Launch dashboard: useful links, readiness audit and must-fix list, goals and definitions, owner board and launch-day roles, tasks by week, go/no-go, hour-by-hour run, distribution lists (communities, creators, newsletters), assets, retention, and what we verified about Product Hunt's rules. |
 | [listing.md](listing.md) | Everything pasted into Product Hunt: name, taglines, description, launch tags, pricing, links, thumbnail, gallery order and captions, video, first maker comment, the full-release draft and the demo video storyboard. |
 | [social-posts.md](social-posts.md) | Every channel post (X, LinkedIn, Instagram, TikTok, Telegram/WhatsApp, email, Reddit, Show HN), one-to-one and creator outreach, and the reply bank for Product Hunt comments. |
+| [milestone-launch-campaign.html](milestone-launch-campaign.html) | The launch-campaign milestone write-up. Open it in a browser, copy all and paste into the Google Doc, like `business-model/milestone-business-model.html`. |
 | [gallery/](gallery/) | Six 1270 × 760 gallery images (`01-hero` to `06-habit`, each with an `@2x`), the 240 × 240 thumbnail (PNG and GIF) and the 1200 × 630 social card. |
 | [gallery-src/](gallery-src/) | HTML compositions for the gallery, built from 4× captures of the running landing page. The captures aren't committed; `capture.mjs` regenerates them from `landing/` on port 3200, then `render.mjs` and `thumb.mjs` export the PNGs and GIF. |
 

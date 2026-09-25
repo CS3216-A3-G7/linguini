@@ -4,10 +4,11 @@ import { Checklist } from "../launch/Checklist";
 import { BannerWall, LaunchClock, ProductHuntListing } from "../launch/Figures";
 import { Img } from "../launch/Img";
 import {
-  Circles, Communities, CreatorMap, DayShifts, DraftRail, FollowUps, GrowthCurve, PlanStrip, ProductHuntAsks,
-  ReturnDots, Roles, Skipped, Yardstick,
+  Circles, Communities, CreatorMap, DayShifts, DraftRail, GrowthCurve, Phases, PlanStrip, ProductHuntAsks, ReturnDots,
+  Roles,
 } from "../launch/Plan";
 import l from "../launch/launch.module.css";
+import p from "../launch/plan.module.css";
 import { InView } from "../story/InView";
 import story from "../story/story.module.css";
 import s from "../article.module.css";
@@ -29,75 +30,57 @@ export function LaunchCampaign() {
       <p className={story.status}>Draft plan · nothing posted yet · checked 25 September 2026</p>
 
       <InView as="p" className={story.lede}>
-        We’re putting Linguini on Product Hunt on <mark>Saturday 17 October at 3:01pm Singapore time</mark>. This page
-        is the whole plan: when we launch and why, what we’ll post and where, what happens on the day, and how we’ll try
-        to <mark>keep the people who show up</mark>. That last part is the one that matters, so most of the thinking
-        went there.
+        A launch is one day. Keeping the people who show up takes <mark>the two weeks after</mark>, so that’s where most
+        of this plan goes. Here it is in the order it happens.
       </InView>
 
       <PlanStrip />
 
       <h2 id="when">When we launch</h2>
       <p>
-        We’re four students in Singapore. So why does our launch time look like it was picked for America?
+        Product Hunt ranks launches on a daily leaderboard, and its day starts at midnight in San Francisco. Launch at
+        12:01am Pacific and you get all 24 hours. Launch later and you’re behind products that started at midnight.
       </p>
       <p>
-        Because Product Hunt picked it. Every launch lives on a daily leaderboard, and that day starts at midnight in San
-        Francisco. Launch at 12:01am Pacific and you get all 24 hours on the board. Launch at noon and you get half,
-        against products that have been collecting votes since midnight. So everyone launches at 12:01am Pacific,
-        wherever they live.
-      </p>
-      <p>
-        For most teams outside the US that means staying up all night. For us it’s the opposite. 12:01am in San
-        Francisco is 3:01pm on a Saturday afternoon in Singapore. We get to launch wide awake, with ten hours before
-        anyone needs to sleep.
+        For a team in Singapore, 12:01am Pacific is <strong>3:01pm on a Saturday afternoon</strong>. Most teams outside
+        the US launch at 3am. We get to launch awake.
       </p>
       <LaunchClock />
       <p>
-        The catch is in the diagram. Most of Product Hunt’s audience is in the US and Europe, and their daytime is our
-        night. So we work in shifts, which we’ll get to.
+        The cost is that most of Product Hunt’s audience, in the US and Europe, is awake during our night. That’s why
+        launch day runs in shifts.
       </p>
       <p>
-        Why a Saturday? Weekdays bring more visitors, but a Tuesday also has about three times as many launches, and
-        Product Hunt’s own guide says weekend launches get 15% more clicks through to the product. We’re a small team
-        with a small network. What we want is people trying the demo, and a quieter day gets us more of that. One more
-        check: the US leaves daylight saving on 1 November, which would push our start to 4:01pm. 17 October is before
-        that.
+        We chose a Saturday because a Tuesday has about three times as many launches, and Product Hunt’s own guide says
+        weekend launches get 15% more clicks through to the product. A small team gets more attention on a quiet day.
+        And 17 October is before the US leaves daylight saving on 1 November, which would move us to 4:01pm.
       </p>
 
-      <h2 id="soft-launch">Open doors or an invite list?</h2>
+      <h2 id="soft-launch">Soft launch first, then open doors</h2>
       <p>
-        The alternative to a big launch is a soft one. Clubhouse was invite-only for 16 months and Arc for over a year,
-        and both made people want in. But exclusivity costs something. Arc’s CEO has said{" "}
-        <a href="https://youtu.be/xJdx0BlP0iY?t=198">they lost up to 80% of sign-ups to their waitlist</a>: people who
-        asked to get in and were gone by the time they were let in.
+        A soft launch means letting a few people in before everyone else. Clubhouse stayed invite-only for 16 months and
+        Arc for over a year, and the scarcity made people want in. The price is people. Arc’s CEO has said{" "}
+        <a href="https://youtu.be/xJdx0BlP0iY?t=198">they lost up to 80% of sign-ups to their waitlist</a>.
       </p>
+      <p>We want the useful part, feedback from a small group, without the waitlist. So we do both, one after the other:</p>
+      <Phases />
       <p>
-        Clubhouse and Arc could afford that because people were already talking about them. Nobody is talking about us
-        yet. We can’t afford to lose four out of five. So we split it by what’s ready:
-      </p>
-      <ul>
-        <li><strong>The browser demo is open to everyone</strong>, no sign-up. It works today, end to end.</li>
-        <li>
-          <strong>The learner app goes to 10 to 20 beta testers first.</strong> Photo upload still returns sample words
-          instead of reading your picture. We’d rather a small group finds that than a front page of strangers.
-        </li>
-      </ul>
-      <p>
-        Two rules made this easy. Product Hunt doesn’t feature waitlisted products unless people get in straight away,
-        and Show HN rejects anything behind a sign-up. A waitlist would have cost us both. So what we’re really
-        launching is the demo, which means the listing has one job: get people to try it.
+        The beta finds the bugs while mistakes are cheap. On launch day there’s nothing to wait for, which matters twice:
+        Product Hunt doesn’t feature products people can’t get into straight away, and Show HN rejects anything behind a
+        waitlist.
       </p>
 
       <h2 id="listing">The listing</h2>
-      <p>Product Hunt asks for five things. Here’s what we’re giving it.</p>
+      <p>
+        Product Hunt is backed by Y Combinator, and it’s where Notion, Obsidian, Otter and BeReal launched. It asks for
+        five things. Here’s what we’re giving it.
+      </p>
       <ProductHuntAsks />
       <ProductHuntListing />
       <p>
-        The tagline says what you can do in the demo today. Our full-release line, “Learn Spanish or French from the
-        photos you take”, waits until the app reads your own photos. The first comment ends on two questions because
-        people answer questions. Product Hunt says 70% of its Product of the Day, Week and Month winners had a first
-        comment from the maker.
+        The tagline says what you can do in the demo in the first minute. The first comment ends on two questions,
+        because people answer questions. Product Hunt says 70% of its Product of the Day, Week and Month winners had a
+        first comment from the maker.
       </p>
       <figure className={s.fig}>
         <div className="no-print">
@@ -115,19 +98,19 @@ export function LaunchCampaign() {
         </figcaption>
       </figure>
       <p>
-        A listing only works if people see it, though. Product Hunt doesn’t so much send you traffic on launch day as
-        reward the traffic you bring. So the next question is what we post, and where.
+        A listing only works if people see it. Product Hunt doesn’t send you traffic so much as reward the traffic you
+        bring, so the next question is what we post.
       </p>
 
       <h2 id="posts">What we’ll post</h2>
       <p>
-        These are the real drafts, one per channel. Scroll sideways to see them all. The likes, the carousel and the
-        story all work.
+        One draft per channel. Each went back and forth between the four of us until we all agreed, and they all go out
+        together at 3:10pm. The rail moves on its own; hover to stop it.
       </p>
       <DraftRail />
       <p>
-        Each one is written the way people on that channel already talk, and none of them ask for upvotes. Product Hunt
-        can pull a launch for that, and a comment tells us more than a vote anyway.
+        None of them ask for upvotes. Product Hunt can pull a launch for that, and a comment tells us more than a vote
+        anyway.
       </p>
 
       <h2 id="banners">Banners</h2>
@@ -138,7 +121,6 @@ export function LaunchCampaign() {
       <div className={`${s.fig} ${s.breakout}`}>
         <BannerWall />
       </div>
-      <p>Posts and banners are the what. The harder question is who sees them first.</p>
 
       <h2 id="who">Who we’re telling, closest first</h2>
       <p>
@@ -148,25 +130,25 @@ export function LaunchCampaign() {
       <Circles />
 
       <h3>Communities</h3>
-      <p>Only where promotion is allowed, and only in the thread the rules point to.</p>
+      <p>We want as much reach as we can get, but every community has rules, and getting banned reaches nobody.</p>
       <Communities />
+      <p>
+        One pair we won’t pitch: Steve Kaufmann and Ikenna run LingQ and Fluyo, and asking a competitor to feature us is
+        awkward for everyone.
+      </p>
 
       <h3>Creators</h3>
       <p>
-        We’re emailing four kinds of language creator. The obvious move is to go for the biggest audience. But a huge
-        channel gets hundreds of pitches, and a small one reads every email.
+        The obvious move is to email the biggest channel. But a huge channel gets hundreds of pitches, and a small one
+        reads every email.
       </p>
       <CreatorMap />
 
-      <h3>Where we’re not posting</h3>
-      <Skipped />
-      <p>
-        Two of those are “not yet” rather than “no”. They’re waiting for the next launch, which we’ll come to. First, the
-        day itself.
-      </p>
-
       <h2 id="day">Launch day, hour by hour</h2>
-      <p>Four of us, three shifts, Singapore time, Saturday into Sunday.</p>
+      <p>
+        Back to the catch from the clock: the US is awake during our night. So the four of us split the 24 hours into
+        three shifts, Singapore time.
+      </p>
       <DayShifts />
       <p>Whoever is on shift covers three jobs:</p>
       <Roles />
@@ -174,29 +156,31 @@ export function LaunchCampaign() {
         <strong>If sign-up breaks:</strong> we stop posting, put a note on the landing page and send people to the demo,
         which needs no account, while we fix it.
       </p>
-      <p>
-        That’s the easy part, because it’s just a schedule. By Sunday afternoon the votes stop mattering. What matters
-        after that is whether anyone comes back.
-      </p>
 
       <h2 id="after">After launch day</h2>
       <p>
-        Most launch plans count visits and upvotes. Those tell you whether the listing worked. They don’t tell you
-        whether the product did. For that we’re watching one number: <strong>of the people who sign up during launch
-        week, how many do a second lesson within seven days?</strong>
+        By Sunday afternoon the votes stop counting. Visits and upvotes tell you whether the listing worked, not whether
+        the product did. For that we’re watching one number: <strong>of the people who sign up during launch week, how
+        many do a second lesson within seven days?</strong>
       </p>
       <ReturnDots />
       <p>
-        Is 10% good? We needed a yardstick. <a href="https://amplitude.com/blog/7-percent-retention-rule">Amplitude</a>{" "}
-        makes the analytics software that thousands of apps use to count their users, so it can see how most apps do.
-        Its finding: if 7% of your new users are still active on day 7, you’re already in the top quarter of apps. We’re
-        not competing with Amplitude. We’re borrowing its ruler.
+        Is 10% good? <a href="https://amplitude.com/blog/7-percent-retention-rule">Amplitude</a> makes the analytics
+        software thousands of apps use to count their users, so it can see how most apps do. We’re not competing with
+        it. We’re borrowing its ruler:
       </p>
-      <Yardstick />
+      <table className={p.table}>
+        <thead>
+          <tr><th scope="col">New users still active on day 7</th><th scope="col">Share</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Enough to be in the top quarter of apps, per Amplitude</th><td>7%</td></tr>
+          <tr><th scope="row">Our target for launch week</th><td>10%</td></tr>
+        </tbody>
+      </table>
       <p>
         So 10% is ambitious, and with numbers this small one person either way changes everything. But it answers the
-        question we actually have: does the loop bring anyone back at all? Here’s what we’re doing to earn the second
-        visit:
+        question we actually have: does the loop bring anyone back at all? Here’s how we try to earn the second visit:
       </p>
       <ul>
         <li><strong>No account for the first lesson.</strong> The demo is the onboarding.</li>
@@ -204,8 +188,11 @@ export function LaunchCampaign() {
         <li><strong>One reminder on day two</strong>, only if you opted in, using your own photo. Not a daily blast.</li>
         <li><strong>A streak from day one</strong>, and a weekly recap of your journal: the week’s photos and words on one page.</li>
       </ul>
-      <p>And here’s what we do with what we learn, in the two weeks after:</p>
-      <FollowUps />
+      <p>
+        Then we act on what we see. On day 1 we fix the onboarding bugs people hit on launch day. On day 3 we talk to five
+        people who came back and five who didn’t. On day 7 we count second lessons and fix the biggest drop-off. On day
+        14 we publish what we learned, with the real numbers.
+      </p>
 
       <h2 id="next">The next launch</h2>
       <p>
@@ -214,11 +201,10 @@ export function LaunchCampaign() {
       </p>
       <GrowthCurve />
       <p>
-        So our second launch is already picked: real photo analysis, the day the app reads your own photo instead of
-        returning sample words. That’s also when Show HN and the AI newsletters make sense. Product Hunt allows a
-        relaunch after a major update, and we want to arrive with our week-one numbers. The business side of that, what
-        we charge and what each lesson costs us, is in <Link href="/blog/linguini-business-model">our business
-        model</Link>.
+        So the second launch is already picked: <strong>speaking feedback</strong>. Linguini is meant to be speak-first,
+        and it doesn’t grade your speaking yet. When it does, that’s worth a relaunch, which Product Hunt allows after a
+        major update, and we’ll arrive with our week-one numbers. What we charge, and what each lesson costs us, is in{" "}
+        <Link href="/blog/linguini-business-model">our business model</Link>.
       </p>
 
       <h2 id="checklist">Our checklist</h2>
@@ -245,6 +231,8 @@ export function LaunchCampaign() {
 
       <h2 id="sources">Sources</h2>
       <p className={s.muted} style={{ fontSize: 14 }}>
+        <a href="https://www.ycombinator.com/">Y Combinator</a> ·{" "}
+        <a href="https://www.producthunt.com/topics/artificial-intelligence">Product Hunt AI launches</a> ·{" "}
         <a href="https://www.producthunt.com/launch/preparing-for-launch">Product Hunt: preparing for launch</a> ·{" "}
         <a href="https://www.producthunt.com/launch">Product Hunt launch guide</a> ·{" "}
         <a href="https://help.producthunt.com/en/articles/479557-how-to-post-a-product">How to post a product</a> ·{" "}

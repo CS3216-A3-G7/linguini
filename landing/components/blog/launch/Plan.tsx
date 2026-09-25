@@ -16,29 +16,50 @@ function useInViewRef<T extends HTMLElement>() {
 /* ---------- The whole plan on one line ---------- */
 
 const steps = [
-  { href: "#checklist", when: "3 weeks out", title: "Fix and test", text: "Beta testers, tracking, every button works" },
-  { href: "#who", when: "1 week out", title: "Tell people", text: "Friends first, then communities, then creators" },
-  { href: "#day", when: "Sat 17 Oct, 3:01pm", title: "Launch", text: "Product Hunt, our posts, three shifts", live: true },
-  { href: "#after", when: "The 2 weeks after", title: "Bring people back", text: "One number: a second lesson in 7 days" },
-  { href: "#next", when: "Already planned", title: "Launch again", text: "Real photo analysis" },
+  { href: "#soft-launch", when: "Now to 16 Oct", title: "Beta testers" },
+  { href: "#who", when: "The week before", title: "Tell people" },
+  { href: "#day", when: "Sat 17 Oct, 3:01pm", title: "Launch", live: true },
+  { href: "#after", when: "The 2 weeks after", title: "Bring people back" },
+  { href: "#next", when: "Already planned", title: "Launch again" },
 ];
 
 export function PlanStrip() {
   const [ref, inView] = useInViewRef<HTMLOListElement>();
   return (
-    <figure className={p.fig}>
+    <nav aria-label="The plan">
       <ol ref={ref} className={p.strip} data-inview={inView || undefined}>
         {steps.map((step, i) => (
           <li key={step.title} style={{ ["--i" as string]: i }} data-live={step.live || undefined}>
             <a href={step.href}>
               <small>{step.when}</small>
               <b>{step.title}</b>
-              <span>{step.text}</span>
             </a>
           </li>
         ))}
       </ol>
-      <figcaption>The plan on one line. Tap a step to jump to it.</figcaption>
+    </nav>
+  );
+}
+
+/* ---------- Soft launch, then open doors ---------- */
+
+export function Phases() {
+  return (
+    <figure className={p.fig}>
+      <div className={p.phases}>
+        <section className={p.phase} data-tone="soft">
+          <small>Now to 16 October</small>
+          <h4>Soft launch</h4>
+          <p><b>10 to 20 beta testers</b>, by invitation. People learning Spanish or French who will tell us what breaks.</p>
+        </section>
+        <span className={p.phaseArrow} aria-hidden="true"><ArrowRight size={22} /></span>
+        <section className={p.phase} data-tone="open">
+          <small>From 17 October, 3:01pm</small>
+          <h4>Open to everyone</h4>
+          <p><b>No waitlist.</b> The browser demo needs no account, and anyone can sign up for the app’s free daily lesson.</p>
+        </section>
+      </div>
+      <figcaption>An invite list for three weeks to find the bugs, then open doors for launch day.</figcaption>
     </figure>
   );
 }
@@ -66,20 +87,31 @@ export function ProductHuntAsks() {
   );
 }
 
-/* ---------- Every draft, side by side ---------- */
+/* ---------- Every draft, side by side, drifting on its own ---------- */
 
-const drafts: { brand: Brand; label: string; note: string; body: ReactNode; wide?: boolean }[] = [
-  { brand: "x", label: "X thread", note: "The first post carries the link card. The replies carry the why.", body: <XThread />, wide: true },
-  { brand: "instagram", label: "Instagram carousel", note: "4:5, because it takes the most room in the feed. Double-click the photo.", body: <InstagramPost /> },
-  { brand: "instagram", label: "Instagram story", note: "A countdown at T−3, then “we’re live” with a link sticker. Top and bottom left clear for Instagram’s buttons.", body: <div className={p.storyWrap}><StoryPhone /></div> },
-  { brand: "linkedin", label: "LinkedIn", note: "Written by one of us, not the brand, because people reply to people.", body: <LinkedInPost />, wide: true },
-  { brand: "reddit", label: "Reddit", note: "A question in the weekly self-promotion thread, not an announcement.", body: <RedditPost /> },
-  { brand: "telegram", label: "Telegram", note: "Lowercase, because that’s how we actually text each other.", body: <TelegramChat /> },
+type Draft = { brand: Brand; label: string; note: string; body: ReactNode };
+
+const slides: { wide?: boolean; drafts: Draft[] }[] = [
+  { wide: true, drafts: [{ brand: "x", label: "X thread", note: "The first post carries the link card. The replies carry the why.", body: <XThread /> }] },
+  { drafts: [{ brand: "instagram", label: "Instagram carousel", note: "4:5 takes the most room in the feed. Double-click the photo.", body: <InstagramPost /> }] },
+  { drafts: [{ brand: "instagram", label: "Instagram story", note: "A countdown at T−3, then “we’re live” with a link sticker.", body: <div className={p.storyWrap}><StoryPhone /></div> }] },
+  {
+    wide: true,
+    drafts: [
+      { brand: "linkedin", label: "LinkedIn", note: "From one of us, not the brand. People reply to people.", body: <LinkedInPost /> },
+      { brand: "reddit", label: "Reddit", note: "A question in the weekly thread, not an announcement.", body: <RedditPost /> },
+      { brand: "telegram", label: "Telegram", note: "Lowercase, because that’s how we text each other.", body: <TelegramChat /> },
+    ],
+  },
 ];
+
+const DRIFT_PX_PER_S = 28;
+const RESUME_AFTER_MS = 4000;
 
 export function DraftRail() {
   const railRef = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ start: true, end: false });
+  const [auto, setAuto] = useState(false);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -97,6 +129,56 @@ export function DraftRail() {
     };
   }, []);
 
+  // Drift back and forth while on screen. Any touch, wheel, hover or focus hands control to the reader.
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let visible = false;
+    let hovered = false;
+    let pausedUntil = 0;
+    let dir = 1;
+    let pos = rail.scrollLeft;
+    let last = 0;
+    let frame = 0;
+
+    const tick = (now: number) => {
+      const dt = last ? Math.min(64, now - last) : 16;
+      last = now;
+      const running = visible && !hovered && now > pausedUntil && !rail.contains(document.activeElement);
+      setAuto(running);
+      if (running) {
+        const max = rail.scrollWidth - rail.clientWidth;
+        if (Math.abs(rail.scrollLeft - pos) > 2) pos = rail.scrollLeft;
+        pos += dir * DRIFT_PX_PER_S * (dt / 1000);
+        if (pos >= max) { pos = max; dir = -1; }
+        if (pos <= 0) { pos = 0; dir = 1; }
+        rail.scrollLeft = pos;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+
+    const hold = () => { pausedUntil = performance.now() + RESUME_AFTER_MS; };
+    const enter = () => { hovered = true; };
+    const leave = () => { hovered = false; hold(); };
+    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { threshold: 0.3 });
+    observer.observe(rail);
+    rail.addEventListener("wheel", hold, { passive: true });
+    rail.addEventListener("touchstart", hold, { passive: true });
+    rail.addEventListener("pointerdown", hold);
+    rail.addEventListener("mouseenter", enter);
+    rail.addEventListener("mouseleave", leave);
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      rail.removeEventListener("wheel", hold);
+      rail.removeEventListener("touchstart", hold);
+      rail.removeEventListener("pointerdown", hold);
+      rail.removeEventListener("mouseenter", enter);
+      rail.removeEventListener("mouseleave", leave);
+    };
+  }, []);
+
   const nudge = (dir: 1 | -1) => {
     const rail = railRef.current;
     if (!rail) return;
@@ -104,25 +186,32 @@ export function DraftRail() {
     rail.scrollBy({ left: dir * rail.clientWidth * 0.8, behavior: reduced ? "auto" : "smooth" });
   };
 
+  const all = slides.flatMap(s => s.drafts);
+
   return (
     <div className={p.railWrap}>
       <div className={p.railBar}>
         <p className={p.railHint}>
-          <span className={p.railLogos} aria-hidden="true">{drafts.map(d => <Logo key={d.label} brand={d.brand} size={16} />)}</span>
-          {drafts.length} drafts, scroll or use the arrows
+          <span className={p.railLogos} aria-hidden="true">{all.map(d => <Logo key={d.label} brand={d.brand} size={16} />)}</span>
+          {all.length} drafts. Hover to stop, or use the arrows.
         </p>
         <div className={p.railButtons}>
           <button type="button" onClick={() => nudge(-1)} disabled={edge.start} aria-label="Previous drafts"><ArrowLeft size={18} /></button>
           <button type="button" onClick={() => nudge(1)} disabled={edge.end} aria-label="More drafts"><ArrowRight size={18} /></button>
         </div>
       </div>
-      <div ref={railRef} className={p.rail} data-start={edge.start || undefined} data-end={edge.end || undefined}>
-        {drafts.map(d => (
-          <section key={d.label} className={p.slide} data-wide={d.wide || undefined} aria-label={d.label}>
-            <p className={p.slideLabel}><Logo brand={d.brand} size={16} /> {d.label}</p>
-            <div className={p.slideBody}>{d.body}</div>
-            <p className={p.slideNote}>{d.note}</p>
-          </section>
+      <div ref={railRef} className={p.rail} data-start={edge.start || undefined} data-end={edge.end || undefined}
+        data-auto={auto || undefined}>
+        {slides.map((slide, i) => (
+          <div key={i} className={p.slide} data-wide={slide.wide || undefined} data-stack={slide.drafts.length > 1 || undefined}>
+            {slide.drafts.map(d => (
+              <section key={d.label} className={p.draft} aria-label={d.label}>
+                <p className={p.slideLabel}><Logo brand={d.brand} size={16} /> {d.label}</p>
+                <div className={p.slideBody}>{d.body}</div>
+                <p className={p.slideNote}>{d.note}</p>
+              </section>
+            ))}
+          </div>
         ))}
       </div>
     </div>
@@ -131,10 +220,10 @@ export function DraftRail() {
 
 /* ---------- Who hears first: three circles ---------- */
 
-const circles: { name: string; when: string; how: string; brands: Brand[]; extra?: string }[] = [
-  { name: "People we know", when: "Testing it from three weeks out", how: "Friends, classmates and our beta testers. They try it first and get a message each on the day, because they’ll use it properly and tell us the truth.", brands: ["telegram", "instagram", "linkedin"] },
-  { name: "Communities", when: "Launch afternoon", how: "Language learners and other makers, once the first circle’s bugs are fixed, and only in the threads that allow it.", brands: ["reddit", "discord", "indiehackers", "producthunt"], extra: "NUS Hackers" },
-  { name: "Creators", when: "A week before", how: "A personal note to language YouTubers, with no ask to post.", brands: ["youtube"] },
+const circles: { name: string; when: string; how: string; brands: Brand[]; extra?: string[] }[] = [
+  { name: "People we know", when: "Beta from now, a message on the day", how: "Friends, classmates and our beta testers. They’ll use it properly and tell us the truth.", brands: ["telegram", "instagram", "linkedin"] },
+  { name: "Communities", when: "Launch afternoon", how: "Language learners, makers and AI readers, in the threads each place allows.", brands: ["reddit", "discord", "ycombinator", "indiehackers", "producthunt"], extra: ["HelloTalk", "NUS Hackers"] },
+  { name: "Creators", when: "A note the week before", how: "Language YouTubers, with no ask to post.", brands: ["youtube"] },
 ];
 
 export function Circles() {
@@ -156,7 +245,7 @@ export function Circles() {
             <p className={p.ringHead}><b>{c.name}</b> <small>{c.when}</small></p>
             <p className={p.ringLogos}>
               {c.brands.map(b => <Logo key={b} brand={b} size={22} title={b} />)}
-              {c.extra ? <span className={p.textMark}>{c.extra}</span> : null}
+              {c.extra?.map(name => <span key={name} className={p.textMark}>{name}</span>)}
             </p>
             <p className={p.ringHow}>{c.how}</p>
           </li>
@@ -168,13 +257,17 @@ export function Circles() {
 
 /* ---------- Communities: one line each ---------- */
 
-const communities: { brand: Brand | null; name: string; size?: string; rule: string }[] = [
-  { brand: "reddit", name: "r/languagelearning", size: "3.4M", rule: "Resources thread only. Exactly our learners." },
+const communities: { brand: Brand | null; mark?: string; name: string; size?: string; rule: string }[] = [
+  { brand: "reddit", name: "r/languagelearning", size: "3.4M", rule: "Resources thread. Exactly our learners." },
   { brand: "reddit", name: "r/Spanish", rule: "Weekly promo thread. We ask the mods first." },
+  { brand: "reddit", name: "r/French", rule: "No ads, so we ask the mods for one feedback post." },
   { brand: "reddit", name: "r/SideProject", rule: "Promotion welcome. We lead with how we built it." },
-  { brand: "discord", name: "Refold, Language Learning Community, Language Cafe", size: "28k to 37k each", rule: "Promo channels only. Daily learners." },
-  { brand: "indiehackers", name: "Indie Hackers", rule: "One Show IH post, asking for feedback on the listing." },
-  { brand: null, name: "NUS Hackers Friday Hacks", rule: "Ten minutes of live demo. Speakers wanted until 13 Nov." },
+  { brand: "discord", name: "Refold, Language Learning Community, Language Cafe", size: "28k to 37k each", rule: "Promo channels. Daily learners." },
+  { brand: null, mark: "HT", name: "HelloTalk", rule: "No promotion, so we share our own journal pages as learners and let people ask." },
+  { brand: "ycombinator", name: "Show HN", rule: "Live demo, no sign-up needed, which is what HN asks for." },
+  { brand: null, mark: "AI", name: "The Rundown, TLDR AI, Ben’s Bites", rule: "One short pitch each: AI that turns your photo into a lesson." },
+  { brand: "indiehackers", name: "Indie Hackers", rule: "One Show IH post, asking for notes on the listing." },
+  { brand: null, mark: "NUS", name: "NUS Hackers Friday Hacks", rule: "Ten minutes of live demo. Speakers wanted until 13 Nov." },
 ];
 
 export function Communities() {
@@ -182,7 +275,7 @@ export function Communities() {
     <ul className={p.rows}>
       {communities.map(c => (
         <li key={c.name}>
-          {c.brand ? <Logo brand={c.brand} size={22} /> : <span className={p.textMark} aria-hidden="true">NUS</span>}
+          {c.brand ? <Logo brand={c.brand} size={22} /> : <span className={p.textMark} aria-hidden="true">{c.mark}</span>}
           <b>{c.name}{c.size ? <small> {c.size}</small> : null}</b>
           <span>{c.rule}</span>
         </li>
@@ -228,30 +321,6 @@ export function CreatorMap() {
   );
 }
 
-/* ---------- Where we’re not posting ---------- */
-
-const skipped: { brand: Brand | null; mark?: string; name: string; why: string; verdict: string }[] = [
-  { brand: "ycombinator", name: "Show HN", why: "They’ll upload their own photo in the first minute and get sample words back. We post once real photo analysis ships.", verdict: "Not yet" },
-  { brand: null, mark: "AI", name: "AI newsletters", why: "Same reason. Pitching an AI tool while the AI part is sample data would backfire.", verdict: "Not yet" },
-  { brand: "reddit", name: "r/French", why: "No advertising at all. We’ll join as learners instead.", verdict: "No" },
-  { brand: null, mark: "HT", name: "HelloTalk", why: "Its guidelines ban promotion.", verdict: "No" },
-  { brand: "youtube", name: "Steve Kaufmann, Ikenna", why: "They run LingQ and Fluyo. Asking a competitor to feature us is awkward for everyone.", verdict: "No" },
-];
-
-export function Skipped() {
-  return (
-    <ul className={`${p.rows} ${p.skipped}`}>
-      {skipped.map(item => (
-        <li key={item.name}>
-          {item.brand ? <Logo brand={item.brand} size={22} mono /> : <span className={p.textMark} aria-hidden="true">{item.mark}</span>}
-          <b>{item.name} <em data-verdict={item.verdict}>{item.verdict}</em></b>
-          <span>{item.why}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /* ---------- Launch day in three shifts ---------- */
 
 const shifts = [
@@ -260,7 +329,7 @@ const shifts = [
     beats: [
       ["14:00", "Sign up fresh on a phone. Dashboards open."],
       ["15:01", "Live. First comment up within a minute.", true],
-      ["15:10", "Posts go out. Friends get a message each."],
+      ["15:10", "Every post goes out at once. Friends get a message each."],
       ["16:00", "Every comment answered within the hour."],
       ["21:00", "US east coast wakes up. Second story."],
     ],
@@ -268,7 +337,7 @@ const shifts = [
   {
     name: "Night", hours: "01:00 to 08:00", crew: "Two on call", tone: "teal",
     beats: [
-      ["01:00", "Handover to one replier and one engineer. Everyone else sleeps."],
+      ["01:00", "Handover to one replier and one engineer."],
       ["All night", "Watch errors and sign-ups. Answer the US."],
     ],
   },
@@ -277,7 +346,7 @@ const shifts = [
     beats: [
       ["08:00", "Read the overnight numbers."],
       ["10:00", "Second nudge in our NUS class chats."],
-      ["14:59", "Day ends. Thank everyone. Write down what broke."],
+      ["14:59", "Day ends. Write down what broke."],
     ],
   },
 ] as const;
@@ -309,8 +378,8 @@ export function DayShifts() {
 
 const roles = [
   { role: "Replier", job: "Answers every comment and support email. Our customer support for the day." },
-  { role: "Engineer on call", job: "Watches the error dashboard. Fixes bugs, restarts servers, rolls back." },
-  { role: "Poster", job: "Sends the posts and messages on time, and tracks what’s been sent." },
+  { role: "Engineer on call", job: "Watches analytics and the error dashboard. Fixes bugs, restarts servers, rolls back." },
+  { role: "Poster", job: "Sends the posts and messages on time, and tracks what’s gone out." },
 ];
 
 export function Roles() {
@@ -346,63 +415,52 @@ export function ReturnDots() {
   );
 }
 
-export function Yardstick() {
-  const [ref, inView] = useInViewRef<HTMLDivElement>();
-  const rows = [
-    { label: "A top-quarter app, per Amplitude’s data", value: 7 },
-    { label: "Our target for Linguini", value: 10, ours: true },
-  ];
-  return (
-    <div ref={ref} className={p.yard} data-inview={inView || undefined}>
-      <p className={p.yardHead}>New users still active on day 7</p>
-      {rows.map((row, i) => (
-        <div key={row.label} className={p.yardRow} data-ours={row.ours || undefined} style={{ ["--i" as string]: i }}>
-          <span>{row.label}</span>
-          <span className={p.yardTrack}><i style={{ ["--w" as string]: `${row.value * 5}%` }} /></span>
-          <b>{row.value}%</b>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const followUps = [
-  { day: "Day 1", text: "Fix the onboarding bugs people hit on launch day." },
-  { day: "Day 3", text: "Talk to five people who came back and five who didn’t." },
-  { day: "Day 7", text: "Count second lessons. Fix the biggest drop-off." },
-  { day: "Day 14", text: "Publish what we learned, with the real numbers." },
-];
-
-export function FollowUps() {
-  return (
-    <ol className={p.follow}>
-      {followUps.map(f => (
-        <li key={f.day}><b>{f.day}</b><span>{f.text}</span></li>
-      ))}
-    </ol>
-  );
-}
-
 /* ---------- Launches are spikes ---------- */
+
+const W = 640;
+const H = 250;
+const X0 = 44;
+const Y0 = 208;
+const weekX = (w: number) => X0 + (w / 12) * (W - X0 - 118);
+
+// Weekly active users, as a share of the launch-day peak. A sketch, not data.
+const oneLaunch = [0.06, 1, 0.55, 0.38, 0.3, 0.26, 0.24, 0.23, 0.22, 0.215, 0.21, 0.205, 0.2];
+const twoLaunches = [...oneLaunch.slice(0, 6), 0.95, 0.62, 0.5, 0.45, 0.42, 0.41, 0.4];
+
+function smooth(values: number[]) {
+  const pts = values.map((v, w) => [weekX(w), Y0 - v * (Y0 - 30)] as const);
+  return pts.reduce((d, [x, y], i) => {
+    if (i === 0) return `M${x},${y}`;
+    const [px, py] = pts[i - 1];
+    const cx = (px + x) / 2;
+    return `${d} C${cx},${py} ${cx},${y} ${x},${y}`;
+  }, "");
+}
 
 export function GrowthCurve() {
   const [ref, inView] = useInViewRef<HTMLDivElement>();
-  // Weekly active users over ~10 weeks: a launch spike, a plateau, then launch two before the plateau sets in.
-  const line = "M0,150 C40,150 50,148 70,146 C80,145 84,60 92,52 C104,44 118,96 150,108 C190,120 220,118 250,117 C262,117 268,112 276,104 C284,30 292,22 300,20 C316,18 330,64 370,74 C410,82 450,80 520,78";
+  const end = (values: number[]) => Y0 - values[12] * (Y0 - 30);
   return (
     <figure className={p.fig}>
       <div ref={ref} className={p.curve} data-inview={inView || undefined}>
-        <svg viewBox="0 0 520 170" preserveAspectRatio="none" aria-hidden="true">
-          <path className={p.curveArea} d={`${line} L520,170 L0,170 Z`} />
-          <path className={p.curveDash} d="M150,108 C190,120 300,122 520,122" />
-          <path className={p.curveLine} d={line} />
+        <svg viewBox={`0 0 ${W} ${H}`} aria-labelledby="growth-title">
+          <title id="growth-title">Active users over twelve weeks: one launch spikes then settles low; a second launch in week six lifts the level again.</title>
+          <rect x={weekX(3)} y={24} width={weekX(5) - weekX(3)} height={Y0 - 24} className={p.planBand} />
+          <text x={(weekX(3) + weekX(5)) / 2} y={18} className={p.planText} textAnchor="middle">Plan launch 2 here</text>
+          <line x1={X0} y1={Y0} x2={weekX(12)} y2={Y0} className={p.axis} />
+          {[0, 2, 4, 6, 8, 10, 12].map(w => (
+            <text key={w} x={weekX(w)} y={Y0 + 20} className={p.tick} textAnchor="middle">{w === 0 ? "Week 0" : w}</text>
+          ))}
+          <text x={X0} y={14} className={p.tick}>Active users</text>
+          <path d={smooth(oneLaunch)} className={p.lineOne} />
+          <path d={smooth(twoLaunches)} className={p.lineTwo} />
+          <text x={weekX(1)} y={Y0 + 38} className={p.launchTick} textAnchor="middle">Launch 1</text>
+          <text x={weekX(6)} y={Y0 + 38} className={p.launchTick} textAnchor="middle">Launch 2</text>
+          <text x={weekX(12) + 10} y={end(twoLaunches) + 4} className={p.endTwo}>With launch 2</text>
+          <text x={weekX(12) + 10} y={end(oneLaunch) + 4} className={p.endOne}>One launch</text>
         </svg>
-        <span className={p.pin} style={{ left: "17.7%", top: "30%" }}>Launch 1<small>Sat 17 Oct</small></span>
-        <span className={p.pin} data-soon style={{ left: "57.7%", top: "11%" }}>Launch 2<small>Real photo analysis</small></span>
-        <span className={p.plateau} style={{ left: "64%", top: "60%" }}>Without it, we flatten here</span>
-        <span className={p.planned} style={{ left: "29%", top: "88%" }}>Plan launch 2 here, before it flattens</span>
       </div>
-      <figcaption>A sketch, not data: what a launch does to active users, and why the next one is planned now.</figcaption>
+      <figcaption>A sketch of what launches do to active users, not our data.</figcaption>
     </figure>
   );
 }
