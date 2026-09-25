@@ -243,40 +243,48 @@ def chart_competitors():
 def chart_session_cost():
     b = MODEL["breakdown"]
     rows = [
-        ("Current models · promo price (2026)", "current@promo"),
-        ("Current models · list price (from Jan 2027)", "current@list"),
-        ("Optimised pipeline (to be evaluated)", "optimized"),
+        ("Chosen models", "chosen"),
+        ("First alternatives", "fallback"),
+        ("Cheapest alternatives (lower quality)", "budget"),
     ]
     c, d = chart_frame(
         "AI cost of one own-photo lesson",
-        "Vision scene analysis is most of the cost, so it is the first thing to optimise",
-        "Model: marketing/business-model/model/cost_model.py · expected tokens, 10% retry allowance · "
-        "Gemini and OpenAI list prices, 23–24 Sep 2026",
+        "Scene analysis and learning tasks are almost all of the cost",
+        "Model: marketing/business-model/model/cost_model.py · measured tokens, 10% retry allowance · "
+        "OpenRouter catalogue prices (MODEL_COMPARISON.md)",
     )
     x0, x1, top, band = 470, 1130, 190, 130
-    maxv = 0.02
+    maxv = 0.025
     scale = (x1 - x0) / maxv
-    # Legend (two series): swatch + text-ink label.
-    for i, (label, color) in enumerate((("Scene analysis (vision)", MARK_A), ("Translation, tasks, I-Spy", MARK_B))):
-        lx = 470 + i * 300
+    scene_key, tasks_key = "Scene analysis (vision)", "Learning tasks"
+    series = (("Scene analysis (vision)", MARK_A), ("Learning tasks", MARK_B), ("Translation and I-Spy", MARK_NEUTRAL))
+    lx = 470
+    for label, color in series:
         rr(d, (lx, 142, lx + 16, 158), 4, color)
         txt(d, (lx + 24, 137), label, 17, INK)
-    for v in (0, 0.005, 0.01, 0.015, 0.02):
+        lx += 24 + int(font(17).getlength(label)) + 40
+    for v in (0, 0.005, 0.01, 0.015, 0.02, 0.025):
         x = x0 + v * scale
         d.line((x, top - 10, x, top + band * len(rows) - 30), fill=GRID, width=1)
         txt(d, (x, top + band * len(rows) - 22), f"${v:.3f}", 15, MUTED, anchor="ma")
     for i, (name, key) in enumerate(rows):
         y = top + i * band + 20
-        vision = b[key]["Scene analysis (vision)"]
-        rest = sum(v for k, v in b[key].items() if k != "Scene analysis (vision)")
+        scene = b[key][scene_key]
+        tasks = b[key][tasks_key]
+        rest = sum(v for k, v in b[key].items() if k not in (scene_key, tasks_key))
         txt(d, (x0 - 18, y + 2), wrap(name, 380, 19), 19, INK, anchor="ra" if "\n" not in wrap(name, 380, 19) else None)
-        hbar(d, x0, y, vision * scale, 24, MARK_A)
-        d.rectangle((x0 + vision * scale, y, x0 + vision * scale + 2, y + 24), fill=PAPER)
-        hbar(d, x0 + vision * scale + 2, y, rest * scale - 2, 24, MARK_B)
-        d.rectangle((x0 + vision * scale + 2, y, x0 + vision * scale + 6, y + 24), fill=MARK_B)
-        total = vision + rest
+        x = x0
+        for j, (value, color) in enumerate(((scene, MARK_A), (tasks, MARK_B), (rest, MARK_NEUTRAL))):
+            start = x + (2 if j else 0)
+            hbar(d, start, y, value * scale - (2 if j else 0), 24, color)
+            if j:  # square the join so only the data end is rounded
+                d.rectangle((start, y, start + 4, y + 24), fill=color)
+            x += value * scale
+            if j < 2:
+                d.rectangle((x, y, x + 2, y + 24), fill=PAPER)
+        total = scene + tasks + rest
         txt(d, (x0 + total * scale + 12, y + 1), f"${total:.4f}", 19, INK, True)
-        txt(d, (x0, y + 34), f"vision {vision / total:.0%} of the lesson", 15, MUTED)
+        txt(d, (x0, y + 34), f"scene analysis {scene / total:.0%}, learning tasks {tasks / total:.0%} of the lesson", 15, MUTED)
     save(c, "chart-session-cost.png")
 
 
@@ -284,13 +292,13 @@ def chart_breakeven():
     be = MODEL["breakeven_conversion"]
     key = "B · Recommended ($7.99 / $49.99)"
     rows = [
-        ("Current models · list price (2027)", be["current@list"][key]),
-        ("Current models · promo price (2026)", be["current@promo"][key]),
-        ("Optimised pipeline", be["optimized"][key]),
+        ("Chosen models", be["chosen"][key]),
+        ("First alternatives", be["fallback"][key]),
+        ("Cheapest alternatives (lower quality)", be["budget"][key]),
     ]
     c, d = chart_frame(
         "Paid share of monthly users needed to cover AI cost",
-        "With 1 free photo lesson a day, the current model mix needs above-median conversion",
+        "With 1 free photo lesson a day, the chosen models need above-median conversion",
         "Model: cost_model.py (free-user mix 50/35/15% light/casual/at cap). Benchmarks: RevenueCat SOSA 2026 "
         "education; Duolingo Q2 2026 letter.",
     )

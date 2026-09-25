@@ -1,84 +1,116 @@
 {
+  "pipelines": {
+    "chosen": {
+      "label": "Chosen models (backend/.env.example)",
+      "models": {
+        "scene": "anthropic/claude-haiku-4.5",
+        "translation": "openai/gpt-4o-mini",
+        "tasks": "openai/gpt-5.4-mini",
+        "clues": "google/gemini-3.1-flash-lite",
+        "guess": "openai/gpt-4.1-mini"
+      }
+    },
+    "fallback": {
+      "label": "First alternative for every call",
+      "models": {
+        "scene": "openai/gpt-4o",
+        "translation": "mistralai/mistral-small-2603",
+        "tasks": "openai/gpt-4.1-mini",
+        "clues": "openai/gpt-4o-mini",
+        "guess": "google/gemini-3.5-flash-lite"
+      }
+    },
+    "budget": {
+      "label": "Cheapest usable alternative",
+      "models": {
+        "scene": "openai/gpt-4.1-mini",
+        "translation": "openai/gpt-4o-mini",
+        "tasks": "openai/gpt-4.1-mini",
+        "clues": "openai/gpt-4o-mini",
+        "guess": "openai/gpt-4o-mini"
+      }
+    }
+  },
   "sessions": {
-    "current@promo, expected": 0.01195,
-    "current@promo, worst case": 0.04383,
-    "current@list, expected": 0.0189,
-    "current@list, worst case": 0.06096,
-    "optimized, expected": 0.00477,
-    "optimized, worst case": 0.01998
+    "chosen, expected": 0.02004,
+    "chosen, worst case": 0.09706,
+    "fallback, expected": 0.01783,
+    "fallback, worst case": 0.1017,
+    "budget, expected": 0.00793,
+    "budget, worst case": 0.03674
   },
   "breakdown": {
-    "current@promo": {
-      "Scene analysis (vision)": 0.00695,
-      "Translation": 0.00171,
-      "Learning tasks": 0.00182,
-      "I-Spy clues": 0.00064,
-      "I-Spy guess feedback": 0.00084
+    "chosen": {
+      "Scene analysis (vision)": 0.00736,
+      "Translation": 0.00025,
+      "Learning tasks": 0.01024,
+      "I-Spy clues": 0.00046,
+      "I-Spy guess feedback": 0.00172
     },
-    "current@list": {
-      "Scene analysis (vision)": 0.01389,
-      "Translation": 0.00171,
-      "Learning tasks": 0.00182,
-      "I-Spy clues": 0.00064,
-      "I-Spy guess feedback": 0.00084
+    "fallback": {
+      "Scene analysis (vision)": 0.01102,
+      "Translation": 0.00026,
+      "Learning tasks": 0.00454,
+      "I-Spy clues": 0.00022,
+      "I-Spy guess feedback": 0.00178
     },
-    "optimized": {
-      "Scene analysis (vision)": 0.00241,
-      "Translation": 0.00016,
-      "Learning tasks": 0.00121,
-      "I-Spy clues": 0.00043,
-      "I-Spy guess feedback": 0.00056
+    "budget": {
+      "Scene analysis (vision)": 0.00229,
+      "Translation": 0.00025,
+      "Learning tasks": 0.00454,
+      "I-Spy clues": 0.00022,
+      "I-Spy guess feedback": 0.00063
     }
   },
   "profiles": {
     "Free \u00b7 light": {
-      "current@promo": 0.027,
-      "current@list": 0.041,
-      "optimized": 0.012,
-      "worst": 0.148
+      "chosen": 0.045,
+      "fallback": 0.041,
+      "budget": 0.019,
+      "worst": 0.255
     },
     "Free \u00b7 casual": {
-      "current@promo": 0.106,
-      "current@list": 0.161,
-      "optimized": 0.047,
-      "worst": 0.55
+      "chosen": 0.174,
+      "fallback": 0.156,
+      "budget": 0.073,
+      "worst": 0.909
     },
     "Free \u00b7 at daily cap": {
-      "current@promo": 0.391,
-      "current@list": 0.6,
-      "optimized": 0.173,
-      "worst": 2.01
+      "chosen": 0.643,
+      "fallback": 0.577,
+      "budget": 0.269,
+      "worst": 3.267
     },
     "Plus \u00b7 typical": {
-      "current@promo": 0.49,
-      "current@list": 0.699,
-      "optimized": 0.272,
-      "worst": 2.82
+      "chosen": 0.742,
+      "fallback": 0.676,
+      "budget": 0.368,
+      "worst": 4.077
     },
     "Plus \u00b7 heavy (3/day)": {
-      "current@promo": 1.427,
-      "current@list": 2.052,
-      "optimized": 0.775,
-      "worst": 8.217
+      "chosen": 2.172,
+      "fallback": 1.975,
+      "budget": 1.061,
+      "worst": 11.815
     },
     "Plus \u00b7 fair-use ceiling (10/day)": {
-      "current@promo": 4.68,
-      "current@list": 6.764,
-      "optimized": 2.519,
-      "worst": 26.837
+      "chosen": 7.133,
+      "fallback": 6.472,
+      "budget": 3.468,
+      "worst": 38.191
     },
     "_mix": {
-      "current@promo": {
-        "free": 0.109,
-        "plus": 0.678
+      "chosen": {
+        "free": 0.18,
+        "plus": 1.028
       },
-      "current@list": {
-        "free": 0.167,
-        "plus": 0.969
+      "fallback": {
+        "free": 0.162,
+        "plus": 0.936
       },
-      "optimized": {
-        "free": 0.049,
-        "plus": 0.373
+      "budget": {
+        "free": 0.075,
+        "plus": 0.506
       }
     }
   },
@@ -103,92 +135,127 @@
     }
   },
   "scenarios": {
-    "current@list": {
+    "chosen": {
       "Beta": {
         "mau": 300,
         "conversion": 0.023,
         "payers": 7,
         "net_revenue": 36.16,
-        "free_ai_cost": 48.96,
-        "plus_ai_cost": 6.69,
+        "free_ai_cost": 52.75,
+        "plus_ai_cost": 7.09,
         "fixed": 52,
-        "total_cost": 107.65,
-        "contribution": -71.49
+        "total_cost": 111.84,
+        "contribution": -75.68
       },
       "Launch year": {
         "mau": 5000,
         "conversion": 0.023,
         "payers": 115,
         "net_revenue": 602.65,
-        "free_ai_cost": 816.06,
-        "plus_ai_cost": 111.49,
+        "free_ai_cost": 879.15,
+        "plus_ai_cost": 118.22,
         "fixed": 52,
-        "total_cost": 979.55,
-        "contribution": -376.91
+        "total_cost": 1049.37,
+        "contribution": -446.72
       },
       "Traction": {
         "mau": 50000,
         "conversion": 0.04,
         "payers": 2000,
         "net_revenue": 10480.81,
-        "free_ai_cost": 8018.63,
-        "plus_ai_cost": 1938.96,
+        "free_ai_cost": 8638.49,
+        "plus_ai_cost": 2056.02,
         "fixed": 70,
-        "total_cost": 10027.59,
-        "contribution": 453.22
+        "total_cost": 10764.51,
+        "contribution": -283.7
       }
     },
-    "optimized": {
+    "fallback": {
       "Beta": {
         "mau": 300,
         "conversion": 0.023,
         "payers": 7,
         "net_revenue": 36.16,
-        "free_ai_cost": 14.28,
-        "plus_ai_cost": 2.57,
+        "free_ai_cost": 47.44,
+        "plus_ai_cost": 6.46,
         "fixed": 52,
-        "total_cost": 68.86,
-        "contribution": -32.7
+        "total_cost": 105.9,
+        "contribution": -69.74
       },
       "Launch year": {
         "mau": 5000,
         "conversion": 0.023,
         "payers": 115,
         "net_revenue": 602.65,
-        "free_ai_cost": 238.05,
-        "plus_ai_cost": 42.88,
+        "free_ai_cost": 790.65,
+        "plus_ai_cost": 107.63,
         "fixed": 52,
-        "total_cost": 332.94,
-        "contribution": 269.71
+        "total_cost": 950.27,
+        "contribution": -347.63
       },
       "Traction": {
         "mau": 50000,
         "conversion": 0.04,
         "payers": 2000,
         "net_revenue": 10480.81,
-        "free_ai_cost": 2339.12,
-        "plus_ai_cost": 745.81,
+        "free_ai_cost": 7768.91,
+        "plus_ai_cost": 1871.74,
         "fixed": 70,
-        "total_cost": 3154.93,
-        "contribution": 7325.88
+        "total_cost": 9710.65,
+        "contribution": 770.16
+      }
+    },
+    "budget": {
+      "Beta": {
+        "mau": 300,
+        "conversion": 0.023,
+        "payers": 7,
+        "net_revenue": 36.16,
+        "free_ai_cost": 22.05,
+        "plus_ai_cost": 3.49,
+        "fixed": 52,
+        "total_cost": 77.54,
+        "contribution": -41.38
+      },
+      "Launch year": {
+        "mau": 5000,
+        "conversion": 0.023,
+        "payers": 115,
+        "net_revenue": 602.65,
+        "free_ai_cost": 367.42,
+        "plus_ai_cost": 58.23,
+        "fixed": 52,
+        "total_cost": 477.65,
+        "contribution": 125.0
+      },
+      "Traction": {
+        "mau": 50000,
+        "conversion": 0.04,
+        "payers": 2000,
+        "net_revenue": 10480.81,
+        "free_ai_cost": 3610.25,
+        "plus_ai_cost": 1012.75,
+        "fixed": 70,
+        "total_cost": 4693.0,
+        "contribution": 5787.81
       }
     }
   },
   "breakeven_conversion": {
-    "current@promo": {
-      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0231,
-      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0234
+    "chosen": {
+      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0403,
+      "B \u00b7 Recommended ($7.99 / $49.99)": 0.041
     },
-    "current@list": {
-      "A \u00b7 Current landing ($6.99 / $59.88)": 0.037,
-      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0376
+    "fallback": {
+      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0357,
+      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0362
     },
-    "optimized": {
-      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0098,
-      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0099
+    "budget": {
+      "A \u00b7 Current landing ($6.99 / $59.88)": 0.0154,
+      "B \u00b7 Recommended ($7.99 / $49.99)": 0.0156
     }
   },
-  "curated_session": 0.00084,
+  "curated_session": 0.00172,
   "journal_feedback": 0.00058,
   "pronunciation_per_session": {
     "Browser speech recognition": 0.0,

@@ -85,7 +85,7 @@ export function CompareApps() {
           </li>
         ))}
       </InView>
-      <figcaption>US list prices checked September 2026; they vary by country and promotion. CapWords turns photos into flashcards, without games or a journal.</figcaption>
+      <figcaption>US list prices checked September 2026; they vary by country and with discounts. CapWords turns photos into flashcards, without games or a journal.</figcaption>
     </figure>
   );
 }

@@ -70,23 +70,29 @@ export function PhotoLessons() {
       <LessonFlow
         sceneId="hillside-street"
         stages={["snap", "check", "find", "choose", "build", "ispy", "journal"]}
-        costs={{ check: "Free", find: "$0.0139 · vision", build: "$0.0035 · translation + tasks", ispy: "$0.0015" }}
+        costs={{ check: "Free", find: "$0.0074 · Claude Haiku 4.5", build: "$0.0105 · GPT-4o-mini + GPT-5.4-mini", ispy: "$0.0022 · Gemini + GPT-4.1-mini" }}
       />
       <p>
-        Each of those is a fraction of a cent. But they are paid on every lesson, for every learner, every day. So we
-        watch them closely.
+        Each step runs on the model that did it best when we tested them on our own prompts and photos, and all of them
+        go through one service, OpenRouter. Claude Haiku 4.5 reads the photo, GPT-4o-mini translates the words, GPT-5.4-mini
+        writes the lesson, Gemini 3.1 Flash-Lite writes the I-Spy clues and GPT-4.1-mini reads your guesses. No provider
+        won every job, and spreading them out means one outage breaks one step, not the app.
+      </p>
+      <p>
+        Together the steps cost about 2¢ a lesson. That sounds like nothing, but it’s paid on every lesson, for every
+        learner, every day. So we watch it closely.
       </p>
 
       <h2 id="cost">What each step costs</h2>
       <p>
-        The chart below shows where the cost goes today, what it looks like from 2027, and what it looks like with the
-        cheaper pipeline we are testing.
+        The chart below shows where the cost goes on the models we chose, what it would be if every provider failed over
+        to its first alternative, and what the cheapest alternatives would cost.
       </p>
       <CostVideo />
       <p>
-        The biggest share is the first real step: looking at the photo and finding the words in it. That’s the $0.0139
-        vision call. The steps after it are smaller: $0.0035 to translate the words and build the tasks, and $0.0015 for
-        I-Spy. So if we want lessons to stay cheap, the photo is where to look.
+        The biggest share isn’t the photo. It’s writing the lesson: $0.0102 of the $0.0105 in the practice step goes to
+        GPT-5.4-mini, the only model that reliably returned a lesson our app would accept. Reading the photo costs $0.0074,
+        and I-Spy $0.0022. So if we want lessons to stay cheap, the lesson writer is where to look.
       </p>
 
       <h2 id="cheap">Keeping it light</h2>
@@ -97,8 +103,10 @@ export function PhotoLessons() {
         <li><strong>Every output has a limit.</strong> Each step has a cap on how much the model can write.</li>
       </ul>
       <p>
-        Scene analysis is still most of the cost. That’s where we are testing cheaper models first. We test them against a
-        labelled set of photos, so that quality doesn’t slip when the price does. The numbers behind all this are in{" "}
+        The next saving is in the lesson writer. Cheaper models write good lessons but often return one question where our
+        format asks for two, so the app throws the lesson away. Once we fix that, GPT-4.1-mini can do the job for about
+        half the price. Any switch has to pass the same tests first, so quality doesn’t slip when the price does. The
+        numbers behind all this are in{" "}
         <Link href="/blog/linguini-business-model">our business model</Link>.
       </p>
       <p>Cost matters. But a photo of your day is personal, and that matters more.</p>

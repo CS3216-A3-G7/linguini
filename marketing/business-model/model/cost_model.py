@@ -4,10 +4,11 @@ Run from any directory with: python3 marketing/business-model/model/cost_model.p
 Standard library only. Writes marketing/business-model/model/unit-economics.json and prints
 the tables used in marketing/business-model/README.md.
 
-Every price below was checked on 24 September 2026; the source is next to each
-constant. Token counts are estimates derived from the backend's prompts, response
-schemas and output caps (see "Tokens per call"). Replace them with Langfuse usage once every
-AI feature is instrumented.
+Model choices and token counts come from the backend's model comparison (MODEL_COMPARISON.md
+and backend/evals/model_comparison/results/summary_full.csv): every candidate ran through the
+production services, and the tokens below are the measured means per call. Prices are the
+OpenRouter catalogue (provider list price) from that comparison's snapshot; every AI call is
+routed through OpenRouter, so they are also what we pay.
 """
 
 from __future__ import annotations
@@ -18,19 +19,17 @@ from pathlib import Path
 
 OUT = Path(__file__).resolve().parent / "unit-economics.json"
 
-# --- Provider prices, USD per 1M tokens ------------------------------------------
-# https://ai.google.dev/gemini-api/docs/pricing (page updated 23 Sep 2026)
-# https://developers.openai.com/api/docs/pricing
+# --- Provider prices through OpenRouter, USD per 1M tokens -------------------------
+# https://openrouter.ai/models (catalogue snapshot in MODEL_COMPARISON.md, "Model facts")
 PRICES = {
-    # gemini-3.7-flash is discounted until 31 Dec 2026, then doubles.
-    "gemini-3.7-flash@promo": (0.75, 3.75),
-    "gemini-3.7-flash@list": (1.50, 7.50),
-    "gemini-3.5-flash-lite": (0.30, 2.50),
-    "gemini-3.1-flash-lite": (0.25, 1.50),
-    "gemini-2.5-flash-lite": (0.10, 0.40),  # cheaper fallback for translation
-    "gpt-4o-mini": (0.15, 0.60),
-    "gpt-4.1-nano": (0.10, 0.40),
-    "gpt-5-nano": (0.05, 0.40),
+    "anthropic/claude-haiku-4.5": (1.00, 5.00),
+    "openai/gpt-4o": (2.50, 10.00),
+    "openai/gpt-4o-mini": (0.15, 0.60),
+    "openai/gpt-4.1-mini": (0.40, 1.60),
+    "openai/gpt-5.4-mini": (0.75, 4.50),
+    "google/gemini-3.1-flash-lite": (0.25, 1.50),
+    "google/gemini-3.5-flash-lite": (0.30, 2.50),
+    "mistralai/mistral-small-2603": (0.15, 0.60),
 }
 MODERATION_PER_IMAGE = 0.0  # omni-moderation-latest is free
 TRANSCRIBE_PER_MIN = 0.003  # gpt-4o-mini-transcribe
@@ -38,13 +37,9 @@ AZURE_PRON_PER_HOUR = 1.32 + 0.30  # Azure real-time STT + pronunciation add-on 
 TTS_PER_M_CHARS = 12.00  # gpt-4o-mini-tts; browser speechSynthesis is free and used today
 
 # --- Tokens per call ------------------------------------------------------------
-# input = system prompt + JSON response schema + request payload (+ image).
-# Prompt sizes: backend/app/ai/features/*/prompt.py (≈4 characters per token).
-# Output caps: backend/app/ai/registry.py (1,500 default; 4,000 for learning tasks).
-# Gemini 3 images cost 1,120 tokens at the default media resolution
-# (https://ai.google.dev/gemini-api/docs/media-resolution).
-# "expected" is a typical structured answer; "cap" bills the whole output cap,
-# which also covers Gemini thinking tokens.
+# tokens_in / out_expected: measured means from the model comparison (image tokens and any
+# reasoning tokens included). out_cap: the output caps in backend/app/ai/registry.py
+# (1,500 default; 4,000 for learning tasks), billed in the worst case.
 
 
 @dataclass(frozen=True)
@@ -58,36 +53,61 @@ class Call:
     calls_worst: float = 1
 
 
-PIPELINES = ("current@promo", "current@list", "optimized")
+PIPELINES = ("chosen", "fallback", "budget")
+PIPELINE_LABELS = {
+    "chosen": "Chosen models (backend/.env.example)",
+    "fallback": "First alternative for every call",
+    "budget": "Cheapest usable alternative",
+}
+
+# Measured tokens per (feature, model): input, output.
+TOKENS = {
+    ("scene", "anthropic/claude-haiku-4.5"): (3375, 664),
+    ("scene", "openai/gpt-4o"): (2298, 427),
+    ("scene", "openai/gpt-4.1-mini"): (2781, 604),
+    ("translation", "openai/gpt-4o-mini"): (648, 216),
+    ("translation", "mistralai/mistral-small-2603"): (421, 294),
+    ("tasks", "openai/gpt-5.4-mini"): (2831, 1597),
+    ("tasks", "openai/gpt-4.1-mini"): (2833, 1872),
+    ("clues", "google/gemini-3.1-flash-lite"): (938, 124),
+    ("clues", "openai/gpt-4o-mini"): (1057, 76),
+    ("guess", "openai/gpt-4.1-mini"): (1025, 70),
+    ("guess", "google/gemini-3.5-flash-lite"): (1201, 72),
+    ("guess", "openai/gpt-4o-mini"): (1025, 62),
+}
+
+MODELS = {
+    # chosen: backend/.env.example after MODEL_COMPARISON.md.
+    "chosen": {"scene": "anthropic/claude-haiku-4.5", "translation": "openai/gpt-4o-mini", "tasks": "openai/gpt-5.4-mini",
+               "clues": "google/gemini-3.1-flash-lite", "guess": "openai/gpt-4.1-mini"},
+    # fallback: the first "main alternative" for each call, used if the chosen provider fails.
+    "fallback": {"scene": "openai/gpt-4o", "translation": "mistralai/mistral-small-2603", "tasks": "openai/gpt-4.1-mini",
+                 "clues": "openai/gpt-4o-mini", "guess": "google/gemini-3.5-flash-lite"},
+    # budget: the cheapest alternative the app still accepted in the comparison. Lower quality: see README.
+    "budget": {"scene": "openai/gpt-4.1-mini", "translation": "openai/gpt-4o-mini", "tasks": "openai/gpt-4.1-mini",
+               "clues": "openai/gpt-4o-mini", "guess": "openai/gpt-4o-mini"},
+}
+
+FEATURES = (
+    ("scene", "Scene analysis (vision)", 1500, 1, 1),
+    ("translation", "Translation", 1500, 1, 1),
+    ("tasks", "Learning tasks", 4000, 1, 1),
+    ("clues", "I-Spy clues", 1500, 1, 1),
+    ("guess", "I-Spy guess feedback", 1500, 3, 5),
+)
 
 
 def session_calls(pipeline: str) -> list[Call]:
-    """Calls for one own-photo session.
-
-    current@*: the models in backend/.env.example. optimized: the same features on
-    cheaper models, medium image resolution (560 tokens) and translations reused from
-    the vocabulary table for half of the words. Optimized quality is unproven until the
-    photo evaluation set described in README.md passes.
-    """
-    if pipeline == "optimized":
-        return [
-            Call("Scene analysis (vision)", "gemini-3.1-flash-lite", 560 + 2800, 900, 1500),
-            Call("Translation", "gemini-2.5-flash-lite", 1000, 500, 1500, 0.5, 1),
-            Call("Learning tasks", "gpt-4.1-nano", 3000, 2000, 4000),
-            Call("I-Spy clues", "gpt-4.1-nano", 1500, 600, 1500),
-            Call("I-Spy guess feedback", "gpt-4.1-nano", 1100, 150, 1500, 3, 5),
-        ]
-    gemini = pipeline.split("@")[1]
-    return [
-        Call("Scene analysis (vision)", f"gemini-3.7-flash@{gemini}", 1120 + 2800, 900, 1500),
-        Call("Translation", "gemini-3.5-flash-lite", 1000, 500, 1500),
-        Call("Learning tasks", "gpt-4o-mini", 3000, 2000, 4000),
-        Call("I-Spy clues", "gpt-4o-mini", 1500, 600, 1500),
-        Call("I-Spy guess feedback", "gpt-4o-mini", 1100, 150, 1500, 3, 5),
-    ]
+    """Calls for one own-photo session on the given pipeline."""
+    calls = []
+    for key, label, cap, expected, worst in FEATURES:
+        model = MODELS[pipeline][key]
+        tokens_in, out = TOKENS[(key, model)]
+        calls.append(Call(label, model, tokens_in, out, cap, expected, worst))
+    return calls
 
 
-JOURNAL_FEEDBACK = Call("Journal feedback (planned)", "gpt-4o-mini", 1500, 500, 1500)
+JOURNAL_FEEDBACK = Call("Journal feedback (planned)", "openai/gpt-4o-mini", 1500, 500, 1500)
 RETRY_EXPECTED, RETRY_WORST = 1.10, 2.0  # MAX_RETRIES=1 can double a call
 
 
@@ -247,7 +267,8 @@ def breakeven_conversion(pipeline: str, option: str = RECOMMENDED) -> float:
 
 
 def main():
-    result = {"sessions": {}, "breakdown": {}, "profiles": {}, "options": {}, "scenarios": {}, "breakeven_conversion": {}}
+    result = {"pipelines": {p: {"label": PIPELINE_LABELS[p], "models": MODELS[p]} for p in PIPELINES},
+              "sessions": {}, "breakdown": {}, "profiles": {}, "options": {}, "scenarios": {}, "breakeven_conversion": {}}
 
     print("Per own-photo session (USD)")
     for pipeline in PIPELINES:
@@ -257,11 +278,11 @@ def main():
             result["sessions"][label] = round(value, 5)
             print(f"  {label:32} ${value:.4f}")
         result["breakdown"][pipeline] = {c.feature: round(call_cost(c, False), 5) for c in session_calls(pipeline)}
-    for pipeline in ("current@list", "optimized"):
+    for pipeline in PIPELINES:
         print(f"  breakdown · {pipeline}")
         for feature, value in result["breakdown"][pipeline].items():
             print(f"    {feature:28} ${value:.4f}")
-    result["curated_session"] = round(curated_session_cost("current@list", False), 5)
+    result["curated_session"] = round(curated_session_cost("chosen", False), 5)
     result["journal_feedback"] = round(call_cost(JOURNAL_FEEDBACK, False), 5)
     result["pronunciation_per_session"] = {k: round(v, 5) for k, v in PRON_OPTIONS.items()}
     print(f"  curated scene session           ${result['curated_session']:.4f}")
@@ -276,7 +297,7 @@ def main():
             pipeline: round(profile_cost(p, pipeline, False, TRANSCRIBE if spoken else BROWSER), 3)
             for pipeline in PIPELINES
         }
-        row["worst"] = round(profile_cost(p, "current@list", True, AZURE if spoken else BROWSER), 3)
+        row["worst"] = round(profile_cost(p, "chosen", True, AZURE if spoken else BROWSER), 3)
         result["profiles"][p.name] = row
         print(f"  {p.name:34} " + "  ".join(f"{k} ${v:5.2f}" for k, v in row.items()))
     for pipeline in PIPELINES:
@@ -293,7 +314,7 @@ def main():
         print(f"  {name:44} web ${web:4.2f}   store ${store:4.2f}")
 
     print("\nScenarios (option B)")
-    for pipeline in ("current@list", "optimized"):
+    for pipeline in PIPELINES:
         for label, mau, conv, fixed_key in SCENARIOS:
             row = scenario(mau, conv, fixed_key, pipeline)
             result["scenarios"].setdefault(pipeline, {})[label] = row

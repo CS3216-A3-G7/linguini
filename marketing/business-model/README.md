@@ -1,6 +1,6 @@
 # Linguini business model and pricing
 
-**Working draft, 24 September 2026.** This is a proposal for team review. Nothing here is live. Plus checkout, trials, pronunciation feedback, review mode and PDF export are not built yet (see [the launch kit's readiness audit](../product-hunt/plan.md#current-readiness-audit-24-september-2026)). Every price was checked on the date above and is linked under [Sources](#sources). The cost figures come from a reproducible model, [`model/cost_model.py`](model/cost_model.py), which uses the backend's actual AI call chain. Its token counts are estimates until Langfuse records real usage for every feature.
+**Working draft, 24 September 2026.** This is a proposal for team review. Nothing here is live. Plus checkout, trials, pronunciation feedback, review mode and PDF export are not built yet (see [the launch kit's readiness audit](../product-hunt/plan.md#current-readiness-audit-24-september-2026)). Every price was checked on the date above and is linked under [Sources](#sources). The cost figures come from a reproducible model, [`model/cost_model.py`](model/cost_model.py), which uses the backend's actual AI call chain and the models the team chose in the [model comparison](https://github.com/CS3216-A3-G7/linguini/blob/main/MODEL_COMPARISON.md). Its token counts are the means measured in that comparison, on the app's own prompts and schemas. Production usage in Langfuse should confirm them once every feature is traced.
 
 ![Proposed Free, Plus and Founding Plus tiers](media/export/pricing-tiers.png)
 
@@ -9,7 +9,7 @@
 1. **Freemium subscription, gated on AI cost rather than on learning.** Free covers **one own-photo lesson and one journal page a day**, plus unlimited replays of the curated scenes, which cost almost nothing to serve. Plus lifts those limits and adds the features that cost us money to run: more photo lessons, pronunciation feedback and multi-photo journals.
 2. **Plus: $7.99 a month or $49.99 a year** ($4.17 a month, 48% off), with a 7-day trial. That is a change from the landing page's $6.99 / $59.88. The annual price sits near the education-app median of $44.99, below Duolingo, Babbel and Speak, and above the photo-flashcard app CapWords, which does less.
 3. **Founding Plus: $34.99 a year for the first 300 paying members**, locked for as long as they stay subscribed. It includes the competitive I-Spy beta, a vote on the roadmap and a monthly call with the makers. This turns early payers into beta testers, as the team wants, without a lifetime deal whose AI costs would have no ceiling.
-4. **Move to cheaper models before opening the free tier widely.** With the current models, one own-photo lesson costs about **$0.012 now and $0.019 from January 2027**, when Gemini 3.7 Flash's promotional price ends. At that cost, **3.8% of monthly users must pay just to cover AI**. The education-app median is 2.3%. Vision scene analysis is 73% of the cost. An optimised pipeline would cost about $0.005 a lesson and break even at about 1% paid, but its quality has to pass a photo evaluation set first.
+4. **Bring the cost of a lesson down before opening the free tier widely.** With the models the team chose (all called through OpenRouter), one own-photo lesson costs about **$0.020 (2.0¢)**. At that cost, **4.1% of monthly users must pay just to cover AI**. The education-app median is 2.3%. Learning tasks are 51% of the cost and scene analysis 37%. The cheapest alternatives the app accepted would cost $0.008 a lesson and break even at 1.6% paid, but they score lower today. The first step is fixing the learning-task schema defect, so that GPT-4.1-mini, at about half the cost of GPT-5.4-mini, can pass.
 5. **Success before revenue means retained learners.** Until the public launch, the headline metric is **weekly learners who finish two or more lessons**. Founding-member sign-ups are the demand signal. Revenue matters once conversion data exists.
 
 ## What “success” means at each stage
@@ -33,7 +33,7 @@
 | Extras | Streaks, XP, pasta avatar | Journal PDF keepsake, early access to new languages | **Competitive I-Spy beta**, roadmap voting, monthly maker call, name in the credits |
 | Trial | — | 7 days | No trial; price shown up front |
 
-The free limits the team chose (one photo lesson and one journal page a day) fit both the cost structure and the product. The daily photo is the habit, and the cap stops a free user from running up cost. Curated scenes are analysed once, offline, by `backend/app/scripts/precompute_preloaded_scenes`. Replaying one costs about $0.0008, for I-Spy feedback alone. That makes them a cheap way to keep free users practising after they reach the daily cap.
+The free limits the team chose (one photo lesson and one journal page a day) fit both the cost structure and the product. The daily photo is the habit, and the cap stops a free user from running up cost. Curated scenes are analysed once, offline, by `backend/app/scripts/precompute_preloaded_scenes`. Replaying one costs about $0.0017, for I-Spy guess feedback alone. That makes them a cheap way to keep free users practising after they reach the daily cap.
 
 **Why the Plus price changes.** The existing $59.88 a year is two to three times CapWords' annual price ($19.99–29.99) for a similar photo-first promise. It is also 33% above the education median. Most education subscribers choose annual plans (59%, per RevenueCat), and an annual subscriber cannot churn for a year. A bigger annual discount (48% rather than 28%) therefore steers buyers toward the plan we want them on. The net revenue model shows the switch costs almost nothing per payer: $5.24 against $5.31 a month on the web. Treat $49.99 against $59.88 as the first price test.
 
@@ -77,22 +77,38 @@ The free limits the team chose (one photo lesson and one journal page a day) fit
 
 ### Cost of one lesson
 
-These calls happen for each own-photo lesson in the current backend (`backend/app/ai/`, `backend/.env.example`):
+These calls happen for each own-photo lesson in the backend (`backend/app/ai/`, `backend/.env.example`). Every call goes through one OpenRouter key, and each call is a separate setting. Token counts are the means measured in the model comparison, including image and reasoning tokens. The cap is the output limit billed in the worst case.
 
-| Step | Model today | Estimated tokens in / out (cap) | Cost, promo | Cost, list from 2027 |
+| Step | Chosen model (via OpenRouter) | Measured tokens in / out (cap) | Cost, chosen | Cost, first alternative |
 | --- | --- | --- | --- | --- |
-| Image moderation | `omni-moderation-latest` | — | free | free |
-| Scene analysis (vision) | `gemini-3.7-flash` | 3,920 in (1,120 image) / 900 out (cap 1,500) | $0.0070 | **$0.0139** |
-| Translation | `gemini-3.5-flash-lite` | 1,000 / 500 (1,500) | $0.0017 | $0.0017 |
-| Learning tasks | `gpt-4o-mini` | 3,000 / 2,000 (4,000) | $0.0018 | $0.0018 |
-| I-Spy clues | `gpt-4o-mini` | 1,500 / 600 (1,500) | $0.0006 | $0.0006 |
-| I-Spy guess feedback, about 3 guesses | `gpt-4o-mini` | 1,100 / 150 (1,500) each | $0.0008 | $0.0008 |
-| **Total, with a 10% retry allowance** | | | **$0.0120** | **$0.0189** |
-| Worst case: every output at its cap, every call retried | | | $0.0438 | $0.0610 |
+| Image moderation | `omni-moderation-latest` (optional) | n/a | free | free |
+| Scene analysis (vision) | `anthropic/claude-haiku-4.5` | 3,375 / 664 (1,500) | $0.0074 | $0.0110 (GPT-4o) |
+| Translation | `openai/gpt-4o-mini` | 648 / 216 (1,500) | $0.0003 | $0.0003 (Mistral Small) |
+| Learning tasks | `openai/gpt-5.4-mini` | 2,831 / 1,597 (4,000) | **$0.0102** | $0.0045 (GPT-4.1-mini) |
+| I-Spy clues | `google/gemini-3.1-flash-lite` | 938 / 124 (1,500) | $0.0005 | $0.0002 (GPT-4o-mini) |
+| I-Spy guess feedback, about 3 guesses | `openai/gpt-4.1-mini` | 1,025 / 70 (1,500) each | $0.0017 | $0.0018 (Gemini 3.5 Flash-Lite) |
+| **Total, with a 10% retry allowance** | | | **$0.0200** | **$0.0178** |
+| Worst case: every output at its cap, every call retried | | | $0.0971 | $0.1017 |
+
+Learning tasks are now the biggest share of a lesson (51%), followed by scene analysis (37%). The first alternatives cost slightly less in total, but only because GPT-4.1-mini is cheaper for tasks; its lessons are rarely accepted today (see below).
 
 ![AI cost of one own-photo lesson](media/export/chart-session-cost.png)
 
-Other per-use costs: planned journal feedback on `gpt-4o-mini` is about $0.0006 a page. Word audio uses the browser's built-in voice today, so it costs nothing. Pronunciation feedback, a Plus feature, costs about **$0.0033 a lesson** using `gpt-4o-mini-transcribe` ($0.003 a minute) plus a text comparison. Azure's scored pronunciation assessment would cost about **$0.027 a lesson**, eight times as much. Use it only if the cheaper approach does not give useful feedback.
+### Which model runs each call
+
+The team chose one model per call from a [comparison](https://github.com/CS3216-A3-G7/linguini/blob/main/MODEL_COMPARISON.md) that ran every candidate through the app's own prompts, schemas and validators: 14 labelled photos, 17 translation cases, 6 scenes and 22 learner descriptions. Temperature is 0 everywhere, because raising it hurt every call tested. Spreading calls across providers is deliberate: an outage at one provider downgrades one feature, not the app.
+
+| Call | Chosen (via OpenRouter) | Main alternatives | Why |
+| --- | --- | --- | --- |
+| Scene analysis | Claude Haiku 4.5 | GPT-4o, GPT-4.1-mini, Gemini 3.7 Flash | Highest quality (0.79), found every anchor object, and the only candidate the app accepted every time, at a third of GPT-4o's cost. The previous default, Gemini 3.7 Flash, failed every call. |
+| Scene translation | GPT-4o-mini | Mistral Small, Claude Haiku 4.5, Gemini 3.5 Flash-Lite | 0.95 quality and 100% accepted, at the same price as Mistral Small, which OpenRouter rate-limited on 12 of 51 calls. |
+| Learning tasks | GPT-5.4-mini | GPT-4.1-mini, Gemini 3.5 Flash-Lite, GPT-4o-mini | The only model that reliably satisfies the lesson schema (75% accepted against 0–12% for the rest) and the highest quality (0.92). The most expensive call. |
+| I-Spy clues | Gemini 3.1 Flash-Lite | GPT-4o-mini, Claude Haiku 4.5 | 0.98 quality and a perfect language score, never leaked the answer word, at a fifth of Claude's cost. |
+| I-Spy guess and feedback | GPT-4.1-mini | Gemini 3.5 Flash-Lite, GPT-4o-mini, Claude Haiku 4.5 | Best guess accuracy (0.97), and it reads directional traps correctly. |
+
+This model tracks three sets. **Chosen** is the table above. **First alternatives** is the first alternative for every call, what we would run if every chosen provider failed. **Cheapest alternatives** is the cheapest model the app still accepted for each call: GPT-4.1-mini for scene analysis and learning tasks, GPT-4o-mini for the rest. It is not a drop-in switch. Scene analysis scores 0.69 against 0.79, and GPT-4.1-mini's lessons are accepted only 12% of the time until the schema defect is fixed.
+
+Other per-use costs: planned journal feedback on GPT-4o-mini is about $0.0006 a page. Word audio uses the browser's built-in voice today, so it costs nothing. Pronunciation feedback, a Plus feature, costs about **$0.0033 a lesson** using `gpt-4o-mini-transcribe` ($0.003 a minute) plus a text comparison. Azure's scored pronunciation assessment would cost about **$0.027 a lesson**, eight times as much. Use it only if the cheaper approach does not give useful feedback.
 
 **Storage and bandwidth are small.** Supabase Pro includes 100 GB of storage (then $0.0213 per GB-month) and 250 GB of egress (then $0.09 per GB). One stored photo (about 3 MB with its derivatives) costs about $0.00006 a month.
 
@@ -102,16 +118,16 @@ Other per-use costs: planned journal feedback on `gpt-4o-mini` is about $0.0006 
 
 ### Cost per user per month
 
-| Profile (sessions a month) | Current models, promo | Current models, list | Optimised |
+| Profile (sessions a month) | Chosen models | First alternatives | Cheapest alternatives |
 | --- | --- | --- | --- |
-| Free, light (2 photo lessons) | $0.03 | $0.04 | $0.01 |
-| Free, casual (8) | $0.11 | $0.16 | $0.05 |
-| Free, at the daily cap (30) | $0.39 | $0.60 | $0.17 |
-| Plus, typical (30, with speaking) | $0.49 | $0.70 | $0.27 |
-| Plus, heavy (90) | $1.43 | $2.05 | $0.78 |
-| Plus at the 10-a-day ceiling (300) | $4.68 | $6.76 | $2.52 |
+| Free, light (2 photo lessons) | $0.04 | $0.04 | $0.02 |
+| Free, casual (8) | $0.17 | $0.16 | $0.07 |
+| Free, at the daily cap (30) | $0.64 | $0.58 | $0.27 |
+| Plus, typical (30, with speaking) | $0.74 | $0.68 | $0.37 |
+| Plus, heavy (90) | $2.17 | $1.98 | $1.06 |
+| Plus at the 10-a-day ceiling (300) | $7.13 | $6.47 | $3.47 |
 
-Net revenue per payer is about **$5.24 a month** on the web. A typical Plus user is profitable under every scenario. A Plus user who hits the 10-a-day cap every day costs more than they pay under current models. That is acceptable if rare, and the cap exists to bound it.
+Across the assumed mix, the average free user costs about $0.18 a month and the average Plus user $1.03 on the chosen models. Net revenue per payer is about **$5.24 a month** on the web. A typical Plus user is profitable under every set. A Plus user who hits the 10-a-day cap every day costs more than they pay under the chosen models. That is acceptable if rare, and the cap exists to bound it.
 
 ### How cost scales, and the break-even line
 
@@ -121,24 +137,26 @@ The risk is not the payers. It is **the free users each payer carries**. At 2.3%
 
 | Scenario (option B pricing) | Monthly users | Payers | Net revenue | AI cost (free + Plus) | Fixed | Monthly result |
 | --- | --- | --- | --- | --- | --- | --- |
-| Beta, current models | 300 | 7 | $36 | $56 | $52 | **−$71** |
-| Launch year at 2.3%, current models | 5,000 | 115 | $603 | $928 | $52 | **−$377** |
-| Launch year at 2.3%, optimised | 5,000 | 115 | $603 | $281 | $52 | **+$270** |
-| Traction at 4%, current models | 50,000 | 2,000 | $10,481 | $9,958 | $70 | +$453 |
-| Traction at 4%, optimised | 50,000 | 2,000 | $10,481 | $3,085 | $70 | **+$7,326** |
+| Beta, chosen models | 300 | 7 | $36 | $60 | $52 | **−$76** |
+| Beta, cheapest alternatives | 300 | 7 | $36 | $26 | $52 | −$41 |
+| Launch year at 2.3%, chosen models | 5,000 | 115 | $603 | $997 | $52 | **−$447** |
+| Launch year at 2.3%, cheapest alternatives | 5,000 | 115 | $603 | $426 | $52 | **+$125** |
+| Traction at 4%, chosen models | 50,000 | 2,000 | $10,481 | $10,695 | $70 | −$284 |
+| Traction at 4%, first alternatives | 50,000 | 2,000 | $10,481 | $9,641 | $70 | +$770 |
+| Traction at 4%, cheapest alternatives | 50,000 | 2,000 | $10,481 | $4,623 | $70 | **+$5,788** |
 
-The beta loses about $70 a month. That is affordable as a research cost and tells us the real token numbers. **Before a broad free launch, the team should do three things:**
+The beta loses about $76 a month. That is affordable as a research cost and tells us the real usage. Even at 4% conversion, nearly twice the median, the chosen models lose money, because they break even at 4.1%. **Before a broad free launch, the team should do three things:**
 
-1. **Optimise the pipeline, protecting quality with a test set.** Collect 50 consenting or team-owned photos in Spanish and French, with human-labelled objects. Run them through the current pipeline and a cheaper one: scene analysis on a Flash-Lite model at medium image resolution (560 tokens instead of 1,120), low thinking, translations reused from the `vocabulary_translations` table, and nano-class models for tasks and I-Spy. Switch only if object precision and learner-rated task quality stay within an agreed margin.
-2. **Enforce limits and track cost on the server.** Limit own-photo analysis per user per local day in the API (one for Free, ten for Plus), not only in the UI. Extend Langfuse tracing, which today covers only I-Spy guesses, to every AI feature with token counts. Alert when the average cost per lesson over 7 days exceeds $0.03.
-3. **Plan for 1 January 2027.** Gemini 3.7 Flash's input and output prices double then. Either migrate before that date or re-run this model with the new rates.
+1. **Fix the learning-task schema defect so GPT-4.1-mini can pass.** Lessons are rejected when a model returns one question for a task that asks for two to four, because providers do not enforce the schema's minimum in strict mode. Either accept one question for that task type or state the count per task in the prompt. GPT-5.4-mini is the only model that passes today, and learning tasks are half the cost of a lesson. GPT-4.1-mini costs about half as much for that call.
+2. **Test the cheaper alternatives against the same evaluation.** The cheapest set breaks even at 1.6% paid, below the median, but scene analysis on GPT-4.1-mini scores 0.69 against 0.79 and its lessons are accepted 12% of the time. Re-run the comparison's photos, scenes and learner descriptions after the schema fix, and switch a call only if quality and acceptance stay within an agreed margin.
+3. **Enforce limits and track cost on the server.** Limit own-photo analysis per user per local day in the API (one for Free, ten for Plus), not only in the UI. Extend Langfuse tracing, which today covers only I-Spy guesses, to every AI feature with token counts. Alert when the average cost per lesson over 7 days exceeds $0.03.
 
 ## Revenue streams
 
 | Stream | When | Notes |
 | --- | --- | --- |
 | **Plus subscriptions**, monthly and annual | At launch, once checkout works end to end | Core revenue. Sell on the web first: no store fees, and the app is a web app. |
-| **Founding Plus** | From public launch; closes at 300 members or 31 Dec 2026, whichever comes first | Early revenue, committed testers and a demand signal. Nets $2.74 a month per member against about $0.97 in AI cost under current models. |
+| **Founding Plus** | From public launch; closes at 300 members or 31 Dec 2026, whichever comes first | Early revenue, committed testers and a demand signal. Nets $2.74 a month per member against about $1.03 in AI cost under the chosen models. |
 | Family plan (for example $79.99 a year for up to 4) | After retention is proven | Duolingo's family plan is $119.99 for 6. Every member uses AI, so price per seat rather than copying Duolingo's generosity. |
 | Classroom licences | Year 2 | Teachers set a daily scene and students journal about it. Longer sales cycle, but the fit with teaching is natural. |
 | Printed journal photo book (one-off) | Once the PDF export ships | Fits the "keep the day" idea. Needs a print-on-demand vendor quote before we set a price. |
@@ -192,7 +210,7 @@ Every promotional asset is labelled as a proposed offer. Remove that label only 
 
 | Assumption | Current value | How to measure |
 | --- | --- | --- |
-| Tokens per call | Estimated from prompt, schema and payload sizes (about 4 characters per token) and output caps | Langfuse usage on every AI feature during the beta |
+| Tokens per call | Means measured in the model comparison on the app's own prompts and test cases, with output caps for the worst case | Langfuse usage on every AI feature during the beta, with real learner photos |
 | Mix of free users | 50% light, 35% casual, 15% at the daily cap | Product analytics: own-photo lessons per monthly user |
 | Mix of Plus users | 80% typical, 20% heavy | Same, for paying users |
 | Paid conversion | 2.3% (RevenueCat education median) | Beta and launch cohorts |
@@ -203,8 +221,8 @@ Every promotional asset is labelled as a proposed offer. Remove that label only 
 
 Checked 23–24 September 2026.
 
-- Gemini API prices and the Gemini 3.7 Flash promotion ending 31 Dec 2026: [ai.google.dev/gemini-api/docs/pricing](https://ai.google.dev/gemini-api/docs/pricing); image token counts: [media resolution](https://ai.google.dev/gemini-api/docs/media-resolution)
-- OpenAI model, transcription, TTS and moderation prices: [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)
+- AI model prices: the [OpenRouter model catalogue](https://openrouter.ai/models) (provider list price), as snapshotted in the team's [model comparison](https://github.com/CS3216-A3-G7/linguini/blob/main/MODEL_COMPARISON.md), which is also the source of the measured tokens, quality and acceptance rates
+- OpenAI transcription, TTS and moderation prices: [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)
 - Azure pronunciation assessment: [Azure Speech pricing](https://azure.microsoft.com/en-us/pricing/details/speech/) and a [Microsoft Q&A answer on pricing](https://learn.microsoft.com/en-us/answers/questions/5608069/pricing-and-usage-of-pronunciation-assessment-feat)
 - Supabase: [pricing](https://supabase.com/pricing), [storage overage](https://supabase.com/docs/guides/platform/manage-your-usage/storage-size). Vercel: [pricing](https://vercel.com/pricing). Render: [free tier limits](https://render.com/docs/free) and [Starter at $7](https://www.srvrlss.io/provider/render/)
 - Stripe: [pricing](https://stripe.com/pricing), as served to the team's region. App store commissions: [RevenueCat on the 15% fee](https://www.revenuecat.com/blog/engineering/small-business-program)
