@@ -149,25 +149,25 @@
       },
       "Launch year": {
         "mau": 5000,
-        "conversion": 0.023,
-        "payers": 115,
-        "net_revenue": 602.65,
-        "free_ai_cost": 879.15,
-        "plus_ai_cost": 118.22,
+        "conversion": 0.045,
+        "payers": 225,
+        "net_revenue": 1179.09,
+        "free_ai_cost": 859.35,
+        "plus_ai_cost": 231.3,
         "fixed": 52,
-        "total_cost": 1049.37,
-        "contribution": -446.72
+        "total_cost": 1142.65,
+        "contribution": 36.44
       },
       "Traction": {
         "mau": 50000,
-        "conversion": 0.04,
-        "payers": 2000,
-        "net_revenue": 10480.81,
-        "free_ai_cost": 8638.49,
-        "plus_ai_cost": 2056.02,
+        "conversion": 0.045,
+        "payers": 2250,
+        "net_revenue": 11790.91,
+        "free_ai_cost": 8593.5,
+        "plus_ai_cost": 2313.02,
         "fixed": 70,
-        "total_cost": 10764.51,
-        "contribution": -283.7
+        "total_cost": 10976.52,
+        "contribution": 814.39
       }
     },
     "fallback": {
@@ -184,25 +184,25 @@
       },
       "Launch year": {
         "mau": 5000,
-        "conversion": 0.023,
-        "payers": 115,
-        "net_revenue": 602.65,
-        "free_ai_cost": 790.65,
-        "plus_ai_cost": 107.63,
+        "conversion": 0.045,
+        "payers": 225,
+        "net_revenue": 1179.09,
+        "free_ai_cost": 772.84,
+        "plus_ai_cost": 210.57,
         "fixed": 52,
-        "total_cost": 950.27,
-        "contribution": -347.63
+        "total_cost": 1035.42,
+        "contribution": 143.68
       },
       "Traction": {
         "mau": 50000,
-        "conversion": 0.04,
-        "payers": 2000,
-        "net_revenue": 10480.81,
-        "free_ai_cost": 7768.91,
-        "plus_ai_cost": 1871.74,
+        "conversion": 0.045,
+        "payers": 2250,
+        "net_revenue": 11790.91,
+        "free_ai_cost": 7728.45,
+        "plus_ai_cost": 2105.71,
         "fixed": 70,
-        "total_cost": 9710.65,
-        "contribution": 770.16
+        "total_cost": 9904.16,
+        "contribution": 1886.76
       }
     },
     "budget": {
@@ -219,25 +219,25 @@
       },
       "Launch year": {
         "mau": 5000,
-        "conversion": 0.023,
-        "payers": 115,
-        "net_revenue": 602.65,
-        "free_ai_cost": 367.42,
-        "plus_ai_cost": 58.23,
+        "conversion": 0.045,
+        "payers": 225,
+        "net_revenue": 1179.09,
+        "free_ai_cost": 359.14,
+        "plus_ai_cost": 113.93,
         "fixed": 52,
-        "total_cost": 477.65,
-        "contribution": 125.0
+        "total_cost": 525.08,
+        "contribution": 654.01
       },
       "Traction": {
         "mau": 50000,
-        "conversion": 0.04,
-        "payers": 2000,
-        "net_revenue": 10480.81,
-        "free_ai_cost": 3610.25,
-        "plus_ai_cost": 1012.75,
+        "conversion": 0.045,
+        "payers": 2250,
+        "net_revenue": 11790.91,
+        "free_ai_cost": 3591.45,
+        "plus_ai_cost": 1139.34,
         "fixed": 70,
-        "total_cost": 4693.0,
-        "contribution": 5787.81
+        "total_cost": 4800.79,
+        "contribution": 6990.12
       }
     }
   },

@@ -77,7 +77,7 @@ const stages = {
   rows: [
     ["Now, in beta", "Does it stick?", "New learners who take a second photo lesson within a week", "None. The beta costs us about $75 a month, which we treat as research."],
     ["Launch year", "Will people pay?", "300 Founding Plus members", "Plus and Founding Plus"],
-    ["After that", "Does it scale?", "4% of monthly learners paying", "Plus, then family plans, classrooms and printed journals"],
+    ["After that", "Does it scale?", "4.5% of monthly learners paying", "Plus, then family plans, classrooms and printed journals"],
   ],
 };
 
@@ -180,8 +180,10 @@ export function BusinessModel() {
       <h2 id="scale">Does the free tier pay for itself?</h2>
       <p>
         Every payer also carries the free learners: about 42 of them when 2.3% pay. On the models we chose, that only
-        pays off once about 4% of learners pay. The cheapest alternatives would break even at under 2%, but they make
-        worse lessons today, so we launch on the chosen models and work on bringing the cost down.<span className="no-print"> Drag the sliders to try other numbers.</span>
+        pays off once about 4% of learners pay, so our target is <strong>4.5%</strong>: enough to cover AI and hosting from 5,000
+        learners a month. That is nearly twice the category median, so we are not counting on it alone. The cheapest
+        alternatives would break even at under 2%, but they make worse lessons today, so we launch on the chosen models
+        and work on bringing the cost down.<span className="no-print"> Drag the sliders to try other numbers.</span>
       </p>
       <BreakEven />
       <p>

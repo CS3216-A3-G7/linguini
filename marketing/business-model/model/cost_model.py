@@ -229,11 +229,13 @@ def monthly_net_arpu(monthly: float | None, annual: float, channel=net_web) -> f
 
 # --- Scale scenarios ----------------------------------------------------------------
 # Conversion: RevenueCat education download-to-paid median 2.3%; Duolingo's paid
-# penetration of MAU (12.7M / 140.6M ≈ 9%) is a mature-product ceiling.
+# penetration of MAU (12.7M / 140.6M ≈ 9%) is a mature-product ceiling. From launch
+# we plan on TARGET_CONVERSION, the paid share that covers AI and hosting at 5,000+ MAU.
+TARGET_CONVERSION = 0.045
 SCENARIOS = [
     ("Beta", 300, 0.023, "launch"),
-    ("Launch year", 5_000, 0.023, "launch"),
-    ("Traction", 50_000, 0.04, "growth"),
+    ("Launch year", 5_000, TARGET_CONVERSION, "launch"),
+    ("Traction", 50_000, TARGET_CONVERSION, "growth"),
 ]
 
 
