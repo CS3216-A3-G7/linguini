@@ -180,8 +180,7 @@ export function BusinessModel() {
       <h2 id="scale">Does the free tier pay for itself?</h2>
       <p>
         Every payer also carries the free learners: about 42 of them when 2.3% pay. On the models we chose, that only
-        pays off once about 4% of learners pay, so our target is <strong>4.5%</strong>: enough to cover AI and hosting from 5,000
-        learners a month. That is nearly twice the category median, so we are not counting on it alone. The cheapest
+        pays off once about 4% of learners pay, so our target is 4.5%, enough to cover AI and hosting from 5,000 learners a month. The cheapest
         alternatives would break even at under 2%, but they make worse lessons today, so we launch on the chosen models
         and work on bringing the cost down.<span className="no-print"> Drag the sliders to try other numbers.</span>
       </p>

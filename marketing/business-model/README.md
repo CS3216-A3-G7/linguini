@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | Beta, now to the Product Hunt launch | D7 second-lesson retention and substantive feedback reports (targets are in [`marketing/product-hunt/plan.md`](../product-hunt/plan.md#launch-goals-and-definitions)) | A new learner product fails on retention before it fails on price. |
 | Launch year | **Weekly active learners with two or more completed lessons**, plus founding-member count (target: 300) | This measures the habit that Plus monetises. Founding sales show willingness to pay before the pricing is tuned. |
-| Traction | Paid share of monthly users against the **4.5% target**, net revenue after AI cost, gross margin | 4.5% is the paid share that covers AI and hosting from 5,000 monthly users (see [the break-even line](#how-cost-scales-and-the-break-even-line)). For comparison, Duolingo's gross margin is 72.6%, including its AI features. |
+| Traction | Paid share of monthly users (**target: 4.5%**), net revenue after AI cost, gross margin | By this stage, conversion has to beat the break-even line shown below. For comparison, Duolingo's gross margin is 72.6%, including its AI features. |
 
 ## Tiers
 
@@ -145,7 +145,7 @@ The risk is not the payers. It is **the free users each payer carries**. At 2.3%
 | Traction at the 4.5% target, first alternatives | 50,000 | 2,250 | $11,791 | $9,834 | $70 | +$1,887 |
 | Traction at the 4.5% target, cheapest alternatives | 50,000 | 2,250 | $11,791 | $4,731 | $70 | **+$6,990** |
 
-The beta loses about $76 a month. That is affordable as a research cost and tells us the real usage. **From launch, our target is 4.5% of monthly users paying.** On the chosen models, that is the paid share that covers AI and hosting from 5,000 monthly users (break-even including hosting is 4.4% at 5,000 and 4.2% at 50,000). It is ambitious: nearly twice the 2.3% education median, though half of Duolingo's 9%. At the median, the launch year would lose about $447 a month. So that falling short of the target doesn't mean losing money, **the team should do three things before a broad free launch:**
+The beta loses about $76 a month. That is affordable as a research cost and tells us the real usage. The chosen models break even at 4.1%, so **our target is 4.5% of monthly users paying**, which covers AI and hosting from 5,000 monthly users. That is nearly twice the 2.3% median; at the median the launch year would lose about $447 a month. **Before a broad free launch, the team should do three things:**
 
 1. **Fix the learning-task schema defect so GPT-4.1-mini can pass.** Lessons are rejected when a model returns one question for a task that asks for two to four, because providers do not enforce the schema's minimum in strict mode. Either accept one question for that task type or state the count per task in the prompt. GPT-5.4-mini is the only model that passes today, and learning tasks are half the cost of a lesson. GPT-4.1-mini costs about half as much for that call.
 2. **Test the cheaper alternatives against the same evaluation.** The cheapest set breaks even at 1.6% paid, below the median, but scene analysis on GPT-4.1-mini scores 0.69 against 0.79 and its lessons are accepted 12% of the time. Re-run the comparison's photos, scenes and learner descriptions after the schema fix, and switch a call only if quality and acceptance stay within an agreed margin.
