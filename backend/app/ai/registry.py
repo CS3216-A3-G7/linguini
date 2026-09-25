@@ -14,6 +14,7 @@ from app.ai.features.object_grounding import GroundingDinoObjectGrounder, Object
 from app.ai.features.scene_analysis import UploadedSceneAnalyzer
 from app.ai.features.translation import SceneTranslationService
 from app.ai.observability import AITracer
+from app.ai.openrouter import OPENROUTER_BASE_URL
 from app.ai.settings import (
     AiFeature,
     AiProvider,
@@ -37,7 +38,26 @@ def build_text_client(
         return OpenAITextClient(settings.openai_api_key, config)
     if provider is AiProvider.GEMINI:
         return GeminiTextClient(settings.gemini_api_key, config)
+    if provider is AiProvider.OPENROUTER:
+        # OpenRouter speaks the OpenAI Responses API; only the host differs.
+        return OpenAITextClient(
+            settings.openrouter_api_key, config, base_url=OPENROUTER_BASE_URL
+        )
     raise ValueError(f"unsupported text provider {provider!r}")
+
+
+def build_vision_client(
+    provider: AiProvider, settings: AiSettings, config: VisionModelConfig
+) -> VisionModelClient:
+    if provider is AiProvider.OPENAI:
+        return OpenAIVisionClient(settings.openai_api_key, config)
+    if provider is AiProvider.GEMINI:
+        return GeminiVisionClient(settings.gemini_api_key, config)
+    if provider is AiProvider.OPENROUTER:
+        return OpenAIVisionClient(
+            settings.openrouter_api_key, config, base_url=OPENROUTER_BASE_URL
+        )
+    raise ValueError(f"unsupported vision provider {provider!r}")
 
 
 def build_uploaded_scene_analyzer(
@@ -53,7 +73,9 @@ def build_uploaded_scene_analyzer(
     caller routes only non-preloaded media through the returned analyzer.
     """
     scene_config = settings.feature(AiFeature.SCENE_ANALYSIS)
-    if scene_config.provider in (AiProvider.OPENAI, AiProvider.GEMINI):
+    if scene_config.provider in (
+        AiProvider.OPENAI, AiProvider.GEMINI, AiProvider.OPENROUTER
+    ):
         if not settings.is_configured(scene_config):
             return None
         vision_config = VisionModelConfig(
@@ -62,14 +84,9 @@ def build_uploaded_scene_analyzer(
             max_output_tokens=scene_config.max_output_tokens or 1500,
             max_retries=min(scene_config.max_retries, 1),
         )
-        client: VisionModelClient = (
-            OpenAIVisionClient(settings.openai_api_key, vision_config)
-            if scene_config.provider is AiProvider.OPENAI
-            else GeminiVisionClient(settings.gemini_api_key, vision_config)
-        )
         return UploadedSceneAnalyzer(
             storage,
-            client,
+            build_vision_client(scene_config.provider, settings, vision_config),
             vision_config,
             tracer=tracer,
             provider=scene_config.provider.value,
