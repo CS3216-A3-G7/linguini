@@ -1,55 +1,72 @@
 # Linguini
 
 Linguini is a photo-led, speak-first language-learning app. A learner starts
-with a ready-made scene or a photo, learns useful words from what they can see,
-and then uses those words in guided practice.
+from a ready-made scene or a personal photo, confirms the useful objects in
+that scene, learns their vocabulary, practises both directions of I-Spy, and
+records the result in a journal.
+
+The live application is available at
+[linguini-navy.vercel.app](https://linguini-navy.vercel.app/).
 
 ## The learner loop
 
-1. **Choose or upload a scene.** Select a curated scene or provide an image.
-2. **Learn its vocabulary.** Linguini identifies useful objects and introduces
-   their vocabulary in the selected language.
-3. **Play two-direction I-Spy.** The learner first identifies Linguini's clue,
-   then describes an object back to Linguini.
-4. **Write a journal entry.** The learner uses the new words in a once-daily
-   journal entry.
+1. **Choose or upload a photo.**
+2. **Review detected objects.** The analysis screen allows objects, attributes,
+   relations, marker positions, and the scene title to be confirmed or edited.
+3. **Learn vocabulary.** The backend persists translated scene vocabulary and
+   generates learning tasks.
+4. **Play two-direction I-Spy.** The learner solves generated clues, then
+   describes an object for evaluation.
+5. **Write a journal entry.** Journal entries can reference learned words and
+   completed-session photos.
 
-The current frontend exposes the learning flow through routes such as
-`/practice`, `/practice/sessions/:sessionId/learn`, the two I-Spy phases, and
-`/journal`.
+## Applications
 
-## Technology stack
+| Directory | Implementation | Role |
+| --- | --- | --- |
+| `frontend/` | React 19, Vite, TypeScript | Authenticated learner SPA and session workflow. |
+| `backend/` | FastAPI, Pydantic, SQLAlchemy/psycopg | `/api/v1` API, workflow services, AI seams, and PostgreSQL access. |
+| `landing/` | Next.js 16 App Router | Independent marketing and interactive-demo site. |
+| `marketing/` | Launch kit and media assets | Product Hunt, video, media-kit, and business-model source files; not deployed. |
 
-- **Frontend:** React 19, Vite 8, and TypeScript.
-- **Backend:** FastAPI, Pydantic, SQLAlchemy, and psycopg.
-- **Database:** PostgreSQL, normally hosted by Supabase.
-- **Migrations:** Prisma owns the schema and migrations; the Python runtime
-  uses SQLAlchemy for application queries.
+## What works today
 
-The frontend talks to the backend's `/api/v1` HTTP API. It does not connect to
-PostgreSQL directly.
+- Supabase bearer-token authentication is implemented. `AUTH_MODE=supabase`
+  verifies access tokens against the project JWKS; `AUTH_MODE=demo` provides the
+  explicit local/test identity path.
+- Curated scenes and uploaded-photo sessions share the persisted session
+  workflow. Uploaded scenes can use scene analysis, translation, lesson
+  generation, I-Spy clue generation, optional object grounding, and optional
+  image moderation.
+- Progress is calculated from the idempotent `xp_events` ledger and persisted
+  vocabulary encounters. Private media is served through backend-signed URLs.
+- The frontend includes account, practice, progress, vocabulary, journal, and
+  profile routes. Browser speech is available only as playback through
+  `speechSynthesis`.
 
-## Current status
+## Known gaps
 
-This is an honest description of the current implementation, not a roadmap:
-
-- There is no authentication. The backend currently uses a configured demo
-  user ID and that identity is not authentication.
-- AI generation, speech evaluation, and real image analysis are not
-  implemented. Uploaded-image analysis uses placeholder workflow data.
-- Some business routes intentionally return `501 Not Implemented`.
-- PostgreSQL persistence covers the implemented user, profile, scene, practice,
-  vocabulary, progress, journal, and observability paths.
-- Supabase Storage is used for media bytes when storage-backed features are
-  configured; database migrations and most local tests do not require Supabase
-  credentials.
+- `GET /api/v1/home`, `POST /api/v1/tasks/{task_id}/hints`,
+  `POST /api/v1/journals/{journal_id}/suggestions`,
+  `GET /api/v1/me/vocabulary/daily`, and
+  `GET /api/v1/me/vocabulary/{vocabulary_item_id}` still call the explicit
+  `service_not_implemented` helper and return HTTP 501.
+- `frontend/src/lib/speech.ts` defines `speak(text, lang)` only. It plays a
+  browser voice when available; it does not record audio or grade speech.
+- AI features are real code paths, but they are configurable. `AI_MODE=demo`
+  or an unconfigured feature selects the deterministic workflow fallback;
+  `AI_MODE=real` requires complete provider/model/key configuration.
+- Storage-backed upload and signed-image paths still require Supabase Storage
+  configuration even though PostgreSQL migrations and most unit tests can run
+  locally.
 
 ## Where to go next
 
-- [Architecture](architecture.md) — repository boundaries, API modules, and
-  frontend routes.
-- [Local development](local-development.md) — install, configure, migrate, and
-  run the apps, including a throwaway local PostgreSQL setup.
-- [Testing](testing.md) — local checks, database-test isolation, and CI jobs.
-- [Database](database.md) — Prisma models, migration conventions, and a partial
-  relationship diagram.
+- [Architecture](architecture.md) — request flow and session lifecycle.
+- [API reference](api.md) — routers, response models, errors, and uploads.
+- [AI](ai.md) — providers, feature configuration, validation, and tracing.
+- [Frontend](frontend.md) — route tree, auth, state, and shared UI.
+- [Local development](local-development.md) — all applications and env vars.
+- [Testing](testing.md) — local commands, database isolation, and CI.
+- [Database](database.md) — current models, constraints, and progress storage.
+- [ERD](erd.md) — current PostgreSQL relationships and composite keys.

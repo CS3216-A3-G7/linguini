@@ -1,8 +1,6 @@
 # Testing
 
-Run checks from each application directory.
-
-## Frontend checks
+## Frontend
 
 ```sh
 cd frontend
@@ -12,12 +10,19 @@ npm run build
 npm run test
 ```
 
-The frontend test script uses Node's test runner with TypeScript stripping.
-`npm run build` also performs the TypeScript project build.
+The test script uses Node's test runner with TypeScript stripping. The build
+also runs the TypeScript project build.
 
-## Backend checks
+## Landing
 
-Install the development extra in a Python 3.12+ environment, then run:
+```sh
+cd landing
+npm ci
+npm run lint
+npm run build
+```
+
+## Backend
 
 ```sh
 cd backend
@@ -26,32 +31,46 @@ ruff check .
 pytest -q
 ```
 
-Without `TEST_DATABASE_URL`, approximately 97 PostgreSQL integration tests
-skip. For the full suite, point both `TEST_DATABASE_URL` and `DATABASE_URL` at
-a disposable database with all Prisma migrations applied:
+PostgreSQL integration tests use `TEST_DATABASE_URL` and skip when it is
+unset. The integration files include `test_postgres_users.py`,
+`test_postgres_language_profiles.py`, `test_postgres_scenes.py`,
+`test_postgres_sessions.py`, `test_postgres_tasks.py`,
+`test_postgres_vocabulary.py`, and `test_postgres_journals.py`, plus
+database-backed API/read paths. Use a disposable migrated database, never a
+live Supabase project:
 
 ```sh
-TEST_DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/linguini_test?sslmode=disable' \
-DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/linguini_test?sslmode=disable' \
-pytest -q
+TEST_DATABASE_URL="$DATABASE_URL" DATABASE_URL="$DATABASE_URL" pytest -q
 ```
 
-Never point `TEST_DATABASE_URL` at a live Supabase project. The integration
-tests write and delete data and require an isolated disposable database.
+AI and schema tests use fake clients, demo settings, and deterministic seams.
+Evaluation tests are `test_scene_analysis_evals.py` and
+`test_scene_translation_evals.py`; they exercise labelled cases and production
+validators without requiring a live provider.
 
-## CI checks
+## Documentation
 
-`.github/workflows/ci.yml` runs four jobs:
+```sh
+NO_MKDOCS_2_WARNING=true \
+  /home/ubuntu/.venvs/mkdocs/bin/mkdocs build --strict
+```
 
-- **frontend** installs Node 24 dependencies, then runs lint, build, and tests.
-- **database** starts PostgreSQL 16, validates the Prisma schema, deploys all
-  migrations, and checks migration status.
-- **backend** starts a separate PostgreSQL 16 service, deploys migrations,
-  installs the Python development package, and runs Ruff plus the full
-  database-backed test suite.
-- **docs** installs the pinned MkDocs dependencies and runs
-  `mkdocs build --strict`.
+## CI
 
-The database and backend jobs each start their own PostgreSQL service
-container, so their databases cannot interfere with one another. The frontend
-and docs jobs need no database.
+`.github/workflows/ci.yml` has six jobs:
+
+| Job | Checks |
+| --- | --- |
+| `attribution` | Rejects agent/AI attribution in PR commits and descriptions. |
+| `frontend` | Node 24 install, lint, build, and test. |
+| `landing` | Node 24 install, lint, and Next.js build. |
+| `database` | PostgreSQL 16, Prisma validate/deploy/status. |
+| `backend` | PostgreSQL 16, migrations, Ruff, and pytest. |
+| `docs` | Pinned MkDocs install and strict build. |
+
+`database` and `backend` each provision an isolated PostgreSQL service
+container. `docs.yml` separately deploys a Pages artifact on pushes to `main`.
+
+Commits and PR descriptions must not contain `Co-Authored-By`, “Generated
+with”, or other AI/agent attribution. Preserve the configured human Git
+identity.
