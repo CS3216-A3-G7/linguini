@@ -27,13 +27,19 @@ class OpenAIISpyGuessGenerator:
         client: Any | None = None,
         prompt_path: Path = DEFAULT_PROMPT_PATH,
         timeout_seconds: int = 60,
+        base_url: str | None = None,
     ) -> None:
         if not api_key.strip() or not model.strip():
             raise ValueError("OpenAI I-Spy guessing requires an API key and model.")
         self.model = model.strip()
         self.prompt = prompt_path.read_text(encoding="utf-8").strip()
+        # A different base URL points the same Responses call at an
+        # OpenAI-compatible host such as OpenRouter.
         self.client = client or OpenAI(
-            api_key=api_key.strip(), timeout=timeout_seconds, max_retries=2
+            api_key=api_key.strip(),
+            timeout=timeout_seconds,
+            max_retries=2,
+            **({"base_url": base_url} if base_url else {}),
         )
 
     def guess(self, context: dict[str, Any], learner_text: str) -> ISpyGuessResult:
