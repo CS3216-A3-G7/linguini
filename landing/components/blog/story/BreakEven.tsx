@@ -29,7 +29,7 @@ function signed(value: number) {
 /** Monthly result as the share of paying learners grows, for the chosen models and the cheapest alternatives. */
 export function BreakEven() {
   const [userIndex, setUserIndex] = useState(3);
-  const [conversion, setConversion] = useState(0.023);
+  const [conversion, setConversion] = useState(0.045);
   const [hover, setHover] = useState<number | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const inView = useInView(chartRef);
