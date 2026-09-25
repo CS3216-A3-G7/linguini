@@ -7,7 +7,7 @@
 
 <p align="center"><strong>Learn the language of your day</strong></p>
 
-[https://linguini-navy.vercel.app/](LIVE URL)
+**Live application:** [Open Linguini](https://linguini-navy.vercel.app/)
 
 ## Group members
 
